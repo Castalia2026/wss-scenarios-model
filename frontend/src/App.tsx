@@ -188,7 +188,7 @@ export default function App() {
           <InterventionPanel inputs={inputs} onChange={handleSetInputs} />
         )}
         {activeTab === 3 && (
-          <ResultsDashboard geoScope={geoScope} scenarios={scenarios} />
+          <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
         )}
       </div>
 

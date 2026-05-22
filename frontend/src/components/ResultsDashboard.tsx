@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import {
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line
+  Legend, ResponsiveContainer, ComposedChart, Line, Cell
 } from 'recharts';
 
 // Static example data for Nepal-like scenario
@@ -72,19 +72,109 @@ function MockChart({ data, title }: { data: any[]; title: string }) {
   );
 }
 
+// --- BAU Forecast static data ---
+const bauYears = [2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
+const bauForecastData = bauYears.map((y, i) => {
+  const t = i / 15;
+  return {
+    year: y,
+    'Safely Managed': +(0.49 + (0.81 - 0.49) * t).toFixed(3),
+    'Basic': +(0.35 + (0.42 - 0.35) * Math.sin(t * Math.PI * 0.6)).toFixed(3),
+    'Limited': +(0.03 - 0.02 * t).toFixed(3),
+    'Unimproved': 0.005,
+    'No Service': 0.002,
+  };
+});
+
+// --- Intervention Impact waterfall data ---
+const interventionImpactData = [
+  { name: 'Service Gap',          value: 0.69,  fill: '#ef4444' },
+  { name: 'Collection Efficiency', value: 0.05,  fill: '#10b981' },
+  { name: 'NRW Reduction',        value: 0.29,  fill: '#10b981' },
+  { name: 'Capital Efficiency',   value: 0.19,  fill: '#10b981' },
+  { name: 'Tariff Reform',        value: 0.09,  fill: '#10b981' },
+  { name: 'Borrowing',            value: 0.06,  fill: '#10b981' },
+  { name: 'Budget Execution',     value: 0.03,  fill: '#10b981' },
+  { name: 'Remaining Gap',        value: -0.02, fill: '#f59e0b' },
+];
+
+const BAU_LINE_COLORS: Record<string, string> = {
+  'Safely Managed': '#2563eb',
+  'Basic': '#10b981',
+  'Limited': '#f59e0b',
+  'Unimproved': '#ef4444',
+  'No Service': '#64748b',
+};
+
 interface Props {
   geoScope: 'urban' | 'rural' | 'combined';
   scenarios: { name: string; inputs: any }[];
+  inputs: any;
 }
 
-export default function ResultsDashboard({ geoScope, scenarios }: Props) {
+export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props) {
   const [activeSector, setActiveSector] = useState<'water' | 'sanitation'>('water');
+  const [exporting, setExporting] = useState<string | null>(null);
+
+  const handleExport = (type: 'pptx' | 'xlsx' | 'csv') => {
+    setExporting(type);
+    fetch(`/api/export/${type}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inputs || {}),
+    })
+      .then(r => r.blob())
+      .then(b => {
+        const u = URL.createObjectURL(b);
+        const a = document.createElement('a');
+        a.href = u;
+        a.download = `wss_export.${type}`;
+        a.click();
+        URL.revokeObjectURL(u);
+      })
+      .catch(() => {})
+      .finally(() => setExporting(null));
+  };
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
       {/* Prototype banner */}
       <div style={{ background: '#fef3c7', padding: '8px 14px', borderRadius: 6, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
-        📊 <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
+        <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
+      </div>
+
+      {/* Export buttons */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+        <button
+          onClick={() => handleExport('pptx')}
+          disabled={exporting !== null}
+          style={{
+            padding: '7px 16px', border: '1px solid #2563eb', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
+            background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 12,
+            opacity: exporting ? 0.7 : 1,
+          }}>
+          {exporting === 'pptx' ? 'Exporting...' : 'Export PowerPoint'}
+        </button>
+        <button
+          onClick={() => handleExport('xlsx')}
+          disabled={exporting !== null}
+          style={{
+            padding: '7px 16px', border: '1px solid #16a34a', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
+            background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: 12,
+            opacity: exporting ? 0.7 : 1,
+          }}>
+          {exporting === 'xlsx' ? 'Exporting...' : 'Export Excel'}
+        </button>
+        <button
+          onClick={() => handleExport('csv')}
+          disabled={exporting !== null}
+          style={{
+            padding: '7px 16px', border: '1px solid #64748b', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
+            background: '#64748b', color: '#fff', fontWeight: 600, fontSize: 12,
+            opacity: exporting ? 0.7 : 1,
+          }}>
+          {exporting === 'csv' ? 'Exporting...' : 'Export CSV'}
+        </button>
       </div>
 
       {/* Sector tabs */}
@@ -169,6 +259,46 @@ export default function ResultsDashboard({ geoScope, scenarios }: Props) {
             ))}
           </tbody>
         </table>
+      </div>
+
+      {/* BAU Forecast chart */}
+      <div style={{ marginBottom: 28 }}>
+        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
+          BAU Forecast — HHs per Service Level (2025–2040)
+        </h3>
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={bauForecastData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+            <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
+            <Legend wrapperStyle={{ fontSize: 10 }} />
+            {Object.keys(BAU_LINE_COLORS).map(key => (
+              <Line key={key} type="monotone" dataKey={key} stroke={BAU_LINE_COLORS[key]} strokeWidth={2} dot={false} />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Intervention Impact chart */}
+      <div style={{ marginBottom: 28 }}>
+        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
+          Intervention Impact — Contribution to Closing the Service Gap
+        </h3>
+        <ResponsiveContainer width="100%" height={300}>
+          <BarChart data={interventionImpactData} layout="vertical" margin={{ left: 20, right: 40, top: 8, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+            <XAxis type="number" tick={{ fontSize: 10 }} domain={[-0.1, 0.8]}
+              tickFormatter={(v: number) => v.toFixed(2)} label={{ value: 'HH millions', position: 'insideBottom', offset: -2, style: { fontSize: 10 } }} />
+            <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
+            <Tooltip formatter={(value: number) => value.toFixed(2)} contentStyle={{ fontSize: 11 }} />
+            <Bar dataKey="value" radius={[0, 3, 3, 0]}>
+              {interventionImpactData.map((entry, index) => (
+                <Cell key={index} fill={entry.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
 
       {/* Saved scenarios */}
