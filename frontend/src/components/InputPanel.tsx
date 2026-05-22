@@ -81,9 +81,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-interface Props { inputs: any; onChange: (i: any) => void; onCalculate: () => void; loading: boolean; showSection?: string; }
+interface Props { inputs: any; onChange: (i: any) => void; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; }
 
-export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs' }: Props) {
+export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs', geoScope = 'urban' }: Props) {
   const [countries, setCountries] = useState<{name:string, currency:string}[]>([]);
 
   React.useEffect(() => {
@@ -127,7 +127,15 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   return (
     <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
       <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
-        {isInputs ? 'Data Inputs & Assumptions' : 'Interventions'}
+        {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
+      </h2>
+      {(isInputs || isBAU) && geoScope && (
+        <div style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: 4, marginBottom: 8, display: 'inline-block' }}>
+          Entering data for: <strong>{geoScope.charAt(0).toUpperCase() + geoScope.slice(1)}</strong> area
+          {geoScope === 'combined' && ' (urban + rural → national rollup)'}
+        </div>
+      )}
+      <h2 style={{ display: 'none' }}>
       </h2>
       <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 9, color: '#64748b' }}>
         <span><span style={{ color: '#0000cc', fontWeight: 600 }}>Blue</span> = editable input</span>
@@ -538,6 +546,34 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`WWT historical (to ${baseYr})`} value={inputs.bau.san_wwt_inv_hist} onChange={v => u('bau','san_wwt_inv_hist',v)} step={100} min={0} max={1000000} tip="Historical wastewater treatment investment" />
         <F label={`Sewerage historical (to ${baseYr})`} value={inputs.bau.san_sewer_inv_hist} onChange={v => u('bau','san_sewer_inv_hist',v)} step={100} min={0} max={1000000} tip="Historical sewerage network investment" />
         <F label={`FSM historical (to ${baseYr})`} value={inputs.bau.san_fsm_inv_hist} onChange={v => u('bau','san_fsm_inv_hist',v)} step={100} min={0} max={1000000} tip="Historical fecal sludge management investment" />
+      </Section>
+
+      {/* ===== BUDGET EXECUTION ===== */}
+      <Section title="10b. Budget Execution">
+        <SubHead text="Budget allocation vs executed expenditure" />
+        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, padding: '6px 8px', background: '#f0f9ff', borderRadius: 4 }}>
+          Enter both allocated budgets and actual executed expenditure where available.
+          The tool can model budget execution improvement as an intervention.
+        </div>
+        <SubHead text="Execution rate input method" />
+        <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer' }}>
+            <input type="radio" name="exec_method" defaultChecked style={{ accentColor: '#2563eb' }} />
+            Manually enter execution rate
+          </label>
+          <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer' }}>
+            <input type="radio" name="exec_method" style={{ accentColor: '#2563eb' }} />
+            Infer from actual outputs
+          </label>
+        </div>
+        <SubHead text="Water supply" />
+        <F label={`Budget allocated (${CUR} mill)`} value={inputs.bau.ws_total_inv_hist || 0} onChange={v => u('bau','ws_total_inv_hist',v)} step={100} tip="Total water supply budget allocated" />
+        <F label="Execution rate" value={0.85} onChange={() => {}} isPercent unit="%" tip="Percentage of allocated budget actually spent" />
+        <F label={`Executed expenditure (${CUR} mill)`} value={(inputs.bau.ws_total_inv_hist || 0) * 0.85} onChange={() => {}} step={100} tip="Actual amount spent (allocated × execution rate)" />
+        <SubHead text="Sanitation" />
+        <F label={`Budget allocated (${CUR} mill)`} value={inputs.bau.san_total_inv_hist || 0} onChange={v => u('bau','san_total_inv_hist',v)} step={100} tip="Total sanitation budget allocated" />
+        <F label="Execution rate" value={0.80} onChange={() => {}} isPercent unit="%" tip="Percentage of allocated budget actually spent" />
+        <F label={`Executed expenditure (${CUR} mill)`} value={(inputs.bau.san_total_inv_hist || 0) * 0.80} onChange={() => {}} step={100} tip="Actual amount spent (allocated × execution rate)" />
       </Section>
 
       {/* ===== TECHNICAL ===== */}
