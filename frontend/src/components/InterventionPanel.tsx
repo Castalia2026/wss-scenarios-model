@@ -71,18 +71,20 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
         {/* Toggles */}
         <Section title="Enable/Disable Interventions" defaultOpen>
           <SubHead text="Water Supply" />
-          <Toggle label="Collection efficiency & NRW reduction" checked={inputs.toggles?.ws_collection_nrw_enabled ?? true} onChange={v => toggleIntv('ws_collection_nrw_enabled', v)} />
+          <Toggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? true} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} />
+          <Toggle label="NRW reduction" checked={inputs.toggles?.ws_nrw_enabled ?? true} onChange={v => toggleIntv('ws_nrw_enabled', v)} />
           <Toggle label="Capital expenditure efficiency" checked={inputs.toggles?.ws_capital_efficiency_enabled ?? true} onChange={v => toggleIntv('ws_capital_efficiency_enabled', v)} />
           <Toggle label="Tariff increase" checked={inputs.toggles?.ws_tariff_enabled ?? true} onChange={v => toggleIntv('ws_tariff_enabled', v)} />
           <Toggle label="Borrowing against future cashflow" checked={inputs.toggles?.ws_borrowing_enabled ?? true} onChange={v => toggleIntv('ws_borrowing_enabled', v)} />
+          <Toggle label="Budget execution improvement" checked={inputs.toggles?.ws_budget_execution_enabled ?? false} onChange={v => toggleIntv('ws_budget_execution_enabled', v)} />
           <SubHead text="Sanitation" />
           <Toggle label="Collection efficiency" checked={inputs.toggles?.san_collection_enabled ?? true} onChange={v => toggleIntv('san_collection_enabled', v)} />
+          <Toggle label="NRW reduction" checked={inputs.toggles?.san_nrw_enabled ?? false} onChange={v => toggleIntv('san_nrw_enabled', v)} />
           <Toggle label="Capital expenditure efficiency" checked={inputs.toggles?.san_capital_efficiency_enabled ?? true} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} />
           <Toggle label="Tariff increase" checked={inputs.toggles?.san_tariff_enabled ?? true} onChange={v => toggleIntv('san_tariff_enabled', v)} />
           <Toggle label="Borrowing against future cashflow" checked={inputs.toggles?.san_borrowing_enabled ?? true} onChange={v => toggleIntv('san_borrowing_enabled', v)} />
           <Toggle label="Microfinance for on-site sanitation" checked={inputs.toggles?.san_microfinance_enabled ?? true} onChange={v => toggleIntv('san_microfinance_enabled', v)} />
-          <SubHead text="New" />
-          <Toggle label="Budget execution improvement" checked={false} onChange={() => {}} />
+          <Toggle label="Budget execution improvement" checked={inputs.toggles?.san_budget_execution_enabled ?? false} onChange={v => toggleIntv('san_budget_execution_enabled', v)} />
         </Section>
 
         {/* Water intervention parameters */}
@@ -92,6 +94,9 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
           <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} tip="Year the target is achieved" />
           <F label="Current collection ratio" value={inputs.water_interventions.ce_current_ratio} onChange={v => u('water_interventions','ce_current_ratio',v)} isPercent unit="%" tip="Current fraction of billed amounts collected" />
           <F label="Target collection ratio" value={inputs.water_interventions.ce_target_ratio} onChange={v => u('water_interventions','ce_target_ratio',v)} isPercent unit="%" tip="Target collection ratio" slider />
+          <F label="Water volume sold" value={inputs.water_interventions.ce_water_sold_mld} onChange={v => u('water_interventions','ce_water_sold_mld',v)} unit="MLD" tip="Total water supply volume sold" />
+          <F label={`Current tariff (${CUR}/m3)`} value={inputs.water_interventions.ce_current_tariff} onChange={v => u('water_interventions','ce_current_tariff',v)} unit={CUR} tip="Current average water tariff" />
+
           <SubHead text="NRW reduction" />
           <F label="Start year" value={inputs.water_interventions.nrw_start_year} onChange={v => u('water_interventions','nrw_start_year',v)} />
           <F label="Target year" value={inputs.water_interventions.nrw_target_year} onChange={v => u('water_interventions','nrw_target_year',v)} />
@@ -156,6 +161,11 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
           <F label="Tenor" value={inputs.water_interventions.loan_tenor} onChange={v => u('water_interventions','loan_tenor',v)} unit="yrs" />
           <F label="Interest rate" value={inputs.water_interventions.loan_interest_rate} onChange={v => u('water_interventions','loan_interest_rate',v)} isPercent unit="%" />
           <F label="Year for maintenance capex" value={inputs.water_interventions.loan_investment_years} onChange={v => u('water_interventions','loan_investment_years',v)} unit="yrs" />
+          <SubHead text="Budget execution improvement" />
+          <F label="Start year" value={2027} onChange={() => {}} tip="Year budget execution improvement begins" />
+          <F label="Target year" value={2033} onChange={() => {}} tip="Year target execution rate is achieved" />
+          <F label="Current execution rate" value={0.85} onChange={() => {}} isPercent unit="%" tip="Current percentage of allocated budget actually spent" />
+          <F label="Target execution rate" value={0.95} onChange={() => {}} isPercent unit="%" tip="Target execution rate" slider />
         </Section>
 
         {/* Sanitation intervention parameters */}
@@ -183,6 +193,11 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
           <F label={`Facility cost (${CUR})`} value={inputs.sanitation_interventions.mf_onsite_cost} onChange={v => u('sanitation_interventions','mf_onsite_cost',v)} step={1000} unit={CUR} />
           <F label="Interest rate" value={inputs.sanitation_interventions.mf_interest_rate} onChange={v => u('sanitation_interventions','mf_interest_rate',v)} isPercent unit="%" />
           <F label="Max % income" value={inputs.sanitation_interventions.mf_max_pct_income} onChange={v => u('sanitation_interventions','mf_max_pct_income',v)} isPercent unit="%" slider />
+          <SubHead text="Budget execution improvement" />
+          <F label="Start year" value={2027} onChange={() => {}} tip="Year budget execution improvement begins" />
+          <F label="Target year" value={2033} onChange={() => {}} tip="Year target execution rate is achieved" />
+          <F label="Current execution rate" value={0.80} onChange={() => {}} isPercent unit="%" tip="Current percentage of allocated budget actually spent" />
+          <F label="Target execution rate" value={0.95} onChange={() => {}} isPercent unit="%" tip="Target execution rate" slider />
         </Section>
 
         {/* Custom interventions - editable but not connected to calculations */}
