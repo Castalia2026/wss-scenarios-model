@@ -98,6 +98,48 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
           <F label="Current NRW %" value={inputs.water_interventions.nrw_current_pct} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" />
           <F label="Target NRW %" value={inputs.water_interventions.nrw_target_pct} onChange={v => u('water_interventions','nrw_target_pct',v)} isPercent unit="%" slider />
           <F label="Lag to benefits" value={inputs.water_interventions.nrw_lag_years} onChange={v => u('water_interventions','nrw_lag_years',v)} unit="yrs" tip="Years between investment and realized improvement" />
+          {/* Year-by-year NRW rate table */}
+          <div style={{ fontSize: 10, color: '#64748b', margin: '6px 0 4px', fontStyle: 'italic' }}>
+            NRW reduction path (editable per year — rates may not be linear):
+          </div>
+          <div style={{ maxHeight: 200, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 4, marginBottom: 8 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+              <thead>
+                <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
+                  <th style={{ padding: '3px 6px', textAlign: 'left' }}>Year</th>
+                  <th style={{ padding: '3px 6px', textAlign: 'right' }}>NRW %</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const startYr = inputs.water_interventions.nrw_start_year;
+                  const endYr = inputs.water_interventions.nrw_target_year;
+                  const currentPct = inputs.water_interventions.nrw_current_pct;
+                  const targetPct = inputs.water_interventions.nrw_target_pct;
+                  const nYears = endYr - startYr + 1;
+                  const rows = [];
+                  for (let yr = startYr; yr <= endYr; yr++) {
+                    const idx = yr - startYr;
+                    // Default: linear interpolation
+                    const defaultRate = nYears > 1
+                      ? currentPct + (targetPct - currentPct) * idx / (nYears - 1)
+                      : targetPct;
+                    rows.push(
+                      <tr key={yr} style={{ background: idx % 2 ? '#fafbfc' : '#fff' }}>
+                        <td style={{ padding: '2px 6px', fontWeight: 600 }}>{yr}</td>
+                        <td style={{ padding: '2px 4px', textAlign: 'right' }}>
+                          <input type="number" defaultValue={Math.round(defaultRate * 1000) / 10}
+                            style={{ width: 50, padding: '1px 3px', border: '1px solid #ddd', borderRadius: 2, fontSize: 10, textAlign: 'right' }}
+                          /> %
+                        </td>
+                      </tr>
+                    );
+                  }
+                  return rows;
+                })()}
+              </tbody>
+            </table>
+          </div>
           <SubHead text="Capital efficiency" />
           <F label="Start year" value={inputs.water_interventions.capeff_start_year} onChange={v => u('water_interventions','capeff_start_year',v)} />
           <F label="Efficiency gains" value={inputs.water_interventions.capeff_gains_pct} onChange={v => u('water_interventions','capeff_gains_pct',v)} isPercent unit="%" slider />
@@ -143,15 +185,76 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
           <F label="Max % income" value={inputs.sanitation_interventions.mf_max_pct_income} onChange={v => u('sanitation_interventions','mf_max_pct_income',v)} isPercent unit="%" slider />
         </Section>
 
-        {/* Custom intervention - visible but non-functional */}
-        <div style={{ marginTop: 8 }}>
-          <button disabled style={{
-            width: '100%', padding: '10px', border: '2px dashed #d1d5db', borderRadius: 6,
-            background: '#f9fafb', cursor: 'not-allowed', fontSize: 12, color: '#9ca3af',
-          }}>
-            + Add Custom Intervention <span style={{ fontSize: 10 }}>(coming soon)</span>
+        {/* Custom interventions - editable but not connected to calculations */}
+        <Section title="Custom Interventions">
+          <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '6px 8px', borderRadius: 4, marginBottom: 8 }}>
+            Custom interventions can be defined here. In this prototype, they are saved with your scenario but do not affect the Results Dashboard calculations.
+          </div>
+          {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
+            const updateCI = (field: string, val: any) => {
+              const arr = [...inputs.custom_interventions];
+              arr[idx] = { ...arr[idx], [field]: val };
+              onChange({ ...inputs, custom_interventions: arr });
+            };
+            return (
+              <div key={idx} style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px', marginBottom: 8, background: '#faf5ff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
+                  <input type="color" value={ci.color || '#9333ea'} onChange={e => updateCI('color', e.target.value)}
+                    style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
+                  <input type="text" value={ci.name} onChange={e => updateCI('name', e.target.value)}
+                    style={{ flex: 1, border: '1px solid #ccc', borderRadius: 3, padding: '2px 6px', fontSize: 11, fontWeight: 600 }} />
+                  <button onClick={() => {
+                    const arr = inputs.custom_interventions.filter((_: any, i: number) => i !== idx);
+                    onChange({ ...inputs, custom_interventions: arr });
+                  }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 6px', cursor: 'pointer', fontSize: 10 }}>✕</button>
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: '#64748b' }}>Sector</label>
+                    <select value={ci.sector} onChange={e => updateCI('sector', e.target.value)}
+                      style={{ width: '100%', padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 10, background: '#fff', color: '#333' }}>
+                      <option value="water">Water Supply</option>
+                      <option value="sanitation">Sanitation</option>
+                      <option value="both">Both</option>
+                    </select>
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <label style={{ fontSize: 10, color: '#64748b' }}>Type</label>
+                    <select value={ci.intervention_type} onChange={e => updateCI('intervention_type', e.target.value)}
+                      style={{ width: '100%', padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 10, background: '#fff', color: '#333' }}>
+                      <option value="fixed_annual">Fixed Annual Amount</option>
+                      <option value="revenue_stream">Revenue Stream</option>
+                      <option value="per_hh_subsidy">Per-HH Subsidy</option>
+                    </select>
+                  </div>
+                </div>
+                <F label="Start year" value={ci.start_year} onChange={v => updateCI('start_year', v)} tip="Year this intervention begins" />
+                <F label="End year" value={ci.end_year} onChange={v => updateCI('end_year', v)} tip="Year this intervention ends" />
+                {ci.intervention_type === 'fixed_annual' && (
+                  <F label="Annual amount (mill)" value={ci.annual_amount} onChange={v => updateCI('annual_amount', v)} step={100} tip="Fixed annual cash amount" />
+                )}
+                {ci.intervention_type === 'revenue_stream' && (<>
+                  <F label="Starting amount (mill)" value={ci.starting_amount} onChange={v => updateCI('starting_amount', v)} step={100} />
+                  <F label="Growth rate" value={ci.growth_rate} onChange={v => updateCI('growth_rate', v)} isPercent unit="%" />
+                </>)}
+                {ci.intervention_type === 'per_hh_subsidy' && (
+                  <F label="Subsidy per HH" value={ci.subsidy_per_hh} onChange={v => updateCI('subsidy_per_hh', v)} step={1000} />
+                )}
+              </div>
+            );
+          })}
+          <button onClick={() => {
+            const existing = inputs.custom_interventions || [];
+            const colors = ['#9333ea','#f97316','#06b6d4','#84cc16','#f43f5e'];
+            onChange({ ...inputs, custom_interventions: [...existing, {
+              name: 'New Intervention', enabled: true, sector: 'water', intervention_type: 'fixed_annual',
+              start_year: 2028, end_year: 2035, annual_amount: 1000, starting_amount: 500,
+              growth_rate: 0.05, subsidy_per_hh: 10000, color: colors[existing.length % colors.length],
+            }] });
+          }} style={{ width: '100%', padding: '6px', border: '1px dashed #9333ea', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#9333ea' }}>
+            + Add Custom Intervention
           </button>
-        </div>
+        </Section>
       </div>
 
       {/* Right: guidance */}
