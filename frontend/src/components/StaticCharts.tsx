@@ -1,7 +1,7 @@
 import React from 'react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line, Cell
+  XAxis, YAxis, CartesianGrid, Tooltip,
+  Legend, ResponsiveContainer, ComposedChart, Line
 } from 'recharts';
 
 // --- BAU Forecast static data ---
@@ -62,25 +62,58 @@ export function BAUForecastChart() {
 }
 
 export function InterventionImpactChart() {
+  const serviceGap = 0.691;
+  const interventions = [
+    { name: 'Collection Efficiency', value: 0.050, color: '#10b981' },
+    { name: 'NRW Reduction', value: 0.289, color: '#10b981' },
+    { name: 'Capital Efficiency', value: 0.192, color: '#f59e0b' },
+    { name: 'Tariff Reform', value: 0.091, color: '#8b5cf6' },
+    { name: 'Borrowing', value: 0.061, color: '#ec4899' },
+    { name: 'Budget Execution', value: 0.030, color: '#06b6d4' },
+  ];
+  const totalClosed = interventions.reduce((s, i) => s + i.value, 0);
+  const remaining = Math.max(0, serviceGap - totalClosed);
+  const pctClosed = serviceGap > 0 ? (totalClosed / serviceGap * 100) : 0;
+
+  const items = [
+    { name: 'Gap (2040)', value: serviceGap, color: '#ef4444', isGap: true },
+    ...interventions.map(i => ({ ...i, isGap: false })),
+    { name: 'Remaining Gap', value: remaining, color: '#fca5a5', isGap: true },
+  ];
+
   return (
     <div>
-      <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>Intervention Impact — Closing the Gap at 2040 (Example)</h3>
+      <h3 style={{ fontSize: 13, marginBottom: 4, fontWeight: 600, color: '#1e3a5f' }}>Intervention Impact — Closing the Gap at 2040 (Example)</h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Static mock-up — no live calculations
       </div>
-      <ResponsiveContainer width="100%" height={300}>
-        <BarChart data={interventionImpactData} layout="vertical" margin={{ left: 120 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis type="number" tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', position: 'insideBottom', style: { fontSize: 10 } }} />
-          <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={110} />
-          <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
-          <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-            {interventionImpactData.map((entry, idx) => (
-              <Cell key={idx} fill={entry.fill} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <p style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
+        {pctClosed.toFixed(0)}% of the service gap closed by interventions
+      </p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {items.map((item, i) => {
+          const width = serviceGap > 0 ? Math.max(1, (Math.abs(item.value) / serviceGap) * 100) : 0;
+          return (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ width: 150, fontSize: 11, color: '#374151', textAlign: 'right', flexShrink: 0 }}>{item.name}</span>
+              <div style={{ flex: 1, position: 'relative', height: 22 }}>
+                <div style={{
+                  width: `${width}%`, height: '100%', borderRadius: 3,
+                  background: item.color, opacity: item.isGap ? 0.6 : 0.85,
+                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
+                }}>
+                  {width > 12 && <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>
+                    {(item.value * 1000000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} HH
+                  </span>}
+                </div>
+              </div>
+              <span style={{ fontSize: 10, color: '#64748b', width: 60, textAlign: 'right' }}>
+                {item.value.toFixed(3)} M
+              </span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
