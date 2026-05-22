@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-  XAxis, YAxis, CartesianGrid, Tooltip,
+  Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ComposedChart, Line
 } from 'recharts';
 
@@ -61,59 +61,39 @@ export function BAUForecastChart() {
   );
 }
 
+// Static stacked area chart matching the main tool's intervention view
+const interventionData = bauYears.map(y => ({
+  year: y,
+  BAU: 0.49 + (y - 2025) * 0.021,
+  'Collection & NRW': Math.max(0, (y - 2028) * 0.008),
+  'Capital Efficiency': Math.max(0, (y - 2033) * 0.006),
+  'Tariff Increase': Math.max(0, (y - 2028) * 0.003),
+  Borrowing: Math.max(0, (y - 2036) * 0.005),
+  Target: 0.49 + (y - 2025) * 0.067,
+}));
+
 export function InterventionImpactChart() {
-  const serviceGap = 0.691;
-  const interventions = [
-    { name: 'Collection Efficiency', value: 0.050, color: '#10b981' },
-    { name: 'NRW Reduction', value: 0.289, color: '#10b981' },
-    { name: 'Capital Efficiency', value: 0.192, color: '#f59e0b' },
-    { name: 'Tariff Reform', value: 0.091, color: '#8b5cf6' },
-    { name: 'Borrowing', value: 0.061, color: '#ec4899' },
-    { name: 'Budget Execution', value: 0.030, color: '#06b6d4' },
-  ];
-  const totalClosed = interventions.reduce((s, i) => s + i.value, 0);
-  const remaining = Math.max(0, serviceGap - totalClosed);
-  const pctClosed = serviceGap > 0 ? (totalClosed / serviceGap * 100) : 0;
-
-  const items = [
-    { name: 'Gap (2040)', value: serviceGap, color: '#ef4444', isGap: true },
-    ...interventions.map(i => ({ ...i, isGap: false })),
-    { name: 'Remaining Gap', value: remaining, color: '#fca5a5', isGap: true },
-  ];
-
   return (
     <div>
-      <h3 style={{ fontSize: 13, marginBottom: 4, fontWeight: 600, color: '#1e3a5f' }}>Intervention Impact — Closing the Gap at 2040 (Example)</h3>
+      <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>Water Supply — Service Gap After Interventions (Example)</h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Static mock-up — no live calculations
       </div>
-      <p style={{ fontSize: 11, color: '#64748b', marginBottom: 10 }}>
-        {pctClosed.toFixed(0)}% of the service gap closed by interventions
-      </p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-        {items.map((item, i) => {
-          const width = serviceGap > 0 ? Math.max(1, (Math.abs(item.value) / serviceGap) * 100) : 0;
-          return (
-            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ width: 150, fontSize: 11, color: '#374151', textAlign: 'right', flexShrink: 0 }}>{item.name}</span>
-              <div style={{ flex: 1, position: 'relative', height: 22 }}>
-                <div style={{
-                  width: `${width}%`, height: '100%', borderRadius: 3,
-                  background: item.color, opacity: item.isGap ? 0.6 : 0.85,
-                  display: 'flex', alignItems: 'center', justifyContent: 'flex-end', paddingRight: 6,
-                }}>
-                  {width > 12 && <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>
-                    {(item.value * 1000000).toFixed(0).replace(/\B(?=(\d{3})+(?!\d))/g, ',')} HH
-                  </span>}
-                </div>
-              </div>
-              <span style={{ fontSize: 10, color: '#64748b', width: 60, textAlign: 'right' }}>
-                {item.value.toFixed(3)} M
-              </span>
-            </div>
-          );
-        })}
-      </div>
+      <ResponsiveContainer width="100%" height={350}>
+        <ComposedChart data={interventionData}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
+          <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
+          <Legend wrapperStyle={{ fontSize: 10 }} />
+          <Area type="monotone" dataKey="BAU" stackId="1" fill="#64748b" stroke="#64748b" fillOpacity={0.5} />
+          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill="#10b981" stroke="#10b981" fillOpacity={0.6} />
+          <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill="#f59e0b" stroke="#f59e0b" fillOpacity={0.6} />
+          <Area type="monotone" dataKey="Tariff Increase" stackId="1" fill="#8b5cf6" stroke="#8b5cf6" fillOpacity={0.6} />
+          <Area type="monotone" dataKey="Borrowing" stackId="1" fill="#ec4899" stroke="#ec4899" fillOpacity={0.6} />
+          <Line type="monotone" dataKey="Target" stroke="#2563eb" strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
+        </ComposedChart>
+      </ResponsiveContainer>
     </div>
   );
 }
