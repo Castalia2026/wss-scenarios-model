@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
+import { BAUForecastChart } from './components/StaticCharts';
 import { fetchDefaults } from './api';
 
 export default function App() {
@@ -181,9 +182,12 @@ export default function App() {
         {activeTab === 0 && inputs && (
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
         )}
-        {activeTab === 1 && inputs && (
+        {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
-        )}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+            <BAUForecastChart />
+          </div>
+        </>)}
         {activeTab === 2 && inputs && (
           <InterventionPanel inputs={inputs} onChange={handleSetInputs} />
         )}

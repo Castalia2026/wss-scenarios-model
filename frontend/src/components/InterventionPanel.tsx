@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { InterventionImpactChart } from './StaticCharts';
 
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -272,19 +273,9 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
         </Section>
       </div>
 
-      {/* Right: guidance */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px', color: '#64748b' }}>
-        <p style={{ fontSize: 16, marginBottom: 8 }}>🔧 Intervention Selection</p>
-        <p style={{ fontSize: 12, lineHeight: 1.6, maxWidth: 500 }}>
-          Toggle interventions on/off using the checkboxes. Adjust parameters for each intervention
-          using the input fields. Sliders are provided for key parameters that can be adjusted
-          without drastically changing the output.
-        </p>
-        <p style={{ fontSize: 12, lineHeight: 1.6, maxWidth: 500, marginTop: 12 }}>
-          <strong>Note:</strong> In this prototype, data entered is for demonstration purposes.
-          The full version will calculate the impact of each intervention on the financing gap
-          and show results in the Results Dashboard.
-        </p>
+      {/* Right: intervention impact chart */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        <InterventionImpactChart />
       </div>
     </div>
   );
