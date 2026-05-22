@@ -82,7 +82,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['Data Input', 'Intervention Selection', 'Results Dashboard'];
+  const tabs = ['Data Input', 'BAU & Costs', 'Intervention Selection', 'Results Dashboard'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -179,12 +179,15 @@ export default function App() {
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} />
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
         )}
         {activeTab === 1 && inputs && (
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
+        )}
+        {activeTab === 2 && inputs && (
           <InterventionPanel inputs={inputs} onChange={handleSetInputs} />
         )}
-        {activeTab === 2 && (
+        {activeTab === 3 && (
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} />
         )}
       </div>
@@ -204,9 +207,10 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
-            { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, targets, unit costs, BAU investment, and technical parameters. Supports urban-only, rural-only, or combined analysis with national rollup. Includes budget allocated vs executed expenditure.', icon: '📝' },
-            { step: '2', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, microfinance, and budget execution improvement. Custom intervention button available for future use.', icon: '🔧' },
-            { step: '3', title: 'Results Dashboard', desc: 'View example outputs showing what the final tool will produce: coverage progress charts for rural water, urban water, and national water. Hover over data points for precise values. Save scenarios and export individual slides or full presentations.', icon: '📊' },
+            { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban-only, rural-only, or combined analysis with national rollup.', icon: '📝' },
+            { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments, budget execution rates), and technical parameters (asset life, treatment capacity, non-HH rates).', icon: '💰' },
+            { step: '3', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, microfinance, and budget execution improvement. Add custom interventions.', icon: '🔧' },
+            { step: '4', title: 'Results Dashboard', desc: 'View example outputs showing what the final tool will produce: coverage progress charts for rural water, urban water, and national water. Hover over data points for precise values. Save scenarios and export individual slides or full presentations.', icon: '📊' },
           ].map(s => (
             <div key={s.step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
               <div style={{ width: 32, height: 32, borderRadius: 6, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>{s.icon}</div>
