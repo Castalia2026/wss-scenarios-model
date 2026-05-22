@@ -261,46 +261,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         </table>
       </div>
 
-      {/* BAU Forecast chart */}
-      <div style={{ marginBottom: 28 }}>
-        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-          BAU Forecast — HHs per Service Level (2025–2040)
-        </h3>
-        <ResponsiveContainer width="100%" height={280}>
-          <ComposedChart data={bauForecastData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-            <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
-            <Legend wrapperStyle={{ fontSize: 10 }} />
-            {Object.keys(BAU_LINE_COLORS).map(key => (
-              <Line key={key} type="monotone" dataKey={key} stroke={BAU_LINE_COLORS[key]} strokeWidth={2} dot={false} />
-            ))}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Intervention Impact chart */}
-      <div style={{ marginBottom: 28 }}>
-        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-          Intervention Impact — Contribution to Closing the Service Gap
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={interventionImpactData} layout="vertical" margin={{ left: 20, right: 40, top: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
-            <XAxis type="number" tick={{ fontSize: 10 }} domain={[-0.1, 0.8]}
-              tickFormatter={(v: number) => v.toFixed(2)} label={{ value: 'HH millions', position: 'insideBottom', offset: -2, style: { fontSize: 10 } }} />
-            <YAxis type="category" dataKey="name" tick={{ fontSize: 10 }} width={130} />
-            <Tooltip formatter={(value: number) => value.toFixed(2)} contentStyle={{ fontSize: 11 }} />
-            <Bar dataKey="value" radius={[0, 3, 3, 0]}>
-              {interventionImpactData.map((entry, index) => (
-                <Cell key={index} fill={entry.fill} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
       {/* Saved scenarios */}
       {scenarios.length > 0 && (
         <div style={{ marginBottom: 28 }}>
