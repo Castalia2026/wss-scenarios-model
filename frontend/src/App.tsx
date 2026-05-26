@@ -319,7 +319,7 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
   // Completeness check helpers
   const filled = (v: any) => v !== undefined && v !== null && v !== 0 && v !== '';
   const sections = [
-    { name: 'Country & Region', done: filled(cc.country) && filled(cc.currency), total: 2 },
+    { name: 'Country & Region', done: [cc.country, cc.currency].filter(filled).length, total: 2 },
     { name: 'Period', done: [p.model_start_year, p.forecast_end_year, p.baseline_year, p.target1_year, p.target2_year].filter(filled).length, total: 5 },
     { name: 'Macroeconomics', done: filled(inputs.macro?.wash_budget_pct_gdp) ? 1 : 0, total: 1 },
     { name: 'Population', done: [pop.total_pop_start, pop.total_hh_start, pop.total_pop_baseline, pop.total_hh_baseline].filter(filled).length, total: 4 },
