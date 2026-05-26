@@ -39,17 +39,35 @@ def get_blank():
     ).model_dump()
     # Zero out all data-specific fields but keep structure
     for section in ['macro', 'population', 'water_service', 'sanitation_service',
-                    'water_costs', 'sanitation_costs', 'bau', 'technical']:
+                    'water_costs', 'sanitation_costs', 'bau', 'technical',
+                    'water_targets', 'sanitation_targets',
+                    'water_interventions', 'sanitation_interventions']:
         if section in blank:
             for key, val in blank[section].items():
                 if isinstance(val, (int, float)):
                     blank[section][key] = 0
                 elif isinstance(val, list):
-                    blank[section][key] = [0] * len(val)
-    # Keep period defaults
-    blank['period'] = {'model_start_year': 2020, 'forecast_end_year': 2050,
-        'baseline_year': 2024, 'as_is_forecast_start': 2025,
-        'as_is_forecast_length': 2, 'target1_year': 2030, 'target2_year': 2040}
+                    # Zero out provider arrays but keep one empty provider shell
+                    if key == 'providers':
+                        blank[section][key] = [{'name': 'Provider 1', 'share_pct': 0,
+                            **{k: 0 for k, v in val[0].items() if k != 'name' and isinstance(v, (int, float))}}] if val else []
+                    else:
+                        blank[section][key] = [0] * len(val)
+    # Keep period as structural defaults (not country data)
+    blank['period'] = {'model_start_year': 0, 'forecast_end_year': 0,
+        'baseline_year': 0, 'as_is_forecast_start': 0,
+        'as_is_forecast_length': 0, 'target1_year': 0, 'target2_year': 0}
+    # Clear toggles
+    if 'toggles' in blank:
+        for key in blank['toggles']:
+            blank['toggles'][key] = False
+    # Clear custom interventions
+    blank['custom_interventions'] = []
+    # Clear country config labels
+    for k in ['ws_serv1_name', 'ws_serv2_name', 'ws_serv3_name', 'ws_serv4_name', 'ws_serv5_name',
+              'san_serv1_name', 'san_serv2_name', 'san_serv3_name', 'san_serv4_name', 'san_serv5_name']:
+        if k in blank.get('country_config', {}):
+            blank['country_config'][k] = ''
     return blank
 
 
