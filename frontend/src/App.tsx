@@ -363,11 +363,10 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
       items: [
         { label: 'HHs with treated piped (start year)', ok: filled(ws.hh_treated_piped_start) },
         { label: 'HHs without treated piped (start year)', ok: filled(ws.hh_no_treated_piped_start) },
-        { label: '% HHs by service level (start year, 5 levels)', ok: filled(ws.pct_serv1_start) },
+        { label: '% HHs by service level (start year, 5 levels)', ok: [ws.pct_serv1_start, ws.pct_serv2_start, ws.pct_serv3_start, ws.pct_serv4_start, ws.pct_serv5_start].some((v: number) => filled(v)) },
         { label: 'HHs with treated piped (baseline)', ok: filled(ws.hh_treated_piped_baseline) },
         { label: 'HHs without piped water (baseline)', ok: filled(ws.hh_no_piped_baseline) },
-        { label: '% HHs by service level (baseline, 5 levels)', ok: filled(ws.pct_serv1_baseline) },
-        { label: 'Per-provider HH counts (piped, 24/7)', ok: (wt.providers || []).some((pr: any) => filled(pr.hh_piped_treated)) },
+        { label: '% HHs by service level (baseline, 5 levels)', ok: [ws.pct_serv1_baseline, ws.pct_serv2_baseline, ws.pct_serv3_baseline, ws.pct_serv4_baseline, ws.pct_serv5_baseline].some((v: number) => filled(v)) },
       ],
     },
     {
@@ -375,11 +374,10 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
       items: [
         { label: 'HHs with sewered sanitation (start year)', ok: filled(san.hh_sewered_start) },
         { label: 'HHs with on-site sanitation (start year)', ok: filled(san.hh_onsite_start) },
-        { label: '% HHs by service level (start year, 5 levels)', ok: filled(san.pct_sserv1_start) },
+        { label: '% HHs by service level (start year, 5 levels)', ok: [san.pct_sserv1_start, san.pct_sserv2_start, san.pct_sserv3_start, san.pct_sserv4_start, san.pct_sserv5_start].some((v: number) => filled(v)) },
         { label: 'HHs sewered/on-site (baseline)', ok: filled(san.hh_sewered_baseline) },
         { label: 'HHs with wastewater treatment (baseline)', ok: filled(san.hh_sewered_wwt_baseline) },
-        { label: '% HHs by service level (baseline, 5 levels)', ok: filled(san.pct_sserv1_baseline) },
-        { label: 'Per-provider HH counts (sewer, WWT)', ok: (st.providers || []).some((pr: any) => filled(pr.hh_sewer_served)) },
+        { label: '% HHs by service level (baseline, 5 levels)', ok: [san.pct_sserv1_baseline, san.pct_sserv2_baseline, san.pct_sserv3_baseline, san.pct_sserv4_baseline, san.pct_sserv5_baseline].some((v: number) => filled(v)) },
       ],
     },
     {
@@ -387,8 +385,8 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
       items: [
         { label: 'At least one water provider defined', ok: (wt.providers || []).length > 0 && filled((wt.providers || [])[0]?.name) },
         { label: 'Provider shares sum to 100%', ok: Math.abs(((wt.providers || []).reduce((s: number, pr: any) => s + (pr.share_pct || 0), 0)) - 1) < 0.005 },
-        { label: 'Target 1 service levels (5 levels)', ok: filled(wt.target1_serv1) },
-        { label: 'Target 2 service levels (5 levels)', ok: filled(wt.target2_serv1) },
+        { label: 'Target 1 service levels (5 levels)', ok: [wt.target1_serv1, wt.target1_serv2, wt.target1_serv3, wt.target1_serv4, wt.target1_serv5].some((v: number) => filled(v)) },
+        { label: 'Target 2 service levels (5 levels)', ok: [wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5].some((v: number) => filled(v)) },
         { label: 'Planned treatment capacity (MLD)', ok: filled(wt.planned_treatment_capacity_mld) },
       ],
     },
@@ -397,8 +395,8 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
       items: [
         { label: 'At least one sanitation provider defined', ok: (st.providers || []).length > 0 && filled((st.providers || [])[0]?.name) },
         { label: 'Provider shares + on-site sum to 100%', ok: Math.abs(((st.providers || []).reduce((s: number, pr: any) => s + (pr.share_pct || 0), 0) + (st.onsite_collection_treatment_pct || 0)) - 1) < 0.005 },
-        { label: 'Target 1 service levels (5 levels)', ok: filled(st.target1_sserv1) },
-        { label: 'Target 2 service levels (5 levels)', ok: filled(st.target2_sserv1) },
+        { label: 'Target 1 service levels (5 levels)', ok: [st.target1_sserv1, st.target1_sserv2, st.target1_sserv3, st.target1_sserv4, st.target1_sserv5].some((v: number) => filled(v)) },
+        { label: 'Target 2 service levels (5 levels)', ok: [st.target2_sserv1, st.target2_sserv2, st.target2_sserv3, st.target2_sserv4, st.target2_sserv5].some((v: number) => filled(v)) },
       ],
     },
   ];
