@@ -107,7 +107,7 @@ const BAU_LINE_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  geoScope: 'urban' | 'rural' | 'combined';
+  geoScope: 'urban' | 'rural' | 'national';
   scenarios: { name: string; inputs: any }[];
   inputs: any;
 }
@@ -189,7 +189,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
       </div>
 
       {/* Three charts per the spec: rural, urban, national */}
-      {geoScope === 'combined' ? (
+      {geoScope === 'national' ? (
         <>
           <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
@@ -199,14 +199,14 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         <>
           <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Switch to <strong>Combined</strong> scope to see how rural feeds into national targets
+            Switch to <strong>National</strong> scope to see how rural feeds into national targets
           </div>
         </>
       ) : (
         <>
           <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Switch to <strong>Combined</strong> scope to see how urban feeds into national targets
+            Switch to <strong>National</strong> scope to see how urban feeds into national targets
           </div>
         </>
       )}

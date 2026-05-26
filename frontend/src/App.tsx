@@ -11,7 +11,7 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [profileList, setProfileList] = useState<string[]>([]);
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
-  const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'combined'>('urban');
+  const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
 
   const refreshProfiles = () => {
@@ -95,12 +95,13 @@ export default function App() {
           <span style={{ fontSize: 11, opacity: 0.6 }}>{inputs?.country_config?.country || ''} — {inputs?.country_config?.area || ''}</span>
           {/* Geographic scope selector */}
           <div style={{ display: 'flex', gap: 2, marginLeft: 8 }}>
-            {(['urban', 'rural', 'combined'] as const).map(g => (
+            {(['urban', 'rural', 'national'] as const).map(g => (
               <button key={g} onClick={() => setGeoScope(g)} style={{
-                padding: '3px 10px', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 3,
-                background: geoScope === g ? 'rgba(255,255,255,0.2)' : 'transparent',
-                color: '#fff', cursor: 'pointer', fontSize: 10, textTransform: 'capitalize',
+                padding: '4px 14px', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4,
+                background: geoScope === g ? '#2563eb' : 'transparent',
+                color: '#fff', cursor: 'pointer', fontSize: 11, textTransform: 'capitalize',
                 fontWeight: geoScope === g ? 700 : 400,
+                transition: 'background 0.15s',
               }}>{g}</button>
             ))}
           </div>
@@ -160,14 +161,31 @@ export default function App() {
       )}
 
       {/* Tab Navigation */}
-      <nav style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0', display: 'flex', padding: '0 20px' }}>
+      <nav style={{ background: '#eef2f7', borderBottom: '2px solid #cbd5e1', display: 'flex', padding: '6px 20px 0', gap: 4 }}>
         {tabs.map((tab, i) => (
           <button key={tab} onClick={() => setActiveTab(i)} style={{
-            padding: '10px 24px', border: 'none', borderBottom: activeTab === i ? '3px solid #2563eb' : '3px solid transparent',
-            background: 'none', cursor: 'pointer', fontSize: 13, fontWeight: activeTab === i ? 700 : 400,
-            color: activeTab === i ? '#2563eb' : '#64748b',
+            padding: '10px 28px', border: 'none',
+            borderRadius: '8px 8px 0 0',
+            background: activeTab === i ? '#fff' : 'transparent',
+            boxShadow: activeTab === i ? '0 -2px 6px rgba(0,0,0,0.08)' : 'none',
+            cursor: 'pointer', fontSize: 13, fontWeight: activeTab === i ? 700 : 500,
+            color: activeTab === i ? '#1e3a5f' : '#64748b',
+            borderBottom: activeTab === i ? '2px solid #fff' : '2px solid transparent',
+            marginBottom: -2,
+            transition: 'all 0.15s',
+            position: 'relative',
           }}>
-            {tab}
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}>
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 20, height: 20, borderRadius: '50%', fontSize: 10, fontWeight: 700,
+                background: activeTab === i ? '#2563eb' : '#94a3b8',
+                color: '#fff', flexShrink: 0,
+              }}>{i + 1}</span>
+              {tab}
+            </span>
           </button>
         ))}
       </nav>
@@ -213,7 +231,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           {[
-            { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban-only, rural-only, or combined analysis with national rollup.', icon: '📝' },
+            { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban-only, rural-only, or national analysis with urban + rural rollup.', icon: '📝' },
             { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments, budget execution rates), and technical parameters (asset life, treatment capacity, non-HH rates).', icon: '💰' },
             { step: '3', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, microfinance, and budget execution improvement. Add custom interventions.', icon: '🔧' },
             { step: '4', title: 'Results Dashboard', desc: 'View example outputs showing what the final tool will produce: coverage progress charts for rural water, urban water, and national water. Hover over data points for precise values. Save scenarios and export individual slides or full presentations.', icon: '📊' },
@@ -231,7 +249,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
         <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 10, color: '#475569' }}>
           <strong>Key features:</strong>
           <ul style={{ margin: '4px 0 0 14px', padding: 0, lineHeight: 1.7 }}>
-            <li><strong>Geographic scope:</strong> Switch between Urban, Rural, or Combined in the header</li>
+            <li><strong>Geographic scope:</strong> Switch between Urban, Rural, or National in the header</li>
             <li><strong>Tooltips:</strong> Hover over any ⓘ icon for field description</li>
             <li><strong>Validation:</strong> Yellow warnings for invalid combinations (e.g., targets not summing to 100%)</li>
             <li><strong>Scenarios:</strong> Save scenarios and export individual PowerPoint slides per scenario</li>

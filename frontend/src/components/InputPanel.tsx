@@ -132,7 +132,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {(isInputs || isBAU) && geoScope && (
         <div style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: 4, marginBottom: 8, display: 'inline-block' }}>
           Entering data for: <strong>{geoScope.charAt(0).toUpperCase() + geoScope.slice(1)}</strong> area
-          {geoScope === 'combined' && ' (urban + rural → national rollup)'}
+          {geoScope === 'national' && ' (urban + rural → national rollup)'}
         </div>
       )}
       <h2 style={{ display: 'none' }}>
