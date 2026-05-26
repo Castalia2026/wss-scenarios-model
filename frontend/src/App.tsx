@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
-import { BAUForecastChart } from './components/StaticCharts';
+import { BAUForecastChart, InterventionImpactChart } from './components/StaticCharts';
 import { fetchDefaults } from './api';
 
 export default function App() {
@@ -12,6 +12,7 @@ export default function App() {
   const [profileList, setProfileList] = useState<string[]>([]);
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'combined'>('urban');
+  const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -185,11 +186,12 @@ export default function App() {
         {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+            <SectorToggle value={sectorTab} onChange={setSectorTab} />
             <BAUForecastChart />
           </div>
         </>)}
         {activeTab === 2 && inputs && (
-          <InterventionPanel inputs={inputs} onChange={handleSetInputs} />
+          <InterventionPanel inputs={inputs} onChange={handleSetInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} />
         )}
         {activeTab === 3 && (
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
@@ -247,6 +249,20 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           Get Started
         </button>
       </div>
+    </div>
+  );
+}
+
+function SectorToggle({ value, onChange }: { value: 'water' | 'sanitation'; onChange: (v: 'water' | 'sanitation') => void }) {
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+      {(['water', 'sanitation'] as const).map(s => (
+        <button key={s} onClick={() => onChange(s)} style={{
+          padding: '7px 18px', border: 'none', borderRadius: 5, cursor: 'pointer',
+          background: value === s ? '#2563eb' : '#e5e7eb',
+          color: value === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
+        }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
+      ))}
     </div>
   );
 }

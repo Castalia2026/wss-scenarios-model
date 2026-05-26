@@ -162,11 +162,11 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {isInputs && <>
 
       {/* ===== COUNTRY CONFIG ===== */}
-      <Section title="0. Country & Labels">
+      <Section title="0. Country & Region">
         {inputs.country_config && <>
           {/* Country with searchable dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Country name</label>
+            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Country</label>
             <input type="text" list="country-list" value={inputs.country_config.country || ''}
               onChange={e => setCountryConfig('country', e.target.value)}
               style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }}
@@ -177,20 +177,18 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             </datalist>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Area / region</label>
+            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Region</label>
             <input type="text" value={inputs.country_config.area || ''}
               onChange={e => setCountryConfig('area', e.target.value)}
-              style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }} />
+              style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }}
+              placeholder="e.g. Kathmandu Valley" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Area type</label>
-            <select value={inputs.country_config.area_type || 'Urban'}
-              onChange={e => setCountryConfig('area_type', e.target.value)}
-              style={{ width: 120, padding: '4px 6px', border: '1px solid #ccc', borderRadius: 4, fontSize: 11, background: '#fff', color: '#333', cursor: 'pointer' }}>
-              <option value="Urban">Urban</option>
-              <option value="Rural">Rural</option>
-              <option value="National">National</option>
-            </select>
+            <label style={{ flex: 1, fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>Scope</label>
+            <span style={{ fontSize: 11, color: '#0369a1', fontWeight: 600, padding: '3px 8px', background: '#e0f2fe', borderRadius: 3 }}>
+              {geoScope.charAt(0).toUpperCase() + geoScope.slice(1)}
+            </span>
+            <span style={{ fontSize: 9, color: '#94a3b8' }}>(set in header)</span>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
             <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Local currency code</label>
