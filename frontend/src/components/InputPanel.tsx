@@ -285,12 +285,20 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="HHs with on-premise treated, piped" value={inputs.water_service.hh_treated_piped_baseline} onChange={v => u('water_service','hh_treated_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="HHs without on-premise piped water" value={inputs.water_service.hh_no_piped_baseline} onChange={v => u('water_service','hh_no_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="Historical increase treated, piped" value={inputs.water_service.hist_increase_treated_piped} onChange={v => u('water_service','hist_increase_treated_piped',v)} isPercent unit="%" tip="Historical annual growth rate in treated piped connections" />
-        <SubHead text={`${P1} served`} />
-        <F label={`HHs with piped, treated (${P1})`} value={inputs.water_service.kukl_hh_piped_treated} onChange={v => u('water_service','kukl_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <F label={`HHs with 24/7 water (${P1})`} value={inputs.water_service.kukl_hh_24hr} onChange={v => u('water_service','kukl_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <SubHead text={`${P2} served`} />
-        <F label={`HHs with piped, treated (${P2})`} value={inputs.water_service.wusc_hh_piped_treated} onChange={v => u('water_service','wusc_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <F label={`HHs with 24/7 water (${P2})`} value={inputs.water_service.wusc_hh_24hr} onChange={v => u('water_service','wusc_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        {wProviders.map((prov: any, idx: number) => {
+          const updateWsProv = (field: string, val: number) => {
+            const provs = [...inputs.water_targets.providers];
+            provs[idx] = { ...provs[idx], [field]: val };
+            onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
+          };
+          return (
+            <React.Fragment key={idx}>
+              <SubHead text={`${prov.name} served`} />
+              <F label={`HHs with piped, treated (${prov.name})`} value={prov.hh_piped_treated || 0} onChange={v => updateWsProv('hh_piped_treated', v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+              <F label={`HHs with 24/7 water (${prov.name})`} value={prov.hh_24hr || 0} onChange={v => updateWsProv('hh_24hr', v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+            </React.Fragment>
+          );
+        })}
         <SubHead text="Non-piped" />
         <F label="HHs with non-piped" value={inputs.water_service.nonpiped_hh} onChange={v => u('water_service','nonpiped_hh',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="HHs with treated non-piped" value={inputs.water_service.nonpiped_hh_treated} onChange={v => u('water_service','nonpiped_hh_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
@@ -318,9 +326,19 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="HHs with sewered sanitation" value={inputs.sanitation_service.hh_sewered_baseline} onChange={v => u('sanitation_service','hh_sewered_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="HHs with on-site sanitation" value={inputs.sanitation_service.hh_onsite_baseline} onChange={v => u('sanitation_service','hh_onsite_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="HHs sewered + wastewater treatment" value={inputs.sanitation_service.hh_sewered_wwt_baseline} onChange={v => u('sanitation_service','hh_sewered_wwt_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <F label={`HHs served by ${P1} sewerage`} value={inputs.sanitation_service.hh_kukl_sewer_baseline} onChange={v => u('sanitation_service','hh_kukl_sewer_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <F label={`${P1} HHs with WWT`} value={inputs.sanitation_service.kukl_hh_wwt} onChange={v => u('sanitation_service','kukl_hh_wwt',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
-        <F label={`${P2} HHs with sewer`} value={inputs.sanitation_service.wusc_hh_sewer} onChange={v => u('sanitation_service','wusc_hh_sewer',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        {sProviders.map((prov: any, idx: number) => {
+          const updateSanProv = (field: string, val: number) => {
+            const provs = [...inputs.sanitation_targets.providers];
+            provs[idx] = { ...provs[idx], [field]: val };
+            onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
+          };
+          return (
+            <React.Fragment key={idx}>
+              <F label={`HHs served by ${prov.name} sewerage`} value={prov.hh_sewer_served || 0} onChange={v => updateSanProv('hh_sewer_served', v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+              <F label={`${prov.name} HHs with WWT`} value={prov.hh_wwt_served || 0} onChange={v => updateSanProv('hh_wwt_served', v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+            </React.Fragment>
+          );
+        })}
 
         <SubHead text={`% HHs by service level, ${baseYr}`} />
         <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_baseline} onChange={v => u('sanitation_service','pct_sserv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -361,7 +379,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           );
         })}
         <button onClick={() => {
-          const provs = [...(inputs.water_targets.providers || []), { name: 'New Provider', share_pct: 0, current_hh: 0, network_cost_per_hh: 0, cost_per_mld_treatment: 0, existing_capacity_mld: 0 }];
+          const provs = [...(inputs.water_targets.providers || []), { name: 'New Provider', share_pct: 0, current_hh: 0, network_cost_per_hh: 0, cost_per_mld_treatment: 0, existing_capacity_mld: 0, hh_piped_treated: 0, hh_24hr: 0, cost_per_capita: 0 }];
           onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
         }} style={{ width: '100%', padding: '4px', border: '1px dashed #94a3b8', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
           + Add Water Provider
@@ -411,7 +429,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           );
         })}
         <button onClick={() => {
-          const provs = [...(inputs.sanitation_targets.providers || []), { name: 'New Provider', share_pct: 0, current_hh_sewer: 0, current_hh_wwt: 0, sewer_cost_per_hh: 0, wwt_cost_per_mld: 0, existing_wwt_capacity_mld: 0 }];
+          const provs = [...(inputs.sanitation_targets.providers || []), { name: 'New Provider', share_pct: 0, current_hh_sewer: 0, current_hh_wwt: 0, sewer_cost_per_hh: 0, wwt_cost_per_mld: 0, existing_wwt_capacity_mld: 0, hh_sewer_served: 0, hh_wwt_served: 0 }];
           onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
         }} style={{ width: '100%', padding: '4px', border: '1px dashed #94a3b8', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
           + Add Sanitation Provider
@@ -445,13 +463,21 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={ws[2]} value={inputs.water_costs.network_cost_per_hh_serv3} onChange={v => u('water_costs','network_cost_per_hh_serv3',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
         <F label={ws[3]} value={inputs.water_costs.network_cost_per_hh_serv4} onChange={v => u('water_costs','network_cost_per_hh_serv4',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
         <F label={ws[4]} value={inputs.water_costs.network_cost_per_hh_serv5} onChange={v => u('water_costs','network_cost_per_hh_serv5',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <SubHead text={P1} />
-        <F label="Cost of extending network/HH" value={inputs.water_costs.kukl_network_cost_per_hh} onChange={v => u('water_costs','kukl_network_cost_per_hh',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <F label="Cost per MLD water treatment" value={inputs.water_costs.kukl_cost_per_mld_treatment} onChange={v => u('water_costs','kukl_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of water treatment capacity" />
-        <SubHead text={P2} />
-        <F label="Cost per capita" value={inputs.water_costs.wusc_cost_per_capita} onChange={v => u('water_costs','wusc_cost_per_capita',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost per person to connect to WUSC network" />
-        <F label="Cost per HH" value={inputs.water_costs.wusc_network_cost_per_hh} onChange={v => u('water_costs','wusc_network_cost_per_hh',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <F label="Cost per MLD treatment" value={inputs.water_costs.wusc_cost_per_mld_treatment} onChange={v => u('water_costs','wusc_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of water treatment capacity" />
+        {wProviders.map((prov: any, idx: number) => {
+          const updateWsCostProv = (field: string, val: number) => {
+            const provs = [...inputs.water_targets.providers];
+            provs[idx] = { ...provs[idx], [field]: val };
+            onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
+          };
+          return (
+            <React.Fragment key={idx}>
+              <SubHead text={prov.name} />
+              <F label="Cost of extending network/HH" value={prov.network_cost_per_hh || 0} onChange={v => updateWsCostProv('network_cost_per_hh', v)} step={1000} unit={CUR} min={0} max={10000000} tip={`Capital cost to connect one HH to ${prov.name} distribution network`} />
+              <F label="Cost per MLD water treatment" value={prov.cost_per_mld_treatment || 0} onChange={v => updateWsCostProv('cost_per_mld_treatment', v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip={`Capital cost to build 1 MLD of ${prov.name} water treatment capacity`} />
+              <F label="Cost per capita" value={prov.cost_per_capita || 0} onChange={v => updateWsCostProv('cost_per_capita', v)} step={1000} unit={CUR} min={0} max={10000000} tip={`Capital cost per person to connect to ${prov.name} network`} />
+            </React.Fragment>
+          );
+        })}
         <SubHead text="Non-piped solutions" />
         <F label="Cost of a dug well" value={inputs.water_costs.dug_well_cost} onChange={v => u('water_costs','dug_well_cost',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of constructing a dug well for one household" />
         <F label="Cost of borehole + handpump" value={inputs.water_costs.borehole_cost} onChange={v => u('water_costs','borehole_cost',v)} step={10000} unit={CUR} min={0} max={10000000} tip="Capital cost of drilling a borehole and installing a handpump" />
@@ -466,13 +492,20 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={ss[2]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv3} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv3',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
         <F label={ss[3]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv4} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv4',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
         <F label={ss[4]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv5} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv5',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label={`Cost ratio ${P2}/${P1}`} value={inputs.sanitation_costs.cost_ratio_wusc_kukl} onChange={v => u('sanitation_costs','cost_ratio_wusc_kukl',v)} step={0.1} min={0} max={10} tip={`Ratio of ${P2} sewer cost to ${P1} sewer cost`} />
-        <SubHead text={`${P1} sewered`} />
-        <F label="Cost extending network/HH" value={inputs.sanitation_costs.kukl_sewer_cost_per_hh} onChange={v => u('sanitation_costs','kukl_sewer_cost_per_hh',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.kukl_wwt_cost_per_mld} onChange={v => u('sanitation_costs','kukl_wwt_cost_per_mld',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
-        <SubHead text={`${P2} sewered`} />
-        <F label="Cost extending network/HH" value={inputs.sanitation_costs.wusc_sewer_cost_per_hh} onChange={v => u('sanitation_costs','wusc_sewer_cost_per_hh',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.wusc_wwt_cost_per_mld} onChange={v => u('sanitation_costs','wusc_wwt_cost_per_mld',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
+        {sProviders.map((prov: any, idx: number) => {
+          const updateSanCostProv = (field: string, val: number) => {
+            const provs = [...inputs.sanitation_targets.providers];
+            provs[idx] = { ...provs[idx], [field]: val };
+            onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
+          };
+          return (
+            <React.Fragment key={idx}>
+              <SubHead text={`${prov.name} sewered`} />
+              <F label="Cost extending network/HH" value={prov.sewer_cost_per_hh || 0} onChange={v => updateSanCostProv('sewer_cost_per_hh', v)} step={1000} unit={CUR} min={0} max={10000000} tip={`Capital cost to connect one HH to ${prov.name} sewer network`} />
+              <F label="Cost per MLD wastewater treatment" value={prov.wwt_cost_per_mld || 0} onChange={v => updateSanCostProv('wwt_cost_per_mld', v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip={`Capital cost to build 1 MLD of ${prov.name} wastewater treatment capacity`} />
+            </React.Fragment>
+          );
+        })}
         <SubHead text="On-site facility" />
         <F label="On-site facility Capex" value={inputs.sanitation_costs.onsite_facility_capex} onChange={v => u('sanitation_costs','onsite_facility_capex',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
         <SubHead text={`Adoption rates (whole ${scopeLower} pop)`} />
