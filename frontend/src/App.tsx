@@ -13,7 +13,7 @@ export default function App() {
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
-  const [showGuide, setShowGuide] = useState(false);
+  const [showGuide, setShowGuide] = useState(true);
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -200,7 +200,7 @@ export default function App() {
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" fullWidth />
         )}
         {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
