@@ -123,6 +123,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   const ss = [cc.san_serv1_name||'Level 1', cc.san_serv2_name||'Level 2', cc.san_serv3_name||'Level 3', cc.san_serv4_name||'Level 4', cc.san_serv5_name||'Level 5'];
   const startYr = inputs.period.model_start_year;
   const baseYr = inputs.period.baseline_year;
+  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
+  const scopeLower = scopeLabel.toLowerCase();
 
   return (
     <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
@@ -258,74 +260,74 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== POPULATION ===== */}
       <Section title="3. Population">
         <SubHead text={`Start year (${startYr})`} />
-        <F label={`Total Urban population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip="Urban population at model start year (census)" />
-        <F label={`Total Urban HHs, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip="Total urban households in millions" />
+        <F label={`Total ${scopeLabel} population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip={`${scopeLabel} population at model start year (census)`} />
+        <F label={`Total ${scopeLabel} HHs, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
         <SubHead text={`Baseline year (${baseYr})`} />
-        <F label={`Total Urban population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip="Urban population at baseline year (estimate)" />
-        <F label={`Total Urban HHs, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip="Total urban households in millions" />
+        <F label={`Total ${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
+        <F label={`Total ${scopeLabel} HHs, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
         <SubHead text="Growth rates" />
-        <F label="Projected CAGR Urban population" value={inputs.population.pop_growth_projected} onChange={v => u('population','pop_growth_projected',v)} isPercent unit="%" tip="Annual urban population growth rate for projection" />
+        <F label={`Projected CAGR ${scopeLabel} population`} value={inputs.population.pop_growth_projected} onChange={v => u('population','pop_growth_projected',v)} isPercent unit="%" tip={`Annual ${scopeLower} population growth rate for projection`} />
         <F label="Projected CAGR Avg HH size" value={inputs.population.hh_size_growth_projected} onChange={v => u('population','hh_size_growth_projected',v)} isPercent unit="%" tip="Annual change in average household size; typically negative" />
       </Section>
 
       {/* ===== WATER SERVICE LEVELS ===== */}
       <Section title="4. Water Supply Service Levels">
         <SubHead text={`${startYr} data`} />
-        <F label="HHs with on-premise treated, piped" value={inputs.water_service.hh_treated_piped_start} onChange={v => u('water_service','hh_treated_piped_start',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs without on-premise treated, piped" value={inputs.water_service.hh_no_treated_piped_start} onChange={v => u('water_service','hh_no_treated_piped_start',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_start} onChange={v => u('water_service','pct_serv1_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_start} onChange={v => u('water_service','pct_serv2_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_start} onChange={v => u('water_service','pct_serv3_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_start} onChange={v => u('water_service','pct_serv4_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_start} onChange={v => u('water_service','pct_serv5_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
+        <F label="HHs with on-premise treated, piped" value={inputs.water_service.hh_treated_piped_start} onChange={v => u('water_service','hh_treated_piped_start',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs without on-premise treated, piped" value={inputs.water_service.hh_no_treated_piped_start} onChange={v => u('water_service','hh_no_treated_piped_start',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_start} onChange={v => u('water_service','pct_serv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_start} onChange={v => u('water_service','pct_serv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_start} onChange={v => u('water_service','pct_serv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_start} onChange={v => u('water_service','pct_serv4_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_start} onChange={v => u('water_service','pct_serv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
 
         <SubHead text={`${baseYr} data`} />
-        <F label="HHs with on-premise treated, piped" value={inputs.water_service.hh_treated_piped_baseline} onChange={v => u('water_service','hh_treated_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs without on-premise piped water" value={inputs.water_service.hh_no_piped_baseline} onChange={v => u('water_service','hh_no_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
+        <F label="HHs with on-premise treated, piped" value={inputs.water_service.hh_treated_piped_baseline} onChange={v => u('water_service','hh_treated_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs without on-premise piped water" value={inputs.water_service.hh_no_piped_baseline} onChange={v => u('water_service','hh_no_piped_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <F label="Historical increase treated, piped" value={inputs.water_service.hist_increase_treated_piped} onChange={v => u('water_service','hist_increase_treated_piped',v)} isPercent unit="%" tip="Historical annual growth rate in treated piped connections" />
         <SubHead text={`${P1} served`} />
-        <F label={`HHs with piped, treated (${P1})`} value={inputs.water_service.kukl_hh_piped_treated} onChange={v => u('water_service','kukl_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`HHs with 24/7 water (${P1})`} value={inputs.water_service.kukl_hh_24hr} onChange={v => u('water_service','kukl_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
+        <F label={`HHs with piped, treated (${P1})`} value={inputs.water_service.kukl_hh_piped_treated} onChange={v => u('water_service','kukl_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`HHs with 24/7 water (${P1})`} value={inputs.water_service.kukl_hh_24hr} onChange={v => u('water_service','kukl_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <SubHead text={`${P2} served`} />
-        <F label={`HHs with piped, treated (${P2})`} value={inputs.water_service.wusc_hh_piped_treated} onChange={v => u('water_service','wusc_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`HHs with 24/7 water (${P2})`} value={inputs.water_service.wusc_hh_24hr} onChange={v => u('water_service','wusc_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
+        <F label={`HHs with piped, treated (${P2})`} value={inputs.water_service.wusc_hh_piped_treated} onChange={v => u('water_service','wusc_hh_piped_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`HHs with 24/7 water (${P2})`} value={inputs.water_service.wusc_hh_24hr} onChange={v => u('water_service','wusc_hh_24hr',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
         <SubHead text="Non-piped" />
-        <F label="HHs with non-piped" value={inputs.water_service.nonpiped_hh} onChange={v => u('water_service','nonpiped_hh',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs with treated non-piped" value={inputs.water_service.nonpiped_hh_treated} onChange={v => u('water_service','nonpiped_hh_treated',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
+        <F label="HHs with non-piped" value={inputs.water_service.nonpiped_hh} onChange={v => u('water_service','nonpiped_hh',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs with treated non-piped" value={inputs.water_service.nonpiped_hh_treated} onChange={v => u('water_service','nonpiped_hh_treated',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
 
         <SubHead text={`% HHs by service level, ${baseYr}`} />
-        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_baseline} onChange={v => u('water_service','pct_serv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_baseline} onChange={v => u('water_service','pct_serv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_baseline} onChange={v => u('water_service','pct_serv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_baseline} onChange={v => u('water_service','pct_serv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_baseline} onChange={v => u('water_service','pct_serv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
+        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_baseline} onChange={v => u('water_service','pct_serv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_baseline} onChange={v => u('water_service','pct_serv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_baseline} onChange={v => u('water_service','pct_serv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_baseline} onChange={v => u('water_service','pct_serv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_baseline} onChange={v => u('water_service','pct_serv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
       </Section>
 
       {/* ===== SANITATION SERVICE LEVELS ===== */}
       <Section title="5. Sanitation Service Levels">
         <SubHead text={`${startYr} data`} />
-        <F label="HHs with sewered sanitation" value={inputs.sanitation_service.hh_sewered_start} onChange={v => u('sanitation_service','hh_sewered_start',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs with on-site sanitation" value={inputs.sanitation_service.hh_onsite_start} onChange={v => u('sanitation_service','hh_onsite_start',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_start} onChange={v => u('sanitation_service','pct_sserv1_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_start} onChange={v => u('sanitation_service','pct_sserv2_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_start} onChange={v => u('sanitation_service','pct_sserv3_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_start} onChange={v => u('sanitation_service','pct_sserv4_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_start} onChange={v => u('sanitation_service','pct_sserv5_start',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
+        <F label="HHs with sewered sanitation" value={inputs.sanitation_service.hh_sewered_start} onChange={v => u('sanitation_service','hh_sewered_start',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs with on-site sanitation" value={inputs.sanitation_service.hh_onsite_start} onChange={v => u('sanitation_service','hh_onsite_start',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_start} onChange={v => u('sanitation_service','pct_sserv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_start} onChange={v => u('sanitation_service','pct_sserv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_start} onChange={v => u('sanitation_service','pct_sserv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_start} onChange={v => u('sanitation_service','pct_sserv4_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_start} onChange={v => u('sanitation_service','pct_sserv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
 
         <SubHead text={`${baseYr} data`} />
-        <F label="HHs with sewered sanitation" value={inputs.sanitation_service.hh_sewered_baseline} onChange={v => u('sanitation_service','hh_sewered_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs with on-site sanitation" value={inputs.sanitation_service.hh_onsite_baseline} onChange={v => u('sanitation_service','hh_onsite_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label="HHs sewered + wastewater treatment" value={inputs.sanitation_service.hh_sewered_wwt_baseline} onChange={v => u('sanitation_service','hh_sewered_wwt_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`HHs served by ${P1} sewerage`} value={inputs.sanitation_service.hh_kukl_sewer_baseline} onChange={v => u('sanitation_service','hh_kukl_sewer_baseline',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`${P1} HHs with WWT`} value={inputs.sanitation_service.kukl_hh_wwt} onChange={v => u('sanitation_service','kukl_hh_wwt',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
-        <F label={`${P2} HHs with sewer`} value={inputs.sanitation_service.wusc_hh_sewer} onChange={v => u('sanitation_service','wusc_hh_sewer',v)} unit="HHs" min={0} max={10000000} tip="Number of urban households with this service" />
+        <F label="HHs with sewered sanitation" value={inputs.sanitation_service.hh_sewered_baseline} onChange={v => u('sanitation_service','hh_sewered_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs with on-site sanitation" value={inputs.sanitation_service.hh_onsite_baseline} onChange={v => u('sanitation_service','hh_onsite_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label="HHs sewered + wastewater treatment" value={inputs.sanitation_service.hh_sewered_wwt_baseline} onChange={v => u('sanitation_service','hh_sewered_wwt_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`HHs served by ${P1} sewerage`} value={inputs.sanitation_service.hh_kukl_sewer_baseline} onChange={v => u('sanitation_service','hh_kukl_sewer_baseline',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`${P1} HHs with WWT`} value={inputs.sanitation_service.kukl_hh_wwt} onChange={v => u('sanitation_service','kukl_hh_wwt',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
+        <F label={`${P2} HHs with sewer`} value={inputs.sanitation_service.wusc_hh_sewer} onChange={v => u('sanitation_service','wusc_hh_sewer',v)} unit="HHs" min={0} max={10000000} tip={`Number of ${scopeLower} households with this service`} />
 
         <SubHead text={`% HHs by service level, ${baseYr}`} />
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_baseline} onChange={v => u('sanitation_service','pct_sserv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_baseline} onChange={v => u('sanitation_service','pct_sserv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_baseline} onChange={v => u('sanitation_service','pct_sserv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_baseline} onChange={v => u('sanitation_service','pct_sserv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_baseline} onChange={v => u('sanitation_service','pct_sserv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip="Share of urban HHs at this service level; all 5 must sum to 100%" />
+        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_baseline} onChange={v => u('sanitation_service','pct_sserv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_baseline} onChange={v => u('sanitation_service','pct_sserv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_baseline} onChange={v => u('sanitation_service','pct_sserv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_baseline} onChange={v => u('sanitation_service','pct_sserv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
+        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_baseline} onChange={v => u('sanitation_service','pct_sserv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
       </Section>
 
       {/* ===== WATER TARGETS ===== */}
@@ -473,12 +475,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.wusc_wwt_cost_per_mld} onChange={v => u('sanitation_costs','wusc_wwt_cost_per_mld',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
         <SubHead text="On-site facility" />
         <F label="On-site facility Capex" value={inputs.sanitation_costs.onsite_facility_capex} onChange={v => u('sanitation_costs','onsite_facility_capex',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <SubHead text="Adoption rates (whole urban pop)" />
-        <F label="Septic tank" value={inputs.sanitation_costs.adopt_septic_tank} onChange={v => u('sanitation_costs','adopt_septic_tank',v)} isPercent unit="%" tip="Share of urban population using this type; all types should sum to total on-site %" />
-        <F label="Pit latrine" value={inputs.sanitation_costs.adopt_pit_latrine} onChange={v => u('sanitation_costs','adopt_pit_latrine',v)} isPercent unit="%" tip="Share of urban population using this type; all types should sum to total on-site %" />
-        <F label="VIP latrine" value={inputs.sanitation_costs.adopt_vip_latrine} onChange={v => u('sanitation_costs','adopt_vip_latrine',v)} isPercent unit="%" tip="Share of urban population using this type; all types should sum to total on-site %" />
-        <F label="Pit latrine with slab" value={inputs.sanitation_costs.adopt_pit_with_slab} onChange={v => u('sanitation_costs','adopt_pit_with_slab',v)} isPercent unit="%" tip="Share of urban population using this type; all types should sum to total on-site %" />
-        <F label="Composting toilet" value={inputs.sanitation_costs.adopt_composting_toilet} onChange={v => u('sanitation_costs','adopt_composting_toilet',v)} isPercent unit="%" tip="Share of urban population using this type; all types should sum to total on-site %" />
+        <SubHead text={`Adoption rates (whole ${scopeLower} pop)`} />
+        <F label="Septic tank" value={inputs.sanitation_costs.adopt_septic_tank} onChange={v => u('sanitation_costs','adopt_septic_tank',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
+        <F label="Pit latrine" value={inputs.sanitation_costs.adopt_pit_latrine} onChange={v => u('sanitation_costs','adopt_pit_latrine',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
+        <F label="VIP latrine" value={inputs.sanitation_costs.adopt_vip_latrine} onChange={v => u('sanitation_costs','adopt_vip_latrine',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
+        <F label="Pit latrine with slab" value={inputs.sanitation_costs.adopt_pit_with_slab} onChange={v => u('sanitation_costs','adopt_pit_with_slab',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
+        <F label="Composting toilet" value={inputs.sanitation_costs.adopt_composting_toilet} onChange={v => u('sanitation_costs','adopt_composting_toilet',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
         <SubHead text="Cost per facility type" />
         <F label="Septic tank" value={inputs.sanitation_costs.cost_septic_tank} onChange={v => u('sanitation_costs','cost_septic_tank',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
         <F label="Pit latrine" value={inputs.sanitation_costs.cost_pit_latrine} onChange={v => u('sanitation_costs','cost_pit_latrine',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
