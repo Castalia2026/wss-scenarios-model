@@ -199,9 +199,10 @@ export default function App() {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {activeTab === 0 && inputs && (
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" fullWidth />
-        )}
+        {activeTab === 0 && inputs && (<>
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
+          <DataInputOverview inputs={inputs} geoScope={geoScope} />
+        </>)}
         {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
@@ -296,6 +297,181 @@ function SectorToggle({ value, onChange }: { value: 'water' | 'sanitation'; onCh
           color: value === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
         }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
       ))}
+    </div>
+  );
+}
+
+// ─── Data Input Overview (middle panel for tab 0) ───
+function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string }) {
+  if (!inputs) return null;
+  const cc = inputs.country_config || {};
+  const p = inputs.period || {};
+  const pop = inputs.population || {};
+  const wt = inputs.water_targets || {};
+  const st = inputs.sanitation_targets || {};
+  const ws = inputs.water_service || {};
+  const san = inputs.sanitation_service || {};
+  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
+
+  const wProviders = wt.providers || [];
+  const sProviders = st.providers || [];
+
+  // Completeness check helpers
+  const filled = (v: any) => v !== undefined && v !== null && v !== 0 && v !== '';
+  const sections = [
+    { name: 'Country & Region', done: filled(cc.country) && filled(cc.currency), total: 2 },
+    { name: 'Period', done: [p.model_start_year, p.forecast_end_year, p.baseline_year, p.target1_year, p.target2_year].filter(filled).length, total: 5 },
+    { name: 'Macroeconomics', done: filled(inputs.macro?.wash_budget_pct_gdp) ? 1 : 0, total: 1 },
+    { name: 'Population', done: [pop.total_pop_start, pop.total_hh_start, pop.total_pop_baseline, pop.total_hh_baseline].filter(filled).length, total: 4 },
+    { name: 'Water Service Levels', done: [ws.hh_treated_piped_start, ws.pct_serv1_start].filter(filled).length, total: 2 },
+    { name: 'Sanitation Service Levels', done: [san.hh_sewered_start, san.pct_sserv1_start].filter(filled).length, total: 2 },
+    { name: 'Water Targets', done: [wt.target1_serv1, wt.planned_treatment_capacity_mld].filter(filled).length, total: 2 },
+    { name: 'Sanitation Targets', done: [st.target1_sserv1, st.onsite_collection_treatment_pct].filter(filled).length, total: 2 },
+  ];
+  const totalDone = sections.reduce((s, x) => s + x.done, 0);
+  const totalAll = sections.reduce((s, x) => s + x.total, 0);
+  const pctDone = Math.round((totalDone / totalAll) * 100);
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 24px', background: '#fff' }}>
+      {/* Country header card */}
+      <div style={{ background: '#f0f4ff', borderRadius: 10, padding: '16px 20px', marginBottom: 16, border: '1px solid #c7d2fe' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <div style={{ fontSize: 18, fontWeight: 700, color: '#1e3a5f' }}>{cc.country || 'No country selected'}</div>
+            <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>{cc.area || 'No region'} — <strong>{scopeLabel}</strong> scope</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 11, color: '#64748b' }}>Currency</div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f' }}>{cc.currency || '—'}</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Completeness bar */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#64748b', marginBottom: 4 }}>
+          <span>Data completeness</span>
+          <span style={{ fontWeight: 700, color: pctDone === 100 ? '#16a34a' : '#f59e0b' }}>{pctDone}%</span>
+        </div>
+        <div style={{ height: 8, background: '#e5e7eb', borderRadius: 4, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${pctDone}%`, background: pctDone === 100 ? '#16a34a' : '#2563eb', borderRadius: 4, transition: 'width 0.3s' }} />
+        </div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+          {sections.map((s, i) => (
+            <span key={i} style={{
+              fontSize: 10, padding: '3px 8px', borderRadius: 10,
+              background: s.done === s.total ? '#dcfce7' : s.done > 0 ? '#fef3c7' : '#f1f5f9',
+              color: s.done === s.total ? '#16a34a' : s.done > 0 ? '#92400e' : '#94a3b8',
+              fontWeight: 500,
+            }}>
+              {s.done === s.total ? '✓' : s.done > 0 ? '◐' : '○'} {s.name}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Key numbers summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 20 }}>
+        <SummaryCard label="Analysis period" value={p.model_start_year && p.forecast_end_year ? `${p.model_start_year} – ${p.forecast_end_year}` : '—'} sub={`Baseline: ${p.baseline_year || '—'}`} />
+        <SummaryCard label={`${scopeLabel} population`} value={pop.total_pop_baseline ? pop.total_pop_baseline.toLocaleString() : '—'} sub={`${pop.total_hh_baseline ? pop.total_hh_baseline.toFixed(3) + 'M HHs' : '—'} (${p.baseline_year || '—'})`} />
+        <SummaryCard label="Target milestones" value={p.target1_year && p.target2_year ? `${p.target1_year} / ${p.target2_year}` : '—'} sub="Target 1 / Target 2" />
+        <SummaryCard label="Pop. growth CAGR" value={pop.pop_growth_projected ? (pop.pop_growth_projected * 100).toFixed(2) + '%' : '—'} sub="Annual projection rate" />
+      </div>
+
+      {/* Providers summary */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 20 }}>
+        <div style={{ border: '1px solid #bfdbfe', borderRadius: 8, padding: '12px 14px', background: '#f0f9ff' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#1e40af', marginBottom: 8 }}>Water Supply Providers ({wProviders.length})</div>
+          {wProviders.length === 0 && <div style={{ fontSize: 10, color: '#94a3b8' }}>None added yet</div>}
+          {wProviders.map((prov: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '3px 0', borderBottom: i < wProviders.length - 1 ? '1px solid #dbeafe' : 'none' }}>
+              <span style={{ color: '#334155', fontWeight: 500 }}>{prov.name}</span>
+              <span style={{ color: '#2563eb', fontWeight: 600 }}>{(prov.share_pct * 100).toFixed(0)}%</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ border: '1px solid #c4b5fd', borderRadius: 8, padding: '12px 14px', background: '#faf5ff' }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#6d28d9', marginBottom: 8 }}>Sanitation Providers ({sProviders.length})</div>
+          {sProviders.length === 0 && <div style={{ fontSize: 10, color: '#94a3b8' }}>None added yet</div>}
+          {sProviders.map((prov: any, i: number) => (
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '3px 0', borderBottom: i < sProviders.length - 1 ? '1px solid #e9d5ff' : 'none' }}>
+              <span style={{ color: '#334155', fontWeight: 500 }}>{prov.name}</span>
+              <span style={{ color: '#7c3aed', fontWeight: 600 }}>{(prov.share_pct * 100).toFixed(0)}%</span>
+            </div>
+          ))}
+          {st.onsite_collection_treatment_pct > 0 && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, padding: '3px 0', color: '#64748b', fontStyle: 'italic' }}>
+              <span>On-site</span>
+              <span>{(st.onsite_collection_treatment_pct * 100).toFixed(0)}%</span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Water service levels at baseline (mini bar) */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Water Service Levels ({p.baseline_year || '—'})</div>
+        <ServiceBar
+          levels={[
+            { name: cc.ws_serv1_name || 'Safely Managed', pct: ws.pct_serv1_baseline || 0, color: '#2563eb' },
+            { name: cc.ws_serv2_name || 'Basic', pct: ws.pct_serv2_baseline || 0, color: '#10b981' },
+            { name: cc.ws_serv3_name || 'Limited', pct: ws.pct_serv3_baseline || 0, color: '#f59e0b' },
+            { name: cc.ws_serv4_name || 'Unimproved', pct: ws.pct_serv4_baseline || 0, color: '#ef4444' },
+            { name: cc.ws_serv5_name || 'No Service', pct: ws.pct_serv5_baseline || 0, color: '#64748b' },
+          ]}
+        />
+      </div>
+
+      {/* Sanitation service levels at baseline */}
+      <div style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Sanitation Service Levels ({p.baseline_year || '—'})</div>
+        <ServiceBar
+          levels={[
+            { name: cc.san_serv1_name || 'Safely Managed', pct: san.pct_sserv1_baseline || 0, color: '#7c3aed' },
+            { name: cc.san_serv2_name || 'Basic', pct: san.pct_sserv2_baseline || 0, color: '#10b981' },
+            { name: cc.san_serv3_name || 'Limited', pct: san.pct_sserv3_baseline || 0, color: '#f59e0b' },
+            { name: cc.san_serv4_name || 'Unimproved', pct: san.pct_sserv4_baseline || 0, color: '#ef4444' },
+            { name: cc.san_serv5_name || 'No Service', pct: san.pct_sserv5_baseline || 0, color: '#64748b' },
+          ]}
+        />
+      </div>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, sub }: { label: string; value: string; sub: string }) {
+  return (
+    <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2 }}>{label}</div>
+      <div style={{ fontSize: 16, fontWeight: 700, color: '#1e3a5f' }}>{value}</div>
+      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 1 }}>{sub}</div>
+    </div>
+  );
+}
+
+function ServiceBar({ levels }: { levels: { name: string; pct: number; color: string }[] }) {
+  const total = levels.reduce((s, l) => s + l.pct, 0);
+  return (
+    <div>
+      <div style={{ display: 'flex', height: 18, borderRadius: 4, overflow: 'hidden', background: '#e5e7eb' }}>
+        {levels.map((l, i) => l.pct > 0 ? (
+          <div key={i} style={{ width: `${l.pct * 100}%`, background: l.color, transition: 'width 0.3s' }}
+            title={`${l.name}: ${(l.pct * 100).toFixed(1)}%`} />
+        ) : null)}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
+        {levels.map((l, i) => (
+          <span key={i} style={{ fontSize: 9, display: 'flex', alignItems: 'center', gap: 3 }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: l.color, display: 'inline-block' }} />
+            <span style={{ color: '#475569' }}>{l.name}</span>
+            <span style={{ color: '#94a3b8' }}>{(l.pct * 100).toFixed(1)}%</span>
+          </span>
+        ))}
+      </div>
+      {total > 0 && Math.abs(total - 1) > 0.005 && (
+        <div style={{ fontSize: 9, color: '#ef4444', marginTop: 2 }}>⚠ Sum: {(total * 100).toFixed(1)}% (should be 100%)</div>
+      )}
     </div>
   );
 }
