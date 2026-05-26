@@ -13,6 +13,7 @@ export default function App() {
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
+  const [showGuide, setShowGuide] = useState(false);
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -197,7 +198,7 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
         )}
@@ -214,6 +215,20 @@ export default function App() {
         {activeTab === 3 && (
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
         )}
+
+        {/* Data Guide toggle + panel */}
+        <button onClick={() => setShowGuide(!showGuide)} style={{
+          position: 'absolute', right: showGuide ? 340 : 0, top: 12,
+          padding: '8px 6px', border: '1px solid #cbd5e1', borderRight: showGuide ? 'none' : '1px solid #cbd5e1',
+          borderRadius: showGuide ? '6px 0 0 6px' : '6px 0 0 6px',
+          background: showGuide ? '#eef2ff' : '#f8fafc', cursor: 'pointer',
+          fontSize: 11, color: '#4338ca', fontWeight: 600, zIndex: 10,
+          writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: 1,
+          boxShadow: '-2px 0 6px rgba(0,0,0,0.06)', transition: 'right 0.2s',
+        }}>
+          {showGuide ? '✕ Close' : '📋 Guide'}
+        </button>
+        {showGuide && <DataGuide tab={activeTab} />}
       </div>
 
       {/* Onboarding */}
@@ -281,6 +296,216 @@ function SectorToggle({ value, onChange }: { value: 'water' | 'sanitation'; onCh
           color: value === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
         }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
       ))}
+    </div>
+  );
+}
+
+// ─── Data Guide per tab ───
+const guideData: Record<number, { title: string; sections: { heading: string; items: { field: string; source: string; url: string }[] }[] }> = {
+  0: {
+    title: 'Data Input — Where to Find the Data',
+    sections: [
+      {
+        heading: '0. Country & Region',
+        items: [
+          { field: 'Country name & currency', source: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' },
+          { field: 'Region / area name', source: 'Government administrative divisions or project TOR', url: '#' },
+        ],
+      },
+      {
+        heading: '1. Period',
+        items: [
+          { field: 'Model start / baseline / forecast years', source: 'Project TOR or latest available census/survey year', url: '#' },
+          { field: 'Target years (SDG milestones)', source: 'National WASH strategy or SDG 6 targets', url: 'https://sdgs.un.org/goals/goal6' },
+        ],
+      },
+      {
+        heading: '2. Macroeconomics',
+        items: [
+          { field: 'GDP growth, nominal GDP', source: 'IMF World Economic Outlook', url: 'https://www.imf.org/en/Publications/WEO' },
+          { field: 'Inflation (domestic & US)', source: 'World Bank Indicators or central bank', url: 'https://data.worldbank.org/indicator/FP.CPI.TOTL.ZG' },
+          { field: 'Exchange rate (USD/LCU)', source: 'World Bank or central bank', url: 'https://data.worldbank.org/indicator/PA.NUS.FCRF' },
+          { field: 'WASH budget % of GDP', source: 'Government budget documents, UNICEF WASH budget briefs', url: 'https://www.unicef.org/documents/wash-budget-briefs' },
+        ],
+      },
+      {
+        heading: '3. Population',
+        items: [
+          { field: 'Total population & HHs (start/baseline)', source: 'National census or UN Population Division', url: 'https://population.un.org/wpp/' },
+          { field: 'Population growth CAGR', source: 'UN Population Division or national statistics office', url: 'https://population.un.org/wpp/' },
+          { field: 'Average HH size trend', source: 'DHS or national household survey', url: 'https://dhsprogram.com/' },
+        ],
+      },
+      {
+        heading: '4–5. Service Levels (Water & Sanitation)',
+        items: [
+          { field: 'HHs by service level (JMP ladder)', source: 'WHO/UNICEF JMP country files', url: 'https://washdata.org/data/household' },
+          { field: 'HHs with piped/treated water', source: 'Utility annual reports or JMP', url: 'https://washdata.org/' },
+          { field: 'HHs with sewered / on-site sanitation', source: 'Utility data, JMP, or national sanitation survey', url: 'https://washdata.org/data/household' },
+          { field: 'Provider-specific HH counts', source: 'Individual utility annual reports or regulator', url: '#' },
+        ],
+      },
+      {
+        heading: '6–7. Targets (Water & Sanitation)',
+        items: [
+          { field: 'Target service level distribution', source: 'National WASH policy/strategy document', url: '#' },
+          { field: 'Provider share allocations', source: 'Government master plan or utility business plans', url: '#' },
+          { field: 'Treatment capacity plans', source: 'Utility capital investment plans', url: '#' },
+        ],
+      },
+    ],
+  },
+  1: {
+    title: 'BAU & Costs — Where to Find the Data',
+    sections: [
+      {
+        heading: '8. Water Supply Unit Costs',
+        items: [
+          { field: 'Network cost per HH (by service level)', source: 'Utility capital budgets or World Bank project appraisals', url: '#' },
+          { field: 'Provider-specific connection costs', source: 'Individual utility annual reports', url: '#' },
+          { field: 'Treatment cost per MLD', source: 'Engineering feasibility studies or IBNET', url: 'https://www.ib-net.org/' },
+          { field: 'Non-piped solution costs (wells, boreholes)', source: 'UNICEF cost benchmarks or national WASH surveys', url: '#' },
+        ],
+      },
+      {
+        heading: '9. Sanitation Unit Costs',
+        items: [
+          { field: 'Sewerage cost per HH', source: 'Utility capital budgets or World Bank project appraisals', url: '#' },
+          { field: 'WWT cost per MLD', source: 'Engineering studies or IBNET', url: 'https://www.ib-net.org/' },
+          { field: 'On-site facility costs (septic, latrine)', source: 'National sanitation cost study or UNICEF', url: '#' },
+          { field: 'FS collection & treatment costs', source: 'FSM cost studies (e.g., World Bank FSM toolbox)', url: 'https://www.worldbank.org/en/topic/sanitation/brief/fecal-sludge-management-tools' },
+        ],
+      },
+      {
+        heading: '10. BAU Investment',
+        items: [
+          { field: 'Historical & planned investment amounts', source: 'Government budget books, MTEF, or donor databases', url: '#' },
+          { field: 'Regional spending shares', source: 'Government budget allocation documents', url: '#' },
+          { field: 'Sector splits (water vs sanitation)', source: 'WASH sector review or TrackFin', url: 'https://www.who.int/teams/environment-climate-change-and-health/water-sanitation-and-health/monitoring-and-evidence/wash-systems-monitoring/un-water-glaas/trackfin' },
+          { field: 'Budget execution rates', source: 'Public expenditure reviews (PER) or PEFA assessments', url: 'https://www.pefa.org/' },
+          { field: 'WASH budget as % of GDP', source: 'UN-Water GLAAS report or government budget docs', url: 'https://www.who.int/teams/environment-climate-change-and-health/water-sanitation-and-health/monitoring-and-evidence/wash-systems-monitoring/un-water-glaas' },
+        ],
+      },
+      {
+        heading: '11. Technical Inputs',
+        items: [
+          { field: 'Asset useful life', source: 'Engineering standards or utility asset management plans', url: '#' },
+          { field: 'Treatment capacity (existing & proposed)', source: 'Utility asset registers or feasibility studies', url: '#' },
+          { field: 'Water requirement per WHO (lpcd)', source: 'WHO guidelines (50–100 lpcd)', url: 'https://www.who.int/publications/i/item/9789241548151' },
+          { field: 'Wastewater factor (% of water supply)', source: 'Engineering norms (typically 70–80%)', url: '#' },
+        ],
+      },
+    ],
+  },
+  2: {
+    title: 'Interventions — Where to Find the Data',
+    sections: [
+      {
+        heading: '12. Water Interventions',
+        items: [
+          { field: 'Collection efficiency (current & target ratio)', source: 'Utility billing & collection reports', url: '#' },
+          { field: 'NRW % (current & target)', source: 'Utility NRW assessment or IBNET benchmarks', url: 'https://www.ib-net.org/' },
+          { field: 'NRW capex unit cost (USD per m3/day)', source: 'World Bank NRW reduction cost studies', url: '#' },
+          { field: 'Capital efficiency gains %', source: 'Procurement reform benchmarks (typically 10–30%)', url: '#' },
+          { field: 'Tariff data (income, revenue, expenditure)', source: 'Utility financial statements + household surveys', url: '#' },
+          { field: 'Borrowing parameters (DSCR, tenor, rate)', source: 'Local financial market or development bank terms', url: '#' },
+        ],
+      },
+      {
+        heading: '13. Sanitation Interventions',
+        items: [
+          { field: 'Collection efficiency & sewer tariff', source: 'Sanitation utility billing data', url: '#' },
+          { field: 'Capital efficiency gains', source: 'Same procurement reform benchmarks as water', url: '#' },
+          { field: 'Tariff & O&M recovery', source: 'Utility financial statements', url: '#' },
+          { field: 'Borrowing parameters', source: 'Local financial market or development bank terms', url: '#' },
+          { field: 'Microfinance (cost, tenor, adoption rate)', source: 'Microfinance institution data or pilot studies', url: '#' },
+        ],
+      },
+      {
+        heading: '14. Custom Interventions',
+        items: [
+          { field: 'Donor grants / government transfers', source: 'Donor commitment letters or project appraisals', url: '#' },
+          { field: 'Climate finance or carbon credits', source: 'GCF, GEF, or carbon market platforms', url: 'https://www.greenclimate.fund/' },
+          { field: 'PPP / private sector contributions', source: 'PPP contract or transaction advisor reports', url: '#' },
+        ],
+      },
+    ],
+  },
+  3: {
+    title: 'Results Dashboard — Guide',
+    sections: [
+      {
+        heading: 'Reading the Charts',
+        items: [
+          { field: 'Coverage progress (stacked area)', source: 'Shows projected HHs by service level over time', url: '#' },
+          { field: 'Financing gap chart', source: 'BAU investment vs. target investment needed', url: '#' },
+          { field: 'National = Urban + Rural rollup', source: 'Switch to National scope in header to see all three charts', url: '#' },
+        ],
+      },
+      {
+        heading: 'Exporting Results',
+        items: [
+          { field: 'PowerPoint export', source: 'Generates presentation slides with charts & tables', url: '#' },
+          { field: 'Excel export', source: 'Full data tables for offline analysis', url: '#' },
+          { field: 'CSV export', source: 'Raw data for import into other tools', url: '#' },
+        ],
+      },
+      {
+        heading: 'Scenario Comparison',
+        items: [
+          { field: 'Save scenarios from header bar', source: 'Click "Save Scenario" to snapshot current inputs', url: '#' },
+          { field: 'Load & compare saved scenarios', source: 'Click scenario name in the scenarios bar to restore', url: '#' },
+          { field: 'Export individual scenario slides', source: 'Click the 📑 icon next to a saved scenario', url: '#' },
+        ],
+      },
+    ],
+  },
+};
+
+function DataGuide({ tab }: { tab: number }) {
+  const guide = guideData[tab];
+  if (!guide) return null;
+  return (
+    <div style={{
+      width: 340, borderLeft: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto',
+      padding: '16px 18px', fontSize: 11, flexShrink: 0,
+    }}>
+      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#312e81', margin: '0 0 12px', borderBottom: '2px solid #c7d2fe', paddingBottom: 6 }}>
+        {guide.title}
+      </h3>
+      {guide.sections.map((sec, si) => (
+        <div key={si} style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6, background: '#e0e7ff', padding: '4px 8px', borderRadius: 4 }}>
+            {sec.heading}
+          </div>
+          {sec.items.map((item, ii) => (
+            <div key={ii} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: '2px solid #e0e7ff' }}>
+              <div style={{ fontWeight: 600, color: '#334155', marginBottom: 2 }}>{item.field}</div>
+              <div style={{ color: '#64748b', lineHeight: 1.4 }}>
+                {item.source}
+                {item.url !== '#' && (
+                  <a href={item.url} target="_blank" rel="noopener noreferrer"
+                    style={{ display: 'block', color: '#4338ca', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>
+                    {item.url}
+                  </a>
+                )}
+                {item.url === '#' && (
+                  <span style={{ display: 'block', color: '#94a3b8', fontSize: 10, marginTop: 2, fontStyle: 'italic' }}>
+                    URL placeholder — to be updated
+                  </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ))}
+      <div style={{ marginTop: 12, padding: '8px 10px', background: '#fef3c7', borderRadius: 6, fontSize: 10, color: '#92400e' }}>
+        <strong>Tip:</strong> If a specific data source is unavailable for your country, check the World Bank Open Data portal or contact the local WASH sector coordinator.
+        <a href="https://data.worldbank.org/" target="_blank" rel="noopener noreferrer"
+          style={{ display: 'block', color: '#92400e', marginTop: 4 }}>
+          https://data.worldbank.org/
+        </a>
+      </div>
     </div>
   );
 }
