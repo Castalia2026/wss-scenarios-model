@@ -81,9 +81,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-interface Props { inputs: any; onChange: (i: any) => void; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; }
+interface Props { inputs: any; onChange: (i: any) => void; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; fullWidth?: boolean; }
 
-export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs', geoScope = 'urban' }: Props) {
+export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs', geoScope = 'urban', fullWidth = false }: Props) {
   const [countries, setCountries] = useState<{name:string, currency:string}[]>([]);
 
   React.useEffect(() => {
@@ -127,7 +127,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   const scopeLower = scopeLabel.toLowerCase();
 
   return (
-    <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
+    <div style={{ width: fullWidth ? undefined : 400, flex: fullWidth ? 1 : undefined, overflowY: 'auto', padding: fullWidth ? '12px 24px' : 12, background: '#fafbfc', borderRight: fullWidth ? 'none' : '1px solid #e0e0e0', fontSize: 11 }}>
       <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
         {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
       </h2>
