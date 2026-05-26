@@ -52,9 +52,9 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-interface Props { inputs: any; onChange: (i: any) => void; }
+interface Props { inputs: any; onChange: (i: any) => void; sectorTab?: 'water' | 'sanitation'; onSectorChange?: (v: 'water' | 'sanitation') => void; }
 
-export default function InterventionPanel({ inputs, onChange }: Props) {
+export default function InterventionPanel({ inputs, onChange, sectorTab = 'water', onSectorChange }: Props) {
   const u = (section: string, field: string, value: number) => {
     onChange({ ...inputs, [section]: { ...inputs[section], [field]: value } });
   };
@@ -273,8 +273,19 @@ export default function InterventionPanel({ inputs, onChange }: Props) {
         </Section>
       </div>
 
-      {/* Right: intervention impact chart */}
+      {/* Right: sector toggle + intervention impact chart */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+        {onSectorChange && (
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            {(['water', 'sanitation'] as const).map(s => (
+              <button key={s} onClick={() => onSectorChange(s)} style={{
+                padding: '7px 18px', border: 'none', borderRadius: 5, cursor: 'pointer',
+                background: sectorTab === s ? '#2563eb' : '#e5e7eb',
+                color: sectorTab === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
+              }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
+            ))}
+          </div>
+        )}
         <InterventionImpactChart />
       </div>
     </div>
