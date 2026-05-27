@@ -229,7 +229,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== MACROECONOMICS ===== */}
       <Section title="2. Macroeconomics">
         <F label="Year for real prices" value={inputs.macro.real_price_year} onChange={v => u('macro','real_price_year',v)} min={inputs.period.model_start_year} max={inputs.period.baseline_year} tip="Base year for converting nominal to real values; must be a year with actual data" />
-        <F label="WASH budget as % of GDP" value={inputs.macro.wash_budget_pct_gdp || 0} onChange={v => u('macro','wash_budget_pct_gdp',v)} isPercent unit="%" tip="Federal+provincial WASH budget as share of GDP" />
+        <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
+        <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
         <SubHead text="Time-series data (year by year)" />
         <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
@@ -477,8 +478,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                   <F label="Start year" value={p.start} onChange={v => updatePeriod(idx, 'start', v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} />
                   <F label="End year" value={p.end} onChange={v => updatePeriod(idx, 'end', v)} min={p.start} max={inputs.period.forecast_end_year} />
                 </>}
-                <F label="Water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total water supply investment for this period" />
-                <F label="Sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total sanitation investment for this period" />
+                <F label="Planned water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned water supply investment for this period" />
+                <F label="Planned sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned sanitation investment for this period" />
               </div>
             ))}
             <button onClick={() => {
