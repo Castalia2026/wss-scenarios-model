@@ -276,13 +276,15 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       <Section title="3. Population">
         <SubHead text={`Start year (${startYr})`} />
         <F label={`Total ${scopeLabel} population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip={`${scopeLabel} population at model start year (census)`} />
-        <F label={`Total ${scopeLabel} HHs, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label={`Total ${scopeLabel} households, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label="Avg household size (calculated)" value={avgHHSizeStart} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_start||0).toLocaleString()} / ${((pop.total_hh_start||0)*1e6).toLocaleString()}`} />
         <SubHead text={`Baseline year (${baseYr})`} />
         <F label={`Total ${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
-        <F label={`Total ${scopeLabel} HHs, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label={`Total ${scopeLabel} households, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label="Avg household size (calculated)" value={avgHHSizeBase} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_baseline||0).toLocaleString()} / ${((pop.total_hh_baseline||0)*1e6).toLocaleString()}`} />
         <SubHead text="Computed growth rates" />
         <F label="Population CAGR (calculated)" value={popCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`CAGR from ${startYr} to ${baseYr}: (${(pop.total_pop_baseline||0).toLocaleString()} / ${(pop.total_pop_start||0).toLocaleString()})^(1/${nYears}) - 1`} />
-        <F label="Avg HH size CAGR (calculated)" value={hhSizeCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Average HH size: ${avgHHSizeStart.toFixed(2)} (${startYr}) → ${avgHHSizeBase.toFixed(2)} (${baseYr})`} />
+        <F label="Avg household size CAGR (calculated)" value={hhSizeCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Household size: ${avgHHSizeStart.toFixed(2)} (${startYr}) → ${avgHHSizeBase.toFixed(2)} (${baseYr})`} />
       </Section>
 
       {/* ===== WATER SERVICE LEVELS ===== */}
