@@ -249,7 +249,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           {[
             { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban-only, rural-only, or national analysis with urban + rural rollup.', icon: '📝' },
             { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments, budget execution rates), and technical parameters (asset life, treatment capacity, non-HH rates).', icon: '💰' },
-            { step: '3', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, microfinance, and budget execution improvement. Add custom interventions.', icon: '🔧' },
+            { step: '3', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Add custom interventions.', icon: '🔧' },
             { step: '4', title: 'Results Dashboard', desc: 'View example outputs showing what the final tool will produce: coverage progress charts for rural water, urban water, and national water. Hover over data points for precise values. Save scenarios and export individual slides or full presentations.', icon: '📊' },
           ].map(s => (
             <div key={s.step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
@@ -372,20 +372,64 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
     {
       section: 'Water Supply Targets', sectionNum: '6',
       items: [
-        { label: 'At least one water provider defined', ok: (wt.providers || []).length > 0 && filled((wt.providers || [])[0]?.name) },
-        { label: 'Provider shares sum to 100%', ok: Math.abs(((wt.providers || []).reduce((s: number, pr: any) => s + (pr.share_pct || 0), 0)) - 1) < 0.005 },
         { label: 'Target 1 service levels (5 levels)', ok: [wt.target1_serv1, wt.target1_serv2, wt.target1_serv3, wt.target1_serv4, wt.target1_serv5].some((v: number) => filled(v)) },
         { label: 'Target 2 service levels (5 levels)', ok: [wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5].some((v: number) => filled(v)) },
-        { label: 'Planned treatment capacity (MLD)', ok: filled(wt.planned_treatment_capacity_mld) },
       ],
     },
     {
       section: 'Sanitation Targets', sectionNum: '7',
       items: [
-        { label: 'At least one sanitation provider defined', ok: (st.providers || []).length > 0 && filled((st.providers || [])[0]?.name) },
-        { label: 'Provider shares + on-site sum to 100%', ok: Math.abs(((st.providers || []).reduce((s: number, pr: any) => s + (pr.share_pct || 0), 0) + (st.onsite_collection_treatment_pct || 0)) - 1) < 0.005 },
+        { label: 'On-site collection & treatment %', ok: filled(st.onsite_collection_treatment_pct) },
         { label: 'Target 1 service levels (5 levels)', ok: [st.target1_sserv1, st.target1_sserv2, st.target1_sserv3, st.target1_sserv4, st.target1_sserv5].some((v: number) => filled(v)) },
         { label: 'Target 2 service levels (5 levels)', ok: [st.target2_sserv1, st.target2_sserv2, st.target2_sserv3, st.target2_sserv4, st.target2_sserv5].some((v: number) => filled(v)) },
+      ],
+    },
+    // --- BAU & Costs tab (§8-11) ---
+    {
+      section: 'Water Unit Costs', sectionNum: '8',
+      items: [
+        { label: 'Distribution network cost per HH (at least 1 level)', ok: filled(inputs.water_costs?.network_cost_per_hh_serv1) || filled(inputs.water_costs?.network_cost_per_hh_serv2) },
+        { label: 'Cost per MLD water treatment', ok: filled(inputs.water_costs?.ws_cost_per_mld_treatment) },
+      ],
+    },
+    {
+      section: 'Sanitation Unit Costs', sectionNum: '9',
+      items: [
+        { label: 'Sewerage cost per HH (at least 1 level)', ok: filled(inputs.sanitation_costs?.sewer_cost_per_hh_sserv1) || filled(inputs.sanitation_costs?.sewer_cost_per_hh_sserv2) },
+        { label: 'Cost per MLD wastewater treatment', ok: filled(inputs.sanitation_costs?.san_cost_per_mld_treatment) },
+      ],
+    },
+    {
+      section: 'BAU Investment', sectionNum: '10',
+      items: [
+        { label: 'Water/Sanitation % of WSS budget', ok: filled(inputs.bau?.ws_pct_of_wss) },
+        { label: 'Capex % of budget', ok: filled(inputs.bau?.capex_pct_budget) },
+      ],
+    },
+    {
+      section: 'Technical Inputs', sectionNum: '11',
+      items: [
+        { label: 'Water asset life', ok: filled(inputs.technical?.ws_asset_life) },
+        { label: 'Existing water treatment capacity', ok: filled(inputs.technical?.ws_existing_treatment_mld) },
+        { label: 'Sanitation asset life', ok: filled(inputs.technical?.san_asset_life) },
+        { label: 'Avg capex/MLD for WWT', ok: filled(inputs.technical?.san_avg_capex_per_mld_wwt) },
+        { label: 'Avg capex/MLD for FSTP', ok: filled(inputs.technical?.san_avg_capex_per_mld_fstp) },
+      ],
+    },
+    // --- Intervention tab (§12-13) ---
+    {
+      section: 'Water Interventions', sectionNum: '12',
+      items: [
+        { label: 'Collection efficiency (start/target year, ratios)', ok: filled(inputs.water_interventions?.ce_start_year) },
+        { label: 'NRW reduction (current/target %, commercial/physical split)', ok: filled(inputs.water_interventions?.nrw_current_pct) },
+        { label: 'Tariff (revenue & expenditure)', ok: filled(inputs.water_interventions?.tariff_op_revenue) },
+      ],
+    },
+    {
+      section: 'Sanitation Interventions', sectionNum: '13',
+      items: [
+        { label: 'Sewer tariff as % of water tariff', ok: filled(inputs.sanitation_interventions?.ce_sewer_tariff_pct_water) },
+        { label: 'Capital efficiency', ok: filled(inputs.sanitation_interventions?.capeff_start_year) },
       ],
     },
   ];
@@ -426,12 +470,19 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
 
       {/* Section checklists */}
       {checklist.map((sec, si) => {
+        const tabLabel = si === 0 ? 'Tab 1: Data Input' : Number(sec.sectionNum) === 8 ? 'Tab 2: BAU & Costs' : Number(sec.sectionNum) === 12 ? 'Tab 3: Intervention Selection' : null;
         const secDone = sec.items.filter(it => it.ok).length;
         const secTotal = sec.items.length;
         const allDone = secDone === secTotal;
         const hasMissing = secDone < secTotal;
         return (
-          <div key={si} style={{
+          <React.Fragment key={si}>
+          {tabLabel && (
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#4338ca', textTransform: 'uppercase', letterSpacing: 1, marginTop: si > 0 ? 14 : 0, marginBottom: 6, padding: '4px 0', borderBottom: '1px solid #e0e7ff' }}>
+              {tabLabel}
+            </div>
+          )}
+          <div style={{
             marginBottom: 10, borderRadius: 8, overflow: 'hidden',
             border: `1px solid ${allDone ? '#bbf7d0' : hasMissing ? '#fecaca' : '#e5e7eb'}`,
           }}>
@@ -475,14 +526,15 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
               </div>
             )}
           </div>
+          </React.Fragment>
         );
       })}
 
       {pctDone === 100 && (
         <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, textAlign: 'center' }}>
           <div style={{ fontSize: 20, marginBottom: 4 }}>🎉</div>
-          <div style={{ fontSize: 12, fontWeight: 600, color: '#166534' }}>All data input fields are complete!</div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>Proceed to BAU & Costs (Tab 2) to enter unit costs and investment data.</div>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#166534' }}>All required fields across all tabs are complete!</div>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 2 }}>You can now review results in the Results Dashboard (Tab 4).</div>
         </div>
       )}
     </div>
@@ -607,7 +659,7 @@ const guideData: Record<number, { title: string; sections: { heading: string; it
           { field: 'Capital efficiency gains', source: 'Same procurement reform benchmarks as water', url: '#' },
           { field: 'Tariff & O&M recovery', source: 'Utility financial statements', url: '#' },
           { field: 'Borrowing parameters', source: 'Local financial market or development bank terms', url: '#' },
-          { field: 'Microfinance (cost, tenor, adoption rate)', source: 'Microfinance institution data or pilot studies', url: '#' },
+          { field: 'Sewer tariff as % of water tariff', source: 'Utility billing data or tariff schedule', url: '#' },
         ],
       },
       {
