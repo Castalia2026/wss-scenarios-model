@@ -490,12 +490,21 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             </button>
           </>;
         })()}
-        <SubHead text="Sector split of WSS budget" />
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Water + Sanitation must sum to 100% of the WSS budget
-        </div>
-        <F label="Water supply % of WSS budget" value={inputs.bau.ws_pct_of_wss || 0} onChange={v => u('bau','ws_pct_of_wss',v)} isPercent unit="%" min={0} max={1.0} tip="Share of WSS budget allocated to water supply; water + sanitation must sum to 100%" />
-        <F label="Sanitation % of WSS budget" value={inputs.bau.san_pct_of_wss || 0} onChange={v => u('bau','san_pct_of_wss',v)} isPercent unit="%" min={0} max={1.0} tip="Share of WSS budget allocated to sanitation; water + sanitation must sum to 100%" />
+        <SubHead text="Sector split of WSS budget (calculated)" />
+        {(() => {
+          const wsGdp = inputs.macro?.ws_budget_pct_gdp || 0;
+          const sanGdp = inputs.macro?.san_budget_pct_gdp || 0;
+          const total = wsGdp + sanGdp;
+          const wsPct = total > 0 ? wsGdp / total : 0;
+          const sanPct = total > 0 ? sanGdp / total : 0;
+          return <>
+            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+              Auto-calculated from water/sanitation budget as % of GDP (Data Input tab)
+            </div>
+            <F label="Water supply % of WSS budget" value={wsPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: WS GDP% / (WS GDP% + SAN GDP%) = ${(wsGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
+            <F label="Sanitation % of WSS budget" value={sanPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: SAN GDP% / (WS GDP% + SAN GDP%) = ${(sanGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
+          </>;
+        })()}
         <SubHead text="Budget allocation" />
         <F label="Proportion large urban networks" value={inputs.bau.large_urban_pct} onChange={v => u('bau','large_urban_pct',v)} isPercent unit="%" tip="Share of sector budget going to large urban networks" />
         <F label="Capital expenditure % of budget" value={inputs.bau.capex_pct_budget} onChange={v => u('bau','capex_pct_budget',v)} isPercent unit="%" tip="Share of total budget that is capital expenditure" />
