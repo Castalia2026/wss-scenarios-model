@@ -19,20 +19,28 @@ function SubHead({ text }: { text: string }) {
   return <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', margin: '8px 0 4px', borderBottom: '1px solid #e5e7eb', paddingBottom: 2 }}>{text}</div>;
 }
 
-function F({ label, value, onChange, unit, step, isPercent, tip, slider }: {
-  label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number; isPercent?: boolean; tip?: string; slider?: boolean;
+function F({ label, value, onChange, unit, step, isPercent, tip, slider, fieldType }: {
+  label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number; isPercent?: boolean; tip?: string; slider?: boolean; fieldType?: 'input' | 'linked' | 'computed';
 }) {
-  const displayVal = isPercent ? Math.round(value * 1e10) / 1e8 : value;
+  const rawPct = Math.round(value * 1e10) / 1e8;
+  const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (fieldType === 'computed' ? Math.round(value * 100) / 100 : value);
+  const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
   return (
     <div style={{ marginBottom: slider ? 6 : 4 }} title={tip || ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500, cursor: tip ? 'help' : 'default' }}>
+        <label style={{ flex: 1, fontSize: 11, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500, cursor: tip ? 'help' : 'default' }}>
           {label}{tip && <span style={{ color: '#94a3b8', marginLeft: 3, fontSize: 9 }}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
           step={isPercent ? 1 : (step || 1)}
-          style={{ width: slider ? 60 : 90, padding: '3px 5px', borderRadius: 3, fontSize: 11, textAlign: 'right', border: '1px solid #ccc' }} />
+          readOnly={fieldType === 'computed' || fieldType === 'linked'}
+          style={{
+            width: slider ? 60 : 90, padding: '3px 5px', borderRadius: 3, fontSize: 11, textAlign: 'right',
+            border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
+            background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
+            color: fieldType === 'computed' ? '#475569' : '#000',
+          }} />
         {unit && <span style={{ fontSize: 10, color: '#888', minWidth: 24 }}>{unit}</span>}
       </div>
       {slider && <input type="range" value={displayVal} onChange={e => { const v = parseFloat(e.target.value); onChange(isPercent ? v / 100 : v); }}
