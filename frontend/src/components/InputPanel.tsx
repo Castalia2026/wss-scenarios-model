@@ -143,12 +143,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   return (
     <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
       {(isInputs || isBAU) && geoScope && (
-        <div style={{ fontSize: 13, fontWeight: 800, color: '#1e3a5f', background: '#dbeafe', padding: '10px 14px', borderRadius: 6, marginBottom: 10, border: '2px solid #93c5fd' }}>
+        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', background: '#1e40af', padding: '12px 16px', borderRadius: 8, marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 }}>
           Entering data for: {scopeLabel} area
-          {geoScope === 'national' && <span style={{ fontWeight: 400, fontSize: 11 }}> (urban + rural → national rollup)</span>}
+          {geoScope === 'national' && <div style={{ fontWeight: 400, fontSize: 11, opacity: 0.8, marginTop: 2 }}>urban + rural → national rollup</div>}
         </div>
       )}
-      <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
+      <h2 style={{ fontSize: 13, marginBottom: 6, color: '#64748b', fontWeight: 500 }}>
         {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
       </h2>
       <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 9, color: '#64748b' }}>
