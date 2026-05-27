@@ -142,16 +142,14 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
   return (
     <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
-      <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
-        {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
-      </h2>
       {(isInputs || isBAU) && geoScope && (
-        <div style={{ fontSize: 10, color: '#0369a1', background: '#e0f2fe', padding: '4px 10px', borderRadius: 4, marginBottom: 8, display: 'inline-block' }}>
-          Entering data for: <strong>{geoScope.charAt(0).toUpperCase() + geoScope.slice(1)}</strong> area
-          {geoScope === 'national' && ' (urban + rural → national rollup)'}
+        <div style={{ fontSize: 13, fontWeight: 800, color: '#1e3a5f', background: '#dbeafe', padding: '10px 14px', borderRadius: 6, marginBottom: 10, border: '2px solid #93c5fd' }}>
+          Entering data for: {scopeLabel} area
+          {geoScope === 'national' && <span style={{ fontWeight: 400, fontSize: 11 }}> (urban + rural → national rollup)</span>}
         </div>
       )}
-      <h2 style={{ display: 'none' }}>
+      <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
+        {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
       </h2>
       <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 9, color: '#64748b' }}>
         <span><span style={{ color: '#0000cc', fontWeight: 600 }}>Blue</span> = editable input</span>
