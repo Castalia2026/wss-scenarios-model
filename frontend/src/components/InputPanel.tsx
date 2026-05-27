@@ -125,6 +125,20 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const scopeLower = scopeLabel.toLowerCase();
 
+  // CAGR helper: (end/start)^(1/n) - 1
+  const cagr = (start: number, end: number, years: number) => {
+    if (!start || !end || !years || years <= 0 || start <= 0 || end <= 0) return 0;
+    return Math.pow(end / start, 1 / years) - 1;
+  };
+  const nYears = (baseYr && startYr && baseYr > startYr) ? baseYr - startYr : 0;
+  const pop = inputs.population || {};
+  const popCagr = cagr(pop.total_pop_start, pop.total_pop_baseline, nYears);
+  const hhStart = pop.total_hh_start || 0;
+  const hhBase = pop.total_hh_baseline || 0;
+  const avgHHSizeStart = (hhStart > 0 && pop.total_pop_start > 0) ? pop.total_pop_start / (hhStart * 1e6) : 0;
+  const avgHHSizeBase = (hhBase > 0 && pop.total_pop_baseline > 0) ? pop.total_pop_baseline / (hhBase * 1e6) : 0;
+  const hhSizeCagr = cagr(avgHHSizeStart, avgHHSizeBase, nYears);
+
   return (
     <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
       <h2 style={{ fontSize: 14, marginBottom: 6, color: '#1a1a2e' }}>
@@ -265,8 +279,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`Total ${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
         <F label={`Total ${scopeLabel} HHs, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
         <SubHead text="Computed growth rates" />
-        <F label="Population CAGR (calculated)" value={inputs.population.pop_cagr_calculated || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Compound annual growth rate calculated from start and baseline population" />
-        <F label="HH size CAGR (calculated)" value={inputs.population.hh_size_cagr_calculated || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Compound annual growth rate of average household size calculated from start and baseline data" />
+        <F label="Population CAGR (calculated)" value={popCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`CAGR from ${startYr} to ${baseYr}: (${(pop.total_pop_baseline||0).toLocaleString()} / ${(pop.total_pop_start||0).toLocaleString()})^(1/${nYears}) - 1`} />
+        <F label="Avg HH size CAGR (calculated)" value={hhSizeCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Average HH size: ${avgHHSizeStart.toFixed(2)} (${startYr}) → ${avgHHSizeBase.toFixed(2)} (${baseYr})`} />
       </Section>
 
       {/* ===== WATER SERVICE LEVELS ===== */}
@@ -284,9 +298,18 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_baseline} onChange={v => u('water_service','pct_serv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_baseline} onChange={v => u('water_service','pct_serv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_baseline} onChange={v => u('water_service','pct_serv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          CAGRs are calculated from start→baseline data automatically
-        </div>
+        {nYears > 0 && <>
+          <SubHead text="Service level CAGRs (calculated)" />
+          {[
+            { name: ws[0], s: inputs.water_service.pct_serv1_start, b: inputs.water_service.pct_serv1_baseline },
+            { name: ws[1], s: inputs.water_service.pct_serv2_start, b: inputs.water_service.pct_serv2_baseline },
+            { name: ws[2], s: inputs.water_service.pct_serv3_start, b: inputs.water_service.pct_serv3_baseline },
+            { name: ws[3], s: inputs.water_service.pct_serv4_start, b: inputs.water_service.pct_serv4_baseline },
+            { name: ws[4], s: inputs.water_service.pct_serv5_start, b: inputs.water_service.pct_serv5_baseline },
+          ].map((lv, i) => (
+            <F key={i} label={`CAGR ${lv.name}`} value={cagr(lv.s || 0.0001, lv.b || 0.0001, nYears)} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`${(lv.s*100).toFixed(2)}% → ${(lv.b*100).toFixed(2)}% over ${nYears} years`} />
+          ))}
+        </>}
       </Section>
 
       {/* ===== SANITATION SERVICE LEVELS ===== */}
@@ -304,9 +327,18 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_baseline} onChange={v => u('sanitation_service','pct_sserv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_baseline} onChange={v => u('sanitation_service','pct_sserv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_baseline} onChange={v => u('sanitation_service','pct_sserv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <div style={{ fontSize: 10, color: '#94a3b8', marginTop: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          CAGRs are calculated from start→baseline data automatically
-        </div>
+        {nYears > 0 && <>
+          <SubHead text="Service level CAGRs (calculated)" />
+          {[
+            { name: ss[0], s: inputs.sanitation_service.pct_sserv1_start, b: inputs.sanitation_service.pct_sserv1_baseline },
+            { name: ss[1], s: inputs.sanitation_service.pct_sserv2_start, b: inputs.sanitation_service.pct_sserv2_baseline },
+            { name: ss[2], s: inputs.sanitation_service.pct_sserv3_start, b: inputs.sanitation_service.pct_sserv3_baseline },
+            { name: ss[3], s: inputs.sanitation_service.pct_sserv4_start, b: inputs.sanitation_service.pct_sserv4_baseline },
+            { name: ss[4], s: inputs.sanitation_service.pct_sserv5_start, b: inputs.sanitation_service.pct_sserv5_baseline },
+          ].map((lv, i) => (
+            <F key={i} label={`CAGR ${lv.name}`} value={cagr(lv.s || 0.0001, lv.b || 0.0001, nYears)} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`${(lv.s*100).toFixed(2)}% → ${(lv.b*100).toFixed(2)}% over ${nYears} years`} />
+          ))}
+        </>}
       </Section>
 
       {/* ===== WATER TARGETS ===== */}
