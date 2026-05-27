@@ -332,7 +332,7 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
         { label: 'Model start year', ok: filled(p.model_start_year) },
         { label: 'Baseline year', ok: filled(p.baseline_year) },
         { label: 'Forecast end year', ok: filled(p.forecast_end_year) },
-        { label: 'As-is forecast start & length', ok: filled(p.as_is_forecast_start) && filled(p.as_is_forecast_length) },
+        { label: 'Performance improvement start year', ok: filled(p.perf_improvement_start_year) },
         { label: 'Target 1 year', ok: filled(p.target1_year) },
         { label: 'Target 2 year', ok: filled(p.target2_year) },
       ],
@@ -340,7 +340,6 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
     {
       section: 'Macroeconomics', sectionNum: '2',
       items: [
-        { label: 'WASH budget % of GDP', ok: filled(m.wash_budget_pct_gdp) },
         { label: 'GDP growth time series', ok: m.gdp_growth?.some?.((v: number) => v !== 0) || false },
         { label: 'Inflation (domestic) time series', ok: m.inflation_nepal?.some?.((v: number) => v !== 0) || false },
         { label: 'Exchange rate time series', ok: m.exchange_rate?.some?.((v: number) => v !== 0) || false },
@@ -354,30 +353,20 @@ function DataInputOverview({ inputs, geoScope }: { inputs: any; geoScope: string
         { label: `Total ${scopeLabel.toLowerCase()} HHs (start year)`, ok: filled(pop.total_hh_start) },
         { label: `Total ${scopeLabel.toLowerCase()} population (baseline)`, ok: filled(pop.total_pop_baseline) },
         { label: `Total ${scopeLabel.toLowerCase()} HHs (baseline)`, ok: filled(pop.total_hh_baseline) },
-        { label: 'Population growth CAGR', ok: filled(pop.pop_growth_projected) },
-        { label: 'HH size growth CAGR', ok: filled(pop.hh_size_growth_projected) },
       ],
     },
     {
       section: 'Water Supply Service Levels', sectionNum: '4',
       items: [
-        { label: 'HHs with treated piped (start year)', ok: filled(ws.hh_treated_piped_start) },
-        { label: 'HHs without treated piped (start year)', ok: filled(ws.hh_no_treated_piped_start) },
-        { label: '% HHs by service level (start year, 5 levels)', ok: [ws.pct_serv1_start, ws.pct_serv2_start, ws.pct_serv3_start, ws.pct_serv4_start, ws.pct_serv5_start].some((v: number) => filled(v)) },
-        { label: 'HHs with treated piped (baseline)', ok: filled(ws.hh_treated_piped_baseline) },
-        { label: 'HHs without piped water (baseline)', ok: filled(ws.hh_no_piped_baseline) },
-        { label: '% HHs by service level (baseline, 5 levels)', ok: [ws.pct_serv1_baseline, ws.pct_serv2_baseline, ws.pct_serv3_baseline, ws.pct_serv4_baseline, ws.pct_serv5_baseline].some((v: number) => filled(v)) },
+        { label: '% HHs by service level (start year)', ok: [ws.pct_serv1_start, ws.pct_serv2_start, ws.pct_serv3_start, ws.pct_serv4_start, ws.pct_serv5_start].some((v: number) => filled(v)) },
+        { label: '% HHs by service level (baseline)', ok: [ws.pct_serv1_baseline, ws.pct_serv2_baseline, ws.pct_serv3_baseline, ws.pct_serv4_baseline, ws.pct_serv5_baseline].some((v: number) => filled(v)) },
       ],
     },
     {
       section: 'Sanitation Service Levels', sectionNum: '5',
       items: [
-        { label: 'HHs with sewered sanitation (start year)', ok: filled(san.hh_sewered_start) },
-        { label: 'HHs with on-site sanitation (start year)', ok: filled(san.hh_onsite_start) },
-        { label: '% HHs by service level (start year, 5 levels)', ok: [san.pct_sserv1_start, san.pct_sserv2_start, san.pct_sserv3_start, san.pct_sserv4_start, san.pct_sserv5_start].some((v: number) => filled(v)) },
-        { label: 'HHs sewered/on-site (baseline)', ok: filled(san.hh_sewered_baseline) },
-        { label: 'HHs with wastewater treatment (baseline)', ok: filled(san.hh_sewered_wwt_baseline) },
-        { label: '% HHs by service level (baseline, 5 levels)', ok: [san.pct_sserv1_baseline, san.pct_sserv2_baseline, san.pct_sserv3_baseline, san.pct_sserv4_baseline, san.pct_sserv5_baseline].some((v: number) => filled(v)) },
+        { label: '% HHs by service level (start year)', ok: [san.pct_sserv1_start, san.pct_sserv2_start, san.pct_sserv3_start, san.pct_sserv4_start, san.pct_sserv5_start].some((v: number) => filled(v)) },
+        { label: '% HHs by service level (baseline)', ok: [san.pct_sserv1_baseline, san.pct_sserv2_baseline, san.pct_sserv3_baseline, san.pct_sserv4_baseline, san.pct_sserv5_baseline].some((v: number) => filled(v)) },
       ],
     },
     {
