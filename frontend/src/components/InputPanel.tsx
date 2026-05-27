@@ -55,8 +55,9 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
           min={displayMin} max={displayMax}
           style={{
             width: showSlider ? 60 : 90, padding: '3px 5px', borderRadius: 3, fontSize: 11, textAlign: 'right',
-            border: outOfRange ? '1.5px solid #ef4444' : '1px solid #ccc',
-            background: outOfRange ? '#fef2f2' : fieldType === 'computed' ? '#f1f5f9' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
+            border: outOfRange ? '1.5px solid #ef4444' : fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
+            background: outOfRange ? '#fef2f2' : fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
+            color: fieldType === 'computed' ? '#475569' : '#000',
           }}
           readOnly={fieldType === 'computed' || fieldType === 'linked'}
         />
