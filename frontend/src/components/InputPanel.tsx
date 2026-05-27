@@ -238,7 +238,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                 <th style={{ padding: '3px 4px', textAlign: 'right' }}>GDP gr%</th>
                 <th style={{ padding: '3px 4px', textAlign: 'right' }}>Infl {cc.country || 'Domestic'}%</th>
                 <th style={{ padding: '3px 4px', textAlign: 'right' }}>Infl US%</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>USD/NPR</th>
+                <th style={{ padding: '3px 4px', textAlign: 'right' }}>USD/{CUR}</th>
                 <th style={{ padding: '3px 4px', textAlign: 'right' }}>GDP $B</th>
               </tr>
             </thead>
@@ -420,18 +420,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={ss[3]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv4} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv4',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
         <SubHead text="Wastewater treatment" />
         <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.san_cost_per_mld_treatment || 0} onChange={v => u('sanitation_costs','san_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
-        <SubHead text={`Adoption rates (whole ${scopeLower} pop)`} />
-        <F label="Septic tank" value={inputs.sanitation_costs.adopt_septic_tank} onChange={v => u('sanitation_costs','adopt_septic_tank',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
-        <F label="Pit latrine" value={inputs.sanitation_costs.adopt_pit_latrine} onChange={v => u('sanitation_costs','adopt_pit_latrine',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
-        <F label="VIP latrine" value={inputs.sanitation_costs.adopt_vip_latrine} onChange={v => u('sanitation_costs','adopt_vip_latrine',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
-        <F label="Pit latrine with slab" value={inputs.sanitation_costs.adopt_pit_with_slab} onChange={v => u('sanitation_costs','adopt_pit_with_slab',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
-        <F label="Composting toilet" value={inputs.sanitation_costs.adopt_composting_toilet} onChange={v => u('sanitation_costs','adopt_composting_toilet',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
-        <SubHead text="Cost per facility type" />
-        <F label="Septic tank" value={inputs.sanitation_costs.cost_septic_tank} onChange={v => u('sanitation_costs','cost_septic_tank',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <F label="Pit latrine" value={inputs.sanitation_costs.cost_pit_latrine} onChange={v => u('sanitation_costs','cost_pit_latrine',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <F label="VIP latrine" value={inputs.sanitation_costs.cost_vip_latrine} onChange={v => u('sanitation_costs','cost_vip_latrine',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <F label="Pit latrine with slab" value={inputs.sanitation_costs.cost_pit_with_slab} onChange={v => u('sanitation_costs','cost_pit_with_slab',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <F label="Composting toilet" value={inputs.sanitation_costs.cost_composting_toilet} onChange={v => u('sanitation_costs','cost_composting_toilet',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
+        <SubHead text="On-site sanitation" />
+        <F label="On-site facility Capex" value={inputs.sanitation_costs.onsite_facility_capex || 0} onChange={v => u('sanitation_costs','onsite_facility_capex',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Average capital cost per on-site sanitation facility (weighted across facility types)" />
         <SubHead text="Treatment" />
         <F label="Cost per MLD fecal sludge treatment" value={inputs.sanitation_costs.cost_per_mld_fst} onChange={v => u('sanitation_costs','cost_per_mld_fst',v)} step={10} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of fecal sludge treatment capacity" />
       </Section>
@@ -450,7 +440,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               let y = startY;
               while (y <= endY) {
                 const pEnd = Math.min(y + unit - 1, endY);
-                autoPeriods.push({ start: y, end: pEnd, ws_distribution_inv: 0, ws_treatment_inv: 0, san_wwt_inv: 0, san_sewer_inv: 0, san_fsm_inv: 0, is_custom: false });
+                autoPeriods.push({ start: y, end: pEnd, ws_inv: 0, san_inv: 0, is_custom: false });
                 y = pEnd + 1;
               }
               const customPeriods = (inputs.bau.investment_periods || []).filter((p: any) => p.is_custom);
@@ -486,17 +476,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                   <F label="Start year" value={p.start} onChange={v => updatePeriod(idx, 'start', v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} />
                   <F label="End year" value={p.end} onChange={v => updatePeriod(idx, 'end', v)} min={p.start} max={inputs.period.forecast_end_year} />
                 </>}
-                <SubHead text="Water Supply" />
-                <F label="Distribution network investment" value={p.ws_distribution_inv || 0} onChange={v => updatePeriod(idx, 'ws_distribution_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Investment in distribution network for this period" />
-                <F label="Water treatment investment" value={p.ws_treatment_inv || 0} onChange={v => updatePeriod(idx, 'ws_treatment_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Investment in water treatment for this period" />
-                <SubHead text="Sanitation" />
-                <F label="Wastewater treatment investment" value={p.san_wwt_inv || 0} onChange={v => updatePeriod(idx, 'san_wwt_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Investment in wastewater treatment for this period" />
-                <F label="Sewerage network investment" value={p.san_sewer_inv || 0} onChange={v => updatePeriod(idx, 'san_sewer_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Investment in sewerage network for this period" />
-                <F label="Fecal sludge management investment" value={p.san_fsm_inv || 0} onChange={v => updatePeriod(idx, 'san_fsm_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Investment in fecal sludge management for this period" />
+                <F label="Water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total water supply investment for this period" />
+                <F label="Sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total sanitation investment for this period" />
               </div>
             ))}
             <button onClick={() => {
-              const newP = { start: inputs.period.baseline_year + 1, end: inputs.period.baseline_year + 5, ws_distribution_inv: 0, ws_treatment_inv: 0, san_wwt_inv: 0, san_sewer_inv: 0, san_fsm_inv: 0, is_custom: true };
+              const newP = { start: inputs.period.baseline_year + 1, end: inputs.period.baseline_year + 5, ws_inv: 0, san_inv: 0, is_custom: true };
               onChange({ ...inputs, bau: { ...inputs.bau, investment_periods: [...periods, newP] } });
             }} style={{ width: '100%', padding: '6px', border: '1px dashed #2563eb', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
               + Add Custom Period
