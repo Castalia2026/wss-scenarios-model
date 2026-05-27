@@ -241,41 +241,40 @@ export default function App() {
 function OnboardingModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 640, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '24px 32px' }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ fontSize: 20, color: '#002244', marginBottom: 4 }}>WSS Strategic Scenarios Simulation Tool</h2>
-        <p style={{ fontSize: 11, color: '#64748b', marginBottom: 16 }}>Interactive prototype — Water Supply and Sanitation strategic scenario analysis</p>
+      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 680, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 12 }}>WSS Strategic Scenarios Simulation Tool</h2>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {[
-            { step: '1', title: 'Data Input', desc: 'Enter country data organized in collapsible groups: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban-only, rural-only, or national analysis with urban + rural rollup.', icon: '📝' },
-            { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments, budget execution rates), and technical parameters (asset life, treatment capacity, non-HH rates).', icon: '💰' },
-            { step: '3', title: 'Intervention Selection', desc: 'Toggle pre-built interventions on/off and configure parameters (start year, target %, lag to benefits, etc.). Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Add custom interventions.', icon: '🔧' },
-            { step: '4', title: 'Results Dashboard', desc: 'View example outputs showing what the final tool will produce: coverage progress charts for rural water, urban water, and national water. Hover over data points for precise values. Save scenarios and export individual slides or full presentations.', icon: '📊' },
+            { step: '1', title: 'Data Input', desc: 'Enter country data: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban, rural, or national scope.', icon: '📝' },
+            { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments), and technical parameters (asset life, treatment capacity, non-household rates).', icon: '💰' },
+            { step: '3', title: 'Intervention Selection', desc: 'Toggle interventions on/off and configure parameters. Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Add custom interventions.', icon: '🔧' },
+            { step: '4', title: 'Results Dashboard', desc: 'Presents urban, rural, and national results: coverage progress charts, financing gaps, and scenario comparisons. Save scenarios and export PowerPoint slides or Excel data.', icon: '📊' },
           ].map(s => (
-            <div key={s.step} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-              <div style={{ width: 32, height: 32, borderRadius: 6, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 14 }}>{s.icon}</div>
+            <div key={s.step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>{s.icon}</div>
               <div>
-                <h3 style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', margin: '0 0 2px' }}>Tab {s.step}: {s.title}</h3>
-                <p style={{ fontSize: 10, color: '#64748b', margin: 0, lineHeight: 1.5 }}>{s.desc}</p>
+                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', margin: '0 0 3px' }}>{s.title}</h3>
+                <p style={{ fontSize: 13, color: '#475569', margin: 0, lineHeight: 1.5 }}>{s.desc}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div style={{ marginTop: 16, padding: '10px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 10, color: '#475569' }}>
+        <div style={{ marginTop: 18, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569' }}>
           <strong>Key features:</strong>
-          <ul style={{ margin: '4px 0 0 14px', padding: 0, lineHeight: 1.7 }}>
+          <ul style={{ margin: '6px 0 0 16px', padding: 0, lineHeight: 1.8 }}>
             <li><strong>Geographic scope:</strong> Switch between Urban, Rural, or National in the header</li>
-            <li><strong>Tooltips:</strong> Hover over any ⓘ icon for field description</li>
-            <li><strong>Validation:</strong> Yellow warnings for invalid combinations (e.g., targets not summing to 100%)</li>
-            <li><strong>Scenarios:</strong> Save scenarios and export individual PowerPoint slides per scenario</li>
-            <li><strong>Excel template:</strong> Download the data input sheet as Excel for offline data collection</li>
+            <li><strong>Tooltips:</strong> Hover over any ⓘ icon for field descriptions</li>
+            <li><strong>Validation:</strong> Warnings for invalid combinations (e.g., service levels not summing to 100%)</li>
+            <li><strong>Scenarios:</strong> Save scenarios and export individual PowerPoint slides</li>
+            <li><strong>Excel template:</strong> Download the data input sheet for offline data collection</li>
             <li><strong>Country profiles:</strong> Load pre-built profiles or start blank for a new country</li>
           </ul>
         </div>
 
-        <div style={{ marginTop: 12, padding: '10px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 10, color: '#92400e' }}>
-          <strong>Prototype note:</strong> This is an interactive mock-up. Data entered is for demonstration purposes — no back-end calculations are performed. The Results Dashboard shows static example charts.
+        <div style={{ marginTop: 14, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
+          <strong>Prototype note:</strong> This is an interactive mock-up for demonstration purposes. The Results Dashboard shows static example charts.
         </div>
 
         <button onClick={onClose}
