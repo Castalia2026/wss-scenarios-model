@@ -645,7 +645,7 @@ const guideData: Record<number, { title: string; sections: { heading: string; it
         heading: '12. Water Interventions',
         items: [
           { field: 'Collection efficiency (current & target ratio)', source: 'Utility billing & collection reports', url: '#' },
-          { field: 'NRW % (current & target)', source: 'Utility NRW assessment or IBNET benchmarks', url: 'https://www.ib-net.org/' },
+          { field: 'NRW % (current & target)', source: 'Utility NRW assessment or IBNET benchmarks. Target NRW has a 3% floor — even the best-performing utilities globally (e.g. Singapore, Tokyo, Copenhagen) report NRW of 3–5% due to unavoidable physical losses from meter inaccuracies, fire hydrant use, and authorized unbilled consumption. Setting a target below 3% is unrealistic for any utility.', url: 'https://www.ib-net.org/' },
           { field: 'NRW capex unit cost (USD per m3/day)', source: 'World Bank NRW reduction cost studies', url: '#' },
           { field: 'Capital efficiency gains %', source: 'Procurement reform benchmarks (typically 10–30%)', url: '#' },
           { field: 'Tariff data (income, revenue, expenditure)', source: 'Utility financial statements + household surveys', url: '#' },
