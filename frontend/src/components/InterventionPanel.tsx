@@ -84,7 +84,6 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
           <Toggle label="Capital expenditure efficiency" checked={inputs.toggles?.san_capital_efficiency_enabled ?? true} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} />
           <Toggle label="Tariff increase" checked={inputs.toggles?.san_tariff_enabled ?? true} onChange={v => toggleIntv('san_tariff_enabled', v)} />
           <Toggle label="Borrowing against future cashflow" checked={inputs.toggles?.san_borrowing_enabled ?? true} onChange={v => toggleIntv('san_borrowing_enabled', v)} />
-          <Toggle label="Microfinance for on-site sanitation" checked={inputs.toggles?.san_microfinance_enabled ?? true} onChange={v => toggleIntv('san_microfinance_enabled', v)} />
           <Toggle label="Budget execution improvement" checked={inputs.toggles?.san_budget_execution_enabled ?? false} onChange={v => toggleIntv('san_budget_execution_enabled', v)} />
         </Section>
 
@@ -188,12 +187,6 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
           <F label="End year" value={inputs.sanitation_interventions.loan_end_year} onChange={v => u('sanitation_interventions','loan_end_year',v)} />
           <F label="DSCR" value={inputs.sanitation_interventions.loan_dscr} onChange={v => u('sanitation_interventions','loan_dscr',v)} step={0.1} />
           <F label="Interest rate" value={inputs.sanitation_interventions.loan_interest_rate} onChange={v => u('sanitation_interventions','loan_interest_rate',v)} isPercent unit="%" />
-          <SubHead text="Microfinance" />
-          <F label="Start year" value={inputs.sanitation_interventions.mf_start_year} onChange={v => u('sanitation_interventions','mf_start_year',v)} />
-          <F label="End year" value={inputs.sanitation_interventions.mf_end_year} onChange={v => u('sanitation_interventions','mf_end_year',v)} />
-          <F label={`Facility cost (${CUR})`} value={inputs.sanitation_interventions.mf_onsite_cost} onChange={v => u('sanitation_interventions','mf_onsite_cost',v)} step={1000} unit={CUR} />
-          <F label="Interest rate" value={inputs.sanitation_interventions.mf_interest_rate} onChange={v => u('sanitation_interventions','mf_interest_rate',v)} isPercent unit="%" />
-          <F label="Max % income" value={inputs.sanitation_interventions.mf_max_pct_income} onChange={v => u('sanitation_interventions','mf_max_pct_income',v)} isPercent unit="%" />
           <SubHead text="Budget execution improvement" />
           <F label="Start year" value={2027} onChange={() => {}} tip="Year budget execution improvement begins" />
           <F label="Target year" value={2033} onChange={() => {}} tip="Year target execution rate is achieved" />
