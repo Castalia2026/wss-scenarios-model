@@ -347,9 +347,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== WATER TARGETS ===== */}
       <Section title="6. Water Supply Targets">
-        <SubHead text="Treatment Capacity" />
-        <F label="Existing treatment capacity" value={inputs.technical.ws_existing_treatment_mld || 0} onChange={v => u('technical','ws_existing_treatment_mld',v)} unit="MLD" min={0} max={10000} tip="Existing water treatment capacity at baseline" />
-        <F label="Planned treatment capacity" value={inputs.water_targets.planned_treatment_capacity_mld || 0} onChange={v => u('water_targets','planned_treatment_capacity_mld',v)} unit="MLD" min={0} max={5000} tip="Total planned treatment capacity including existing and new" />
         <SubHead text="Service Targets" />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
@@ -372,9 +369,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== SANITATION TARGETS ===== */}
       <Section title="7. Sanitation Targets">
-        <SubHead text="Treatment Capacity" />
-        <F label="Existing WWT capacity" value={inputs.technical.san_existing_wwt_mld || 0} onChange={v => u('technical','san_existing_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Existing wastewater treatment capacity" />
-        <F label="Planned WWT capacity" value={inputs.technical.san_planned_wwt_mld || 0} onChange={v => u('technical','san_planned_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Total planned wastewater treatment capacity" />
         <SubHead text="On-site sanitation" />
         <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed HHs served by on-site systems (septic tanks with fecal sludge collection). Provider shares + on-site must sum to 100%." />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
@@ -509,15 +503,15 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       <Section title="11. Technical Inputs">
         <SubHead text="Water supply" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
-        <F label="Existing treatment capacity (from Data Input)" value={inputs.technical.ws_existing_treatment_mld || 0} onChange={() => {}} fieldType="linked" unit="MLD" tip="Linked from §6 Water Supply Targets — edit there" />
-        <F label="Planned treatment capacity (from Data Input)" value={inputs.water_targets?.planned_treatment_capacity_mld || 0} onChange={() => {}} fieldType="linked" unit="MLD" tip="Linked from §6 Water Supply Targets — edit there" />
+        <F label="Existing treatment capacity" value={inputs.technical.ws_existing_treatment_mld || 0} onChange={v => u('technical','ws_existing_treatment_mld',v)} unit="MLD" min={0} max={10000} tip="Existing water treatment capacity at baseline" />
+        <F label="Planned treatment capacity" value={inputs.water_targets?.planned_treatment_capacity_mld || 0} onChange={v => u('water_targets','planned_treatment_capacity_mld',v)} unit="MLD" min={0} max={5000} tip="Total planned treatment capacity including existing and new" />
         <F label="Water requirement per WHO" value={inputs.technical.ws_water_req_who_lpcd} onChange={v => u('technical','ws_water_req_who_lpcd',v)} unit="lpcd" min={20} max={200} tip="WHO minimum water requirement per person per day" />
         <SubHead text="Sanitation" />
         <F label="Useful life of assets" value={inputs.technical.san_asset_life} onChange={v => u('technical','san_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="Factor wastewater of water supply" value={inputs.technical.san_wastewater_factor} onChange={v => u('technical','san_wastewater_factor',v)} isPercent unit="%" tip="Wastewater volume as share of water supply volume" />
         <SubHead text="Wastewater treatment" />
-        <F label="Existing WWT capacity (from Data Input)" value={inputs.technical.san_existing_wwt_mld || 0} onChange={() => {}} fieldType="linked" unit="MLD" tip="Linked from §7 Sanitation Targets — edit there" />
-        <F label="Planned WWT capacity (from Data Input)" value={inputs.technical.san_planned_wwt_mld || 0} onChange={() => {}} fieldType="linked" unit="MLD" tip="Linked from §7 Sanitation Targets — edit there" />
+        <F label="Existing WWT capacity" value={inputs.technical.san_existing_wwt_mld || 0} onChange={v => u('technical','san_existing_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Existing wastewater treatment capacity" />
+        <F label="Planned WWT capacity" value={inputs.technical.san_planned_wwt_mld || 0} onChange={v => u('technical','san_planned_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Total planned wastewater treatment capacity" />
         <F label="Avg capex per MLD for WWT" value={inputs.technical.san_avg_capex_per_mld_wwt || 0} onChange={v => u('technical','san_avg_capex_per_mld_wwt',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a wastewater treatment plant" />
         <SubHead text="Fecal sludge" />
         <F label="Avg capex per MLD for FSTP" value={inputs.technical.san_avg_capex_per_mld_fstp || 395} onChange={v => u('technical','san_avg_capex_per_mld_fstp',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a fecal sludge treatment plant (e.g. Birendranagar FSTP)" />
