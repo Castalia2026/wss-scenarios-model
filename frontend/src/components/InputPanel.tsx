@@ -230,6 +230,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== MACROECONOMICS ===== */}
       <Section title="2. Macroeconomics">
         <F label="Year for real prices" value={inputs.macro.real_price_year} onChange={v => u('macro','real_price_year',v)} min={inputs.period.model_start_year} max={inputs.period.baseline_year} tip="Base year for converting nominal to real values; must be a year with actual data" />
+        <F label="WASH budget as % of GDP" value={inputs.macro.wash_budget_pct_gdp || 0} onChange={v => u('macro','wash_budget_pct_gdp',v)} isPercent unit="%" tip="Federal+provincial WASH budget as share of GDP" />
         <SubHead text="Time-series data (year by year)" />
         <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
@@ -346,38 +347,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       <Section title="6. Water Supply Targets">
         <SubHead text="Service Capacity" />
         <F label="Total planned treatment capacity" value={inputs.water_targets.planned_treatment_capacity_mld} onChange={v => u('water_targets','planned_treatment_capacity_mld',v)} unit="MLD" min={0} max={5000} tip="Total planned treatment capacity including existing and new" />
-        <SubHead text="Water providers" />
-        {(inputs.water_targets.providers || []).map((prov: any, idx: number) => {
-          const updateProv = (field: string, val: any) => {
-            const provs = [...inputs.water_targets.providers];
-            provs[idx] = { ...provs[idx], [field]: val };
-            onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
-          };
-          return (
-            <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 10px', marginBottom: 6, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                <input type="text" value={prov.name} onChange={e => updateProv('name', e.target.value)}
-                  style={{ flex: 1, border: '1px solid #ccc', borderRadius: 3, padding: '2px 5px', fontSize: 11, fontWeight: 600 }} />
-                {inputs.water_targets.providers.length > 1 && (
-                  <button onClick={() => {
-                    const provs = inputs.water_targets.providers.filter((_: any, i: number) => i !== idx);
-                    onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
-                  }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 6px', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                )}
-              </div>
-              <F label="Share %" value={prov.share_pct} onChange={v => updateProv('share_pct', v)} isPercent unit="%" min={0} max={1.0} tip="Share of target HHs served by this provider; all must sum to 100%" />
-              <F label="Network cost per HH" value={prov.network_cost_per_hh} onChange={v => updateProv('network_cost_per_hh', v)} unit={CUR} min={0} max={10000000} tip="Cost to connect one HH" />
-              <F label="Treatment cost per MLD" value={prov.cost_per_mld_treatment} onChange={v => updateProv('cost_per_mld_treatment', v)} unit={`${CUR} M`} min={0} max={100000} tip="Cost to build 1 MLD treatment capacity" />
-              <F label="Existing capacity" value={prov.existing_capacity_mld} onChange={v => updateProv('existing_capacity_mld', v)} unit="MLD" min={0} max={10000} tip="Existing treatment capacity at baseline" />
-            </div>
-          );
-        })}
-        <button onClick={() => {
-          const provs = [...(inputs.water_targets.providers || []), { name: 'New Provider', share_pct: 0, network_cost_per_hh: 0, cost_per_mld_treatment: 0, existing_capacity_mld: 0 }];
-          onChange({ ...inputs, water_targets: { ...inputs.water_targets, providers: provs } });
-        }} style={{ width: '100%', padding: '4px', border: '1px dashed #94a3b8', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
-          + Add Water Provider
-        </button>
+        <F label="Network cost per HH" value={inputs.water_targets.network_cost_per_hh || 0} onChange={v => u('water_targets','network_cost_per_hh',v)} unit={CUR} min={0} max={10000000} tip="Cost to connect one HH to the distribution network" />
+        <F label="Treatment cost per MLD" value={inputs.water_targets.cost_per_mld_treatment || 0} onChange={v => u('water_targets','cost_per_mld_treatment',v)} unit={`${CUR} M`} min={0} max={100000} tip="Cost to build 1 MLD treatment capacity" />
+        <F label="Existing treatment capacity" value={inputs.water_targets.existing_capacity_mld || 0} onChange={v => u('water_targets','existing_capacity_mld',v)} unit="MLD" min={0} max={10000} tip="Existing treatment capacity at baseline" />
         <SubHead text="Service Targets" />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
@@ -399,39 +371,10 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== SANITATION TARGETS ===== */}
       <Section title="7. Sanitation Targets">
         <SubHead text="Service Capacity" />
-        <SubHead text="Sanitation providers" />
-        {(inputs.sanitation_targets.providers || []).map((prov: any, idx: number) => {
-          const updateSanProv = (field: string, val: any) => {
-            const provs = [...inputs.sanitation_targets.providers];
-            provs[idx] = { ...provs[idx], [field]: val };
-            onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
-          };
-          return (
-            <div key={idx} style={{ border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 10px', marginBottom: 6, background: '#f8fafc' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                <input type="text" value={prov.name} onChange={e => updateSanProv('name', e.target.value)}
-                  style={{ flex: 1, border: '1px solid #ccc', borderRadius: 3, padding: '2px 5px', fontSize: 11, fontWeight: 600 }} />
-                {inputs.sanitation_targets.providers.length > 1 && (
-                  <button onClick={() => {
-                    const provs = inputs.sanitation_targets.providers.filter((_: any, i: number) => i !== idx);
-                    onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
-                  }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 6px', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                )}
-              </div>
-              <F label="Share %" value={prov.share_pct} onChange={v => updateSanProv('share_pct', v)} isPercent unit="%" min={0} max={1.0} tip="Share of target HHs; all must sum to 100%" />
-              <F label="Sewer cost per HH" value={prov.sewer_cost_per_hh} onChange={v => updateSanProv('sewer_cost_per_hh', v)} unit={CUR} min={0} max={10000000} />
-              <F label="WWT cost per MLD" value={prov.wwt_cost_per_mld} onChange={v => updateSanProv('wwt_cost_per_mld', v)} unit={`${CUR} M`} min={0} max={100000} />
-              <F label="Existing WWT capacity" value={prov.existing_wwt_capacity_mld} onChange={v => updateSanProv('existing_wwt_capacity_mld', v)} unit="MLD" min={0} max={10000} />
-            </div>
-          );
-        })}
-        <button onClick={() => {
-          const provs = [...(inputs.sanitation_targets.providers || []), { name: 'New Provider', share_pct: 0, sewer_cost_per_hh: 0, wwt_cost_per_mld: 0, existing_wwt_capacity_mld: 0 }];
-          onChange({ ...inputs, sanitation_targets: { ...inputs.sanitation_targets, providers: provs } });
-        }} style={{ width: '100%', padding: '4px', border: '1px dashed #94a3b8', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
-          + Add Sanitation Provider
-        </button>
-        <SubHead text="On-site sanitation (separate from sewered providers)" />
+        <F label="Sewer cost per HH" value={inputs.sanitation_targets.sewer_cost_per_hh || 0} onChange={v => u('sanitation_targets','sewer_cost_per_hh',v)} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network" />
+        <F label="WWT cost per MLD" value={inputs.sanitation_targets.wwt_cost_per_mld || 0} onChange={v => u('sanitation_targets','wwt_cost_per_mld',v)} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment" />
+        <F label="Existing WWT capacity" value={inputs.sanitation_targets.existing_wwt_capacity_mld || 0} onChange={v => u('sanitation_targets','existing_wwt_capacity_mld',v)} unit="MLD" min={0} max={10000} tip="Existing wastewater treatment capacity at baseline" />
+        <SubHead text="On-site sanitation" />
         <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed HHs served by on-site systems (septic tanks with fecal sludge collection). Provider shares + on-site must sum to 100%." />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Providers ({Math.round((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) * 100)}%) + On-site ({Math.round((inputs.sanitation_targets.onsite_collection_treatment_pct || 0) * 100)}%) = {Math.round(((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) + (inputs.sanitation_targets.onsite_collection_treatment_pct || 0)) * 100)}%
@@ -482,8 +425,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={ss[4]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv5} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv5',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
         <SubHead text="Wastewater treatment" />
         <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.san_cost_per_mld_treatment || 0} onChange={v => u('sanitation_costs','san_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
-        <SubHead text="On-site facility" />
-        <F label="On-site facility Capex" value={inputs.sanitation_costs.onsite_facility_capex} onChange={v => u('sanitation_costs','onsite_facility_capex',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
         <SubHead text={`Adoption rates (whole ${scopeLower} pop)`} />
         <F label="Septic tank" value={inputs.sanitation_costs.adopt_septic_tank} onChange={v => u('sanitation_costs','adopt_septic_tank',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
         <F label="Pit latrine" value={inputs.sanitation_costs.adopt_pit_latrine} onChange={v => u('sanitation_costs','adopt_pit_latrine',v)} isPercent unit="%" tip={`Share of ${scopeLower} population using this type; all types should sum to total on-site %`} />
@@ -496,13 +437,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="VIP latrine" value={inputs.sanitation_costs.cost_vip_latrine} onChange={v => u('sanitation_costs','cost_vip_latrine',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
         <F label="Pit latrine with slab" value={inputs.sanitation_costs.cost_pit_with_slab} onChange={v => u('sanitation_costs','cost_pit_with_slab',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
         <F label="Composting toilet" value={inputs.sanitation_costs.cost_composting_toilet} onChange={v => u('sanitation_costs','cost_composting_toilet',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost of on-site sanitation facility" />
-        <SubHead text="Collection capex" />
-        <F label="Cost of FS collection truck" value={inputs.sanitation_costs.fs_truck_cost_mill} onChange={v => u('sanitation_costs','fs_truck_cost_mill',v)} step={0.5} unit={`${CUR} M`} min={0} max={100000} tip={`Capital cost of one fecal sludge collection truck in ${CUR} millions`} />
-        <F label="Truck size" value={inputs.sanitation_costs.truck_size_m3} onChange={v => u('sanitation_costs','truck_size_m3',v)} unit="m3" min={0} max={100} tip="Volume capacity of one fecal sludge collection truck in cubic meters" />
-        <F label="FS generated per person per day" value={inputs.sanitation_costs.fs_per_person_per_day_liters} onChange={v => u('sanitation_costs','fs_per_person_per_day_liters',v)} step={0.1} unit="liters" min={0} max={10} tip="Volume of fecal sludge generated per person per day in liters" />
-        <F label="Emptying frequency" value={inputs.sanitation_costs.emptying_frequency_years} onChange={v => u('sanitation_costs','emptying_frequency_years',v)} unit="yrs" min={0} max={100} tip="Average years between emptying of on-site containment" />
-        <F label="Trips per truck per year" value={inputs.sanitation_costs.trips_per_truck_year} onChange={v => u('sanitation_costs','trips_per_truck_year',v)} min={0} max={10000} tip="Number of collection trips one truck can make per year" />
-        <F label="Cost of collection per HH" value={inputs.sanitation_costs.cost_collection_per_hh} onChange={v => u('sanitation_costs','cost_collection_per_hh',v)} step={500} unit={CUR} min={0} max={10000000} tip={`Cost in ${CUR}`} />
         <SubHead text="Treatment" />
         <F label="Cost per MLD fecal sludge treatment" value={inputs.sanitation_costs.cost_per_mld_fst} onChange={v => u('sanitation_costs','cost_per_mld_fst',v)} step={10} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of fecal sludge treatment capacity" />
       </Section>
@@ -516,19 +450,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Period 2 end" value={inputs.bau.period2_end} onChange={v => u('bau','period2_end',v)} min={inputs.bau.period2_start} max={inputs.period.forecast_end_year} tip="End of second planned investment period" />
         <F label="Period 3 start" value={inputs.bau.period3_start} onChange={v => u('bau','period3_start',v)} min={inputs.bau.period2_end + 1} max={inputs.period.forecast_end_year} tip="Start of third period; must be after period 2 ends" />
         <F label="Period 3 end" value={inputs.bau.period3_end} onChange={v => u('bau','period3_end',v)} min={inputs.bau.period3_start} max={inputs.period.forecast_end_year} tip="End of third planned investment period" />
-        <SubHead text="Historic WASH spending as % of GDP" />
-        <F label="Water as % of GDP, 2021" value={inputs.bau.ws_gdp_share_2021 || 0} onChange={v => u('bau','ws_gdp_share_2021',v)} isPercent unit="%" tip="Water sector spending as percentage of GDP" />
-        <F label="Water as % of GDP, 2022" value={inputs.bau.ws_gdp_share_2022 || 0} onChange={v => u('bau','ws_gdp_share_2022',v)} isPercent unit="%" tip="Water sector spending as percentage of GDP" />
-        <F label="Water as % of GDP, 2023" value={inputs.bau.ws_gdp_share_2023 || 0} onChange={v => u('bau','ws_gdp_share_2023',v)} isPercent unit="%" tip="Water sector spending as percentage of GDP" />
-        <F label="Water as % of GDP, average" value={inputs.bau.ws_gdp_share_avg || 0} onChange={v => u('bau','ws_gdp_share_avg',v)} isPercent unit="%" tip="Water sector spending as percentage of GDP (average)" />
-        <F label="Sanitation as % of GDP, 2021" value={inputs.bau.san_gdp_share_2021 || 0} onChange={v => u('bau','san_gdp_share_2021',v)} isPercent unit="%" tip="Sanitation sector spending as percentage of GDP" />
-        <F label="Sanitation as % of GDP, 2022" value={inputs.bau.san_gdp_share_2022 || 0} onChange={v => u('bau','san_gdp_share_2022',v)} isPercent unit="%" tip="Sanitation sector spending as percentage of GDP" />
-        <F label="Sanitation as % of GDP, 2023" value={inputs.bau.san_gdp_share_2023 || 0} onChange={v => u('bau','san_gdp_share_2023',v)} isPercent unit="%" tip="Sanitation sector spending as percentage of GDP" />
-        <F label="Sanitation as % of GDP, average" value={inputs.bau.san_gdp_share_avg || 0} onChange={v => u('bau','san_gdp_share_avg',v)} isPercent unit="%" tip="Sanitation sector spending as percentage of GDP (average)" />
-        <F label="WASH as % of GDP, 2021" value={inputs.bau.wash_gdp_share_2021 || 0} onChange={v => u('bau','wash_gdp_share_2021',v)} isPercent unit="%" tip="Combined WASH spending as percentage of GDP" />
-        <F label="WASH as % of GDP, 2022" value={inputs.bau.wash_gdp_share_2022 || 0} onChange={v => u('bau','wash_gdp_share_2022',v)} isPercent unit="%" tip="Combined WASH spending as percentage of GDP" />
-        <F label="WASH as % of GDP, 2023" value={inputs.bau.wash_gdp_share_2023 || 0} onChange={v => u('bau','wash_gdp_share_2023',v)} isPercent unit="%" tip="Combined WASH spending as percentage of GDP" />
-        <F label="WASH as % of GDP, average" value={inputs.bau.wash_gdp_share_avg || 0} onChange={v => u('bau','wash_gdp_share_avg',v)} isPercent unit="%" tip="Combined WASH spending as percentage of GDP (average)" />
+        <SubHead text="Sector split of WSS budget" />
+        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+          Water + Sanitation must sum to 100% of the WSS budget
+        </div>
+        <F label="Water supply % of WSS budget" value={inputs.bau.ws_pct_of_wss || 0} onChange={v => u('bau','ws_pct_of_wss',v)} isPercent unit="%" min={0} max={1.0} tip="Share of WSS budget allocated to water supply; water + sanitation must sum to 100%" />
+        <F label="Sanitation % of WSS budget" value={inputs.bau.san_pct_of_wss || 0} onChange={v => u('bau','san_pct_of_wss',v)} isPercent unit="%" min={0} max={1.0} tip="Share of WSS budget allocated to sanitation; water + sanitation must sum to 100%" />
         <SubHead text="Budget allocation" />
         <F label="Proportion large urban networks" value={inputs.bau.large_urban_pct} onChange={v => u('bau','large_urban_pct',v)} isPercent unit="%" tip="Share of sector budget going to large urban networks" />
         <F label="Capital expenditure % of budget" value={inputs.bau.capex_pct_budget} onChange={v => u('bau','capex_pct_budget',v)} isPercent unit="%" tip="Share of total budget that is capital expenditure" />
@@ -537,20 +464,22 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== TECHNICAL ===== */}
       <Section title="11. Technical Inputs">
         <SubHead text="Water supply" />
-        <F label="% water sold to domestic" value={inputs.technical.ws_pct_domestic} onChange={v => u('technical','ws_pct_domestic',v)} isPercent unit="%" tip="Share of water/wastewater sold to domestic customers" />
-        <F label="Non-HH as % of HH" value={inputs.technical.ws_non_hh_pct_of_hh} onChange={v => u('technical','ws_non_hh_pct_of_hh',v)} isPercent unit="%" tip="Non-household infrastructure as percentage of household investment" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="Existing water treatment capacity" value={inputs.technical.ws_existing_treatment_mld} onChange={v => u('technical','ws_existing_treatment_mld',v)} unit="MLD" min={0} max={10000} tip="Capacity in million liters per day" />
-        <F label="Number of treatment plants" value={inputs.technical.ws_num_treatment_plants} onChange={v => u('technical','ws_num_treatment_plants',v)} min={0} max={100} tip="Total number of water treatment plants in operation" />
         <F label="Water requirement per WHO" value={inputs.technical.ws_water_req_who_lpcd} onChange={v => u('technical','ws_water_req_who_lpcd',v)} unit="lpcd" min={20} max={200} tip="WHO minimum water requirement per person per day" />
         <SubHead text="Sanitation" />
-        <F label="% wastewater sold to domestic" value={inputs.technical.san_pct_domestic} onChange={v => u('technical','san_pct_domestic',v)} isPercent unit="%" tip="Share of wastewater sold to domestic customers" />
-        <F label="Non-HH as % of HH" value={inputs.technical.san_non_hh_pct_of_hh} onChange={v => u('technical','san_non_hh_pct_of_hh',v)} isPercent unit="%" tip="Non-household infrastructure as percentage of household investment" />
         <F label="Useful life of assets" value={inputs.technical.san_asset_life} onChange={v => u('technical','san_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
-        <SubHead text="Fecal sludge" />
-        <F label="Existing FST capacity" value={inputs.technical.san_existing_fst_mld} onChange={v => u('technical','san_existing_fst_mld',v)} step={0.0001} unit="MLD" min={0} max={10000} tip="Capacity in million liters per day" />
-        <F label="FS per person per day" value={inputs.technical.san_fs_per_person_per_day} onChange={v => u('technical','san_fs_per_person_per_day',v)} step={0.1} unit="liters" min={0} max={10} tip="Volume of fecal sludge generated per person per day in liters" />
         <F label="Factor wastewater of water supply" value={inputs.technical.san_wastewater_factor} onChange={v => u('technical','san_wastewater_factor',v)} isPercent unit="%" tip="Wastewater volume as share of water supply volume" />
+        <SubHead text="Wastewater treatment" />
+        <F label="Existing WWT capacity" value={inputs.technical.san_existing_wwt_mld || 0} onChange={v => u('technical','san_existing_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="All wastewater treatment capacity" />
+        <F label="Existing WWT plant" value={inputs.technical.san_existing_wwt_plant_mld || 19} onChange={v => u('technical','san_existing_wwt_plant_mld',v)} unit="MLD" min={0} max={10000} tip="Existing wastewater treatment plant capacity" />
+        <F label="Proposed WWT plant" value={inputs.technical.san_proposed_wwt_plant_mld || 138.1} onChange={v => u('technical','san_proposed_wwt_plant_mld',v)} unit="MLD" min={0} max={10000} tip="Proposed wastewater treatment plant capacity" />
+        <F label="Capex of WWT plants" value={inputs.technical.san_wwt_capex_mill || 0} onChange={v => u('technical','san_wwt_capex_mill',v)} unit={`${CUR} M`} min={0} max={1000000} tip="Capital expenditure for wastewater treatment plants" />
+        <F label="Avg capex per MLD for WWT" value={inputs.technical.san_avg_capex_per_mld_wwt || 0} onChange={v => u('technical','san_avg_capex_per_mld_wwt',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a wastewater treatment plant" />
+        <SubHead text="Fecal sludge" />
+        <F label="Avg capex per MLD for FSTP" value={inputs.technical.san_avg_capex_per_mld_fstp || 395} onChange={v => u('technical','san_avg_capex_per_mld_fstp',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a fecal sludge treatment plant (e.g. Birendranagar FSTP)" />
+        <F label="Existing FST capacity" value={inputs.technical.san_existing_fst_mld} onChange={v => u('technical','san_existing_fst_mld',v)} step={0.0001} unit="MLD" min={0} max={10000} tip="Existing fecal sludge treatment capacity" />
+        <F label="FS per person per day" value={inputs.technical.san_fs_per_person_per_day} onChange={v => u('technical','san_fs_per_person_per_day',v)} step={0.1} unit="liters" min={0} max={10} tip="Volume of fecal sludge generated per person per day in liters" />
       </Section>
       </>}
 
