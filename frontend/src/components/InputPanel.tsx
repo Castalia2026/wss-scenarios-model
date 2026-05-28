@@ -143,9 +143,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', fontSize: 12 }}>
-      <div style={{ display: 'flex', gap: 14, marginBottom: 10, fontSize: 10, color: '#64748b' }}>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#fff', border: '1px solid #ccc', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }}></span><span style={{ color: '#0000cc', fontWeight: 600 }}>Blue</span> = editable</span>
-        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#e2e8f0', border: '1px solid #94a3b8', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }}></span><span style={{ color: '#94a3b8', fontWeight: 600 }}>Gray</span> = auto-calculated</span>
+      <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, padding: '6px 10px', background: '#f0f4ff', borderRadius: 6, lineHeight: 1.5, border: '1px solid #c7d2fe' }}>
+        <span style={{ color: '#0000cc', fontWeight: 600 }}>Blue fields</span> are editable inputs. <span style={{ color: '#64748b', fontWeight: 600, background: '#e2e8f0', padding: '1px 4px', borderRadius: 2 }}>Gray fields</span> are auto-calculated and cannot be edited.
       </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
@@ -170,7 +169,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {isInputs && <>
 
       {/* ===== COUNTRY CONFIG ===== */}
-      <Section title="1. Country & Region">
+      <Section title="1. Country, Region & Currency">
         {inputs.country_config && <>
           {/* Country with searchable dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
@@ -192,7 +191,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               placeholder="e.g. Kathmandu Valley" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Local currency code</label>
+            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Currency code</label>
             <input type="text" value={inputs.country_config.currency || ''}
               onChange={e => setCountryConfig('currency', e.target.value)}
               style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }} />
