@@ -8,32 +8,33 @@ import {
 const allYears = [2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
 const baselineIdx = 14; // 2025
 
-// --- Water Supply BAU data (stacked area) ---
-const waterBAUData = allYears.map((y, i) => {
-  const t = i / (allYears.length - 1);
-  const hist = i <= baselineIdx;
-  return {
-    year: y,
-    'Safely Managed': +(hist ? 0 + t * 0.02 : 0.02 + (i - baselineIdx) * 0.018).toFixed(3),
-    'Basic': +(hist ? 0.35 + t * 0.15 : 0.50 + (i - baselineIdx) * 0.012).toFixed(3),
-    'Limited': +(hist ? 0.45 - t * 0.05 : 0.40 - (i - baselineIdx) * 0.008).toFixed(3),
-    'Unimproved': +(hist ? 0.15 - t * 0.05 : 0.10 - (i - baselineIdx) * 0.005).toFixed(3),
-    'No Service': +(hist ? 0.05 - t * 0.02 : 0.03 - (i - baselineIdx) * 0.002).toFixed(3),
-  };
+// Normalize so levels always sum to exactly 1.0
+function makeBAUData(profiles: { sm: [number,number], ba: [number,number], li: [number,number], un: [number,number], ns: [number,number] }) {
+  return allYears.map((y, i) => {
+    const t = i / (allYears.length - 1);
+    const lerp = (a: number, b: number) => a + (b - a) * t;
+    const raw = {
+      'Safely Managed': Math.max(0, lerp(profiles.sm[0], profiles.sm[1])),
+      'Basic': Math.max(0, lerp(profiles.ba[0], profiles.ba[1])),
+      'Limited': Math.max(0, lerp(profiles.li[0], profiles.li[1])),
+      'Unimproved': Math.max(0, lerp(profiles.un[0], profiles.un[1])),
+      'No Service': Math.max(0, lerp(profiles.ns[0], profiles.ns[1])),
+    };
+    const sum = Object.values(raw).reduce((s, v) => s + v, 0);
+    const norm: any = { year: y };
+    for (const [k, v] of Object.entries(raw)) norm[k] = +(v / sum).toFixed(4);
+    return norm;
+  });
+}
+
+// Water: from low safely-managed to high safely-managed
+const waterBAUData = makeBAUData({
+  sm: [0.00, 0.25], ba: [0.35, 0.55], li: [0.45, 0.15], un: [0.15, 0.04], ns: [0.05, 0.01],
 });
 
-// --- Sanitation BAU data (different numbers) ---
-const sanitationBAUData = allYears.map((y, i) => {
-  const t = i / (allYears.length - 1);
-  const hist = i <= baselineIdx;
-  return {
-    year: y,
-    'Safely Managed': +(hist ? 0 + t * 0.01 : 0.01 + (i - baselineIdx) * 0.008).toFixed(3),
-    'Basic': +(hist ? 0.20 + t * 0.18 : 0.38 + (i - baselineIdx) * 0.015).toFixed(3),
-    'Limited': +(hist ? 0.55 - t * 0.08 : 0.47 - (i - baselineIdx) * 0.010).toFixed(3),
-    'Unimproved': +(hist ? 0.18 - t * 0.06 : 0.12 - (i - baselineIdx) * 0.006).toFixed(3),
-    'No Service': +(hist ? 0.07 - t * 0.03 : 0.04 - (i - baselineIdx) * 0.003).toFixed(3),
-  };
+// Sanitation: different profile, lower safely-managed
+const sanitationBAUData = makeBAUData({
+  sm: [0.00, 0.12], ba: [0.20, 0.50], li: [0.55, 0.28], un: [0.18, 0.07], ns: [0.07, 0.03],
 });
 
 const STACK_COLORS: Record<string, string> = {
