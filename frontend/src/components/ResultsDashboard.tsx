@@ -114,28 +114,6 @@ interface Props {
 
 export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props) {
   const [activeSector, setActiveSector] = useState<'water' | 'sanitation'>('water');
-  const [exporting, setExporting] = useState<string | null>(null);
-
-  const handleExport = (type: 'pptx' | 'xlsx' | 'csv') => {
-    setExporting(type);
-    fetch(`/api/export/${type}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(inputs || {}),
-    })
-      .then(r => r.blob())
-      .then(b => {
-        const u = URL.createObjectURL(b);
-        const a = document.createElement('a');
-        a.href = u;
-        a.download = `wss_export.${type}`;
-        a.click();
-        URL.revokeObjectURL(u);
-      })
-      .catch(() => {})
-      .finally(() => setExporting(null));
-  };
-
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
       {/* Prototype banner */}
@@ -143,38 +121,20 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
       </div>
 
-      {/* Export buttons */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-        <button
-          onClick={() => handleExport('pptx')}
-          disabled={exporting !== null}
-          style={{
-            padding: '7px 16px', border: '1px solid #2563eb', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
-            background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 12,
-            opacity: exporting ? 0.7 : 1,
-          }}>
-          {exporting === 'pptx' ? 'Exporting...' : 'Export PowerPoint'}
-        </button>
-        <button
-          onClick={() => handleExport('xlsx')}
-          disabled={exporting !== null}
-          style={{
-            padding: '7px 16px', border: '1px solid #16a34a', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
-            background: '#16a34a', color: '#fff', fontWeight: 600, fontSize: 12,
-            opacity: exporting ? 0.7 : 1,
-          }}>
-          {exporting === 'xlsx' ? 'Exporting...' : 'Export Excel'}
-        </button>
-        <button
-          onClick={() => handleExport('csv')}
-          disabled={exporting !== null}
-          style={{
-            padding: '7px 16px', border: '1px solid #64748b', borderRadius: 5, cursor: exporting ? 'wait' : 'pointer',
-            background: '#64748b', color: '#fff', fontWeight: 600, fontSize: 12,
-            opacity: exporting ? 0.7 : 1,
-          }}>
-          {exporting === 'csv' ? 'Exporting...' : 'Export CSV'}
-        </button>
+      {/* Interactive controls — intervention toggles */}
+      <div style={{ background: '#f0f4ff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #c7d2fe' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 6 }}>Toggle interventions to see impact</div>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
+            <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', padding: '3px 8px', background: '#fff', borderRadius: 4, border: '1px solid #e0e7ff' }}>
+              <input type="checkbox" defaultChecked style={{ accentColor: '#2563eb', width: 14, height: 14 }} />
+              <span>{name}</span>
+            </label>
+          ))}
+        </div>
+        <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, fontStyle: 'italic' }}>
+          In the full tool, toggling these will update the charts in real time.
+        </div>
       </div>
 
       {/* Sector tabs */}
