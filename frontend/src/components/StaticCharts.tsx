@@ -66,6 +66,25 @@ export function BAUForecastChart({ sector = 'water' }: { sector?: 'water' | 'san
             name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
+      {/* Right-side annotation labels for last data point */}
+      {(() => {
+        const last = data[data.length - 1];
+        const items = [
+          { color: '#9ca3af', label: 'Total households', value: last['Total households'] },
+          { color: '#d1d5db', label: `HHs with ${serviceLabel} (BAU)`, value: last['Households under BAU'] },
+          { color: '#16a34a', label: 'Target', value: last['Target'] },
+        ];
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4, fontSize: 10, color: '#475569' }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, display: 'inline-block', flexShrink: 0 }} />
+                <span>{it.label}: <b>{it.value.toFixed(2)}M</b> ({last.year})</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
@@ -153,6 +172,29 @@ export function InterventionImpactChart({ sector = 'water' }: { sector?: 'water'
             name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
+      {/* Right-side annotation labels for last data point */}
+      {(() => {
+        const last = data[data.length - 1];
+        const items = [
+          { color: '#9ca3af', label: 'Total households', value: last['Total households'] },
+          { color: INTV_COLORS['BAU'], label: `HHs (BAU)`, value: last['BAU'] },
+          { color: INTV_COLORS['Collection & NRW'], label: 'Collection & NRW', value: last['Collection & NRW'] },
+          { color: INTV_COLORS['Capital efficiency'], label: 'Capital efficiency', value: last['Capital efficiency'] },
+          { color: INTV_COLORS['Tariff increase'], label: 'Tariff increase', value: last['Tariff increase'] },
+          { color: INTV_COLORS['Borrowing'], label: 'Borrowing', value: last['Borrowing'] },
+          { color: '#16a34a', label: 'Target', value: last['Target'] },
+        ];
+        return (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4, fontSize: 10, color: '#475569' }}>
+            {items.map((it, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, display: 'inline-block', flexShrink: 0 }} />
+                <span>{it.label}: <b>{it.value.toFixed(3)}M</b> ({last.year})</span>
+              </div>
+            ))}
+          </div>
+        );
+      })()}
     </div>
   );
 }
