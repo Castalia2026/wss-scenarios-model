@@ -26,9 +26,9 @@ function F({ label, value, onChange, unit, step, isPercent, tip, slider, fieldTy
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (fieldType === 'computed' ? Math.round(value * 100) / 100 : value);
   const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
   return (
-    <div style={{ marginBottom: slider ? 8 : 6 }} title={tip || ''}>
+    <div style={{ marginBottom: slider ? 8 : 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label style={{ flex: 1, fontSize: 13, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500, cursor: tip ? 'help' : 'default' }}>
+        <label style={{ flex: 1, fontSize: 13, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tip || undefined}>
           {label}{tip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
