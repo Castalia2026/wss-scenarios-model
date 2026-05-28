@@ -13,6 +13,7 @@ export default function App() {
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
+  const [showGuide, setShowGuide] = useState(false);
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -212,6 +213,24 @@ export default function App() {
         {activeTab === 2 && inputs && (
           <InterventionPanel inputs={inputs} onChange={handleSetInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} />
         )}
+        {/* Guide panel — tabs 0, 1, 2 */}
+        {activeTab <= 2 && (
+          <>
+            <button onClick={() => setShowGuide(!showGuide)} style={{
+              position: 'absolute', right: showGuide ? 320 : 0, top: 12,
+              padding: '8px 6px', border: '1px solid #cbd5e1', borderRight: showGuide ? 'none' : undefined,
+              borderRadius: '6px 0 0 6px',
+              background: showGuide ? '#eef2ff' : '#f8fafc', cursor: 'pointer',
+              fontSize: 11, color: '#4338ca', fontWeight: 600, zIndex: 10,
+              writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: 1,
+              boxShadow: '-2px 0 6px rgba(0,0,0,0.06)', transition: 'right 0.2s',
+            }}>
+              {showGuide ? '✕ Close' : '📋 Guide'}
+            </button>
+            {showGuide && <DataGuide tab={activeTab} />}
+          </>
+        )}
+
         {activeTab === 3 && (
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
         )}

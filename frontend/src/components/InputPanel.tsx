@@ -172,29 +172,29 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       <Section title="1. Country, Region & Currency">
         {inputs.country_config && <>
           {/* Country with searchable dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Country</label>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Country</label>
             <input type="text" list="country-list" value={inputs.country_config.country || ''}
               onChange={e => setCountryConfig('country', e.target.value)}
-              style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }}
+              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
               placeholder="Type to search..."
             />
             <datalist id="country-list">
               {countries.map(c => <option key={c.name} value={c.name} />)}
             </datalist>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Region</label>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Region</label>
             <input type="text" value={inputs.country_config.area || ''}
               onChange={e => setCountryConfig('area', e.target.value)}
-              style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }}
+              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
               placeholder="e.g. Kathmandu Valley" />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Currency code</label>
+          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
+            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Currency code</label>
             <input type="text" value={inputs.country_config.currency || ''}
               onChange={e => setCountryConfig('currency', e.target.value)}
-              style={{ width: 120, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }} />
+              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }} />
           </div>
         </>}
       </Section>
