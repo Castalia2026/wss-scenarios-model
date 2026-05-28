@@ -7,7 +7,7 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
       <button onClick={() => setOpen(!open)} style={{
         width: '100%', padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
         border: 'none', background: open ? '#e8f0fe' : '#fff', fontWeight: 600,
-        fontSize: 12, borderRadius: 6, display: 'flex', justifyContent: 'space-between',
+        fontSize: 14, borderRadius: 6, display: 'flex', justifyContent: 'space-between',
       }}>
         {title}<span>{open ? '▴' : '▾'}</span>
       </button>
@@ -17,7 +17,7 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
 }
 
 function SubHead({ text }: { text: string }) {
-  return <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', margin: '8px 0 4px', borderBottom: '1px solid #e5e7eb', paddingBottom: 2 }}>{text}</div>;
+  return <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '10px 0 6px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
 }
 
 // Color convention: blue text = editable input, green text = cross-linked, gray = computed/derived
@@ -43,25 +43,25 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
   const showSlider = slider && displayMin !== undefined && displayMax !== undefined;
 
   return (
-    <div style={{ marginBottom: showSlider ? 6 : 4 }} title={tooltip}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <label style={{ flex: 1, fontSize: 11, color: labelColor, lineHeight: 1.2, cursor: tooltip ? 'help' : 'default', fontWeight: fieldType === 'computed' ? 400 : 500 }}>
+    <div style={{ marginBottom: showSlider ? 8 : 6 }} title={tooltip}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label style={{ flex: 1, fontSize: 13, color: labelColor, lineHeight: 1.3, cursor: tooltip ? 'help' : 'default', fontWeight: fieldType === 'computed' ? 400 : 500 }}>
           {label}
-          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
+          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
           step={isPercent ? 1 : (step || 1)}
           min={displayMin} max={displayMax}
           style={{
-            width: showSlider ? 60 : 90, padding: '3px 5px', borderRadius: 3, fontSize: 11, textAlign: 'right',
+            width: showSlider ? 70 : 100, padding: '5px 7px', borderRadius: 4, fontSize: 13, textAlign: 'right',
             border: outOfRange ? '1.5px solid #ef4444' : fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
             background: outOfRange ? '#fef2f2' : fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
             color: fieldType === 'computed' ? '#475569' : '#000',
           }}
           readOnly={fieldType === 'computed' || fieldType === 'linked'}
         />
-        {unit && <span style={{ fontSize: 10, color: '#888', minWidth: 24 }}>{unit}</span>}
+        {unit && <span style={{ fontSize: 12, color: '#64748b', minWidth: 28 }}>{unit}</span>}
       </div>
       {showSlider && (
         <input type="range" value={displayVal}
@@ -76,7 +76,7 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
 
 function Toggle({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, cursor: 'pointer', fontSize: 12 }}>
+    <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, cursor: 'pointer', fontSize: 13 }}>
       <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
         style={{ width: 16, height: 16, accentColor: '#2563eb' }} />
       <span style={{ color: checked ? '#1a1a2e' : '#94a3b8', fontWeight: checked ? 600 : 400 }}>{label}</span>
