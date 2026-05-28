@@ -1,126 +1,156 @@
 import React from 'react';
 import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line
+  Legend, ResponsiveContainer, ComposedChart, Line, Label
 } from 'recharts';
 
-// --- Historical + Forecast years ---
-const allYears = [2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
-const baselineIdx = 14; // 2025
+const allYears = [2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
 
-// Normalize so levels always sum to exactly 1.0
-function makeBAUData(profiles: { sm: [number,number], ba: [number,number], li: [number,number], un: [number,number], ns: [number,number] }) {
-  return allYears.map((y, i) => {
-    const t = i / (allYears.length - 1);
-    const lerp = (a: number, b: number) => a + (b - a) * t;
-    const raw = {
-      'Safely Managed': Math.max(0, lerp(profiles.sm[0], profiles.sm[1])),
-      'Basic': Math.max(0, lerp(profiles.ba[0], profiles.ba[1])),
-      'Limited': Math.max(0, lerp(profiles.li[0], profiles.li[1])),
-      'Unimproved': Math.max(0, lerp(profiles.un[0], profiles.un[1])),
-      'No Service': Math.max(0, lerp(profiles.ns[0], profiles.ns[1])),
-    };
-    const sum = Object.values(raw).reduce((s, v) => s + v, 0);
-    const norm: any = { year: y };
-    for (const [k, v] of Object.entries(raw)) norm[k] = +(v / sum).toFixed(4);
-    return norm;
-  });
-}
-
-// Water: from low safely-managed to high safely-managed
-const waterBAUData = makeBAUData({
-  sm: [0.00, 0.25], ba: [0.35, 0.55], li: [0.45, 0.15], un: [0.15, 0.04], ns: [0.05, 0.01],
+// ─── Water Supply BAU data ───
+const waterBAUData = allYears.map((y) => {
+  const t = (y - 2020) / 20;
+  const totalHH = 0.8 + t * 0.7;
+  const bauHH = 0.4 + t * 0.4 * 0.5;
+  const targetHH = y <= 2027 ? bauHH : bauHH + (y - 2027) * 0.065;
+  return {
+    year: y,
+    'Total households': +totalHH.toFixed(2),
+    'Households under BAU': +bauHH.toFixed(2),
+    'Target': +Math.min(targetHH, totalHH).toFixed(2),
+  };
 });
 
-// Sanitation: different profile, lower safely-managed
-const sanitationBAUData = makeBAUData({
-  sm: [0.00, 0.12], ba: [0.20, 0.50], li: [0.55, 0.28], un: [0.18, 0.07], ns: [0.07, 0.03],
+// ─── Sanitation BAU data (different profile) ───
+const sanBAUData = allYears.map((y) => {
+  const t = (y - 2020) / 20;
+  const totalHH = 0.8 + t * 0.7;
+  const bauHH = 0.25 + t * 0.4 * 0.4;
+  const targetHH = y <= 2027 ? bauHH : bauHH + (y - 2027) * 0.045;
+  return {
+    year: y,
+    'Total households': +totalHH.toFixed(2),
+    'Households under BAU': +bauHH.toFixed(2),
+    'Target': +Math.min(targetHH, totalHH).toFixed(2),
+  };
 });
-
-const STACK_COLORS: Record<string, string> = {
-  'Safely Managed': '#2563eb',
-  'Basic': '#10b981',
-  'Limited': '#f59e0b',
-  'Unimproved': '#ef4444',
-  'No Service': '#64748b',
-};
 
 export function BAUForecastChart({ sector = 'water' }: { sector?: 'water' | 'sanitation' }) {
-  const data = sector === 'water' ? waterBAUData : sanitationBAUData;
-  const label = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const data = sector === 'water' ? waterBAUData : sanBAUData;
+  const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
-      <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>{label} — BAU Service Levels (Stacked)</h3>
+      <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
+        {sectorLabel} — BAU Service Gap
+      </h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Static example — historical (white) + forecast (yellow tint)
+        Static example data
       </div>
-      <ResponsiveContainer width="100%" height={320}>
-        <ComposedChart data={data}>
+      <ResponsiveContainer width="100%" height={360}>
+        <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} domain={[0, 1]} tickFormatter={(v: number) => `${Math.round(v*100)}%`} label={{ value: '% of households', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-          <Tooltip formatter={(value: number) => `${(value*100).toFixed(1)}%`} contentStyle={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 10 }} domain={[0, 1.6]}>
+            <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
+          </YAxis>
+          <Tooltip formatter={(value: number) => value.toFixed(2) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          {Object.keys(STACK_COLORS).reverse().map(key => (
-            <Area key={key} type="monotone" dataKey={key} stackId="1" fill={STACK_COLORS[key]} stroke={STACK_COLORS[key]} fillOpacity={0.7} />
-          ))}
-          {/* Baseline year marker */}
-          <Line type="monotone" dataKey={() => null} stroke="transparent" />
+          {/* BAU shaded area */}
+          <Area type="monotone" dataKey="Households under BAU" fill="#d1d5db" stroke="#9ca3af" fillOpacity={0.6}
+            name={`Households with ${serviceLabel} under BAU`} />
+          {/* Total HHs dashed line */}
+          <Line type="monotone" dataKey="Total households" stroke="#9ca3af" strokeWidth={2.5} dot={false}
+            strokeDasharray="8 4" name="Total households" />
+          {/* Target line */}
+          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false}
+            name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
-      <div style={{ display: 'flex', justifyContent: 'center', gap: 16, fontSize: 10, color: '#64748b', marginTop: 4 }}>
-        <span>◀ Historical data</span>
-        <span style={{ color: '#1e3a5f', fontWeight: 700 }}>|2025|</span>
-        <span>Forecast ▶</span>
-      </div>
     </div>
   );
 }
 
-// Static stacked area chart for intervention impact view
-const interventionYears = allYears.filter(y => y >= 2025);
-const waterInterventionData = interventionYears.map(y => ({
-  year: y,
-  BAU: 0.49 + (y - 2025) * 0.021,
-  'Collection & NRW': Math.max(0, (y - 2028) * 0.008),
-  'Capital Efficiency': Math.max(0, (y - 2033) * 0.006),
-  'Tariff Increase': Math.max(0, (y - 2028) * 0.003),
-  Borrowing: Math.max(0, (y - 2036) * 0.005),
-  Target: 0.49 + (y - 2025) * 0.067,
-}));
+// ─── Intervention Impact Charts ───
+const waterIntvData = allYears.map((y) => {
+  const t = (y - 2020) / 20;
+  const totalHH = 0.8 + t * 0.7;
+  const bauHH = 0.4 + t * 0.4 * 0.5;
+  const intv = y <= 2027 ? 0 : (y - 2027);
+  return {
+    year: y,
+    'Total households': +totalHH.toFixed(2),
+    'BAU': +bauHH.toFixed(2),
+    'Collection & NRW': +(intv * 0.025).toFixed(3),
+    'Capital efficiency': +(intv * 0.018).toFixed(3),
+    'Tariff increase': +(intv * 0.012).toFixed(3),
+    'Borrowing': +(intv * 0.008).toFixed(3),
+    'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * 0.065, totalHH).toFixed(2),
+  };
+});
 
-const sanitationInterventionData = interventionYears.map(y => ({
-  year: y,
-  BAU: 0.32 + (y - 2025) * 0.015,
-  'Collection & NRW': Math.max(0, (y - 2028) * 0.005),
-  'Capital Efficiency': Math.max(0, (y - 2033) * 0.004),
-  'Tariff Increase': Math.max(0, (y - 2028) * 0.002),
-  Borrowing: Math.max(0, (y - 2036) * 0.003),
-  Target: 0.32 + (y - 2025) * 0.045,
-}));
+const sanIntvData = allYears.map((y) => {
+  const t = (y - 2020) / 20;
+  const totalHH = 0.8 + t * 0.7;
+  const bauHH = 0.25 + t * 0.4 * 0.4;
+  const intv = y <= 2027 ? 0 : (y - 2027);
+  return {
+    year: y,
+    'Total households': +totalHH.toFixed(2),
+    'BAU': +bauHH.toFixed(2),
+    'Collection & NRW': +(intv * 0.015).toFixed(3),
+    'Capital efficiency': +(intv * 0.012).toFixed(3),
+    'Tariff increase': +(intv * 0.008).toFixed(3),
+    'Borrowing': +(intv * 0.005).toFixed(3),
+    'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * 0.045, totalHH).toFixed(2),
+  };
+});
+
+const INTV_COLORS = {
+  'BAU': '#d1d5db',
+  'Collection & NRW': '#93c5fd',
+  'Capital efficiency': '#3b82f6',
+  'Tariff increase': '#1d4ed8',
+  'Borrowing': '#1e3a5f',
+};
 
 export function InterventionImpactChart({ sector = 'water' }: { sector?: 'water' | 'sanitation' }) {
-  const data = sector === 'water' ? waterInterventionData : sanitationInterventionData;
-  const label = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const data = sector === 'water' ? waterIntvData : sanIntvData;
+  const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
-      <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>{label} — Service Gap After Interventions</h3>
+      <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
+        {sectorLabel} — Service Gap After Interventions
+      </h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Static example — intervention impact on coverage
+        Static example data
       </div>
-      <ResponsiveContainer width="100%" height={350}>
-        <ComposedChart data={data}>
+      <ResponsiveContainer width="100%" height={380}>
+        <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} label={{ value: 'Households (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-          <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 10 }} domain={[0, 1.6]}>
+            <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
+          </YAxis>
+          <Tooltip formatter={(value: number) => value.toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          <Area type="monotone" dataKey="BAU" stackId="1" fill="#64748b" stroke="#64748b" fillOpacity={0.5} />
-          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill="#10b981" stroke="#10b981" fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill="#f59e0b" stroke="#f59e0b" fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Tariff Increase" stackId="1" fill="#8b5cf6" stroke="#8b5cf6" fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Borrowing" stackId="1" fill="#ec4899" stroke="#ec4899" fillOpacity={0.6} />
-          <Line type="monotone" dataKey="Target" stroke="#2563eb" strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
+          {/* Stacked intervention areas */}
+          <Area type="monotone" dataKey="BAU" stackId="1" fill={INTV_COLORS['BAU']} stroke="#9ca3af" fillOpacity={0.7}
+            name={`Households with ${serviceLabel} under BAU`} />
+          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={INTV_COLORS['Collection & NRW']} stroke={INTV_COLORS['Collection & NRW']} fillOpacity={0.7}
+            name="Increased collection efficiency & NRW reduction" />
+          <Area type="monotone" dataKey="Capital efficiency" stackId="1" fill={INTV_COLORS['Capital efficiency']} stroke={INTV_COLORS['Capital efficiency']} fillOpacity={0.7}
+            name="Increased efficiency in capital expenditure" />
+          <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.7}
+            name="Tariff increase" />
+          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.7}
+            name="Borrow against future cashflow" />
+          {/* Total HHs dashed line */}
+          <Line type="monotone" dataKey="Total households" stroke="#9ca3af" strokeWidth={2.5} dot={false}
+            strokeDasharray="8 4" />
+          {/* Target line */}
+          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false}
+            name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
