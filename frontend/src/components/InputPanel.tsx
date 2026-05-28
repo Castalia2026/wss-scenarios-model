@@ -219,40 +219,78 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Year for real prices" value={inputs.macro.real_price_year} onChange={v => u('macro','real_price_year',v)} min={inputs.period.model_start_year} max={inputs.period.baseline_year} tip="Base year for converting nominal to real values; must be a year with actual data" />
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
-        <SubHead text="Time-series data (year by year)" />
+        <SubHead text="Year-by-year data" />
         <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Enter nominal GDP and actual rates for historical years. GDP growth is calculated automatically.
+          Enter data for historical years. Forecast years are projected. GDP growth, population growth, avg household size, and execution rates are auto-calculated.
         </div>
         {(() => {
           const arr = inputs.macro.gdp_nominal_usd || inputs.macro.gdp_growth || [];
           const years = arr.map((_: number, i: number) => (inputs.period.model_start_year || 2011) + i);
           const baseYr2 = inputs.period.baseline_year || 2025;
           const gdpArr = inputs.macro.gdp_nominal_usd || [];
-          const tsInput = (field: string, idx: number, val: number, isPct: boolean) => (
-            <input type="number" value={isPct ? Math.round(val*10000)/100 : Math.round(val*1000)/1000}
+          const tsInput = (section: string, field: string, idx: number, val: number, isPct: boolean) => (
+            <input type="number" value={isPct ? Math.round(val*10000)/100 : Math.round(val*100)/100}
               onChange={e => { const v=parseFloat(e.target.value); if(!isNaN(v)){
-                const a=[...inputs.macro[field]]; a[idx]=isPct?v/100:v;
-                onChange({...inputs, macro:{...inputs.macro, [field]:a}});
+                const a=[...(inputs[section]?.[field] || inputs.macro?.[field] || [])]; a[idx]=isPct?v/100:v;
+                if (section === 'macro') onChange({...inputs, macro:{...inputs.macro, [field]:a}});
+                else onChange({...inputs, [section]:{...inputs[section], [field]:a}});
               }}}
-              style={{ width: 58, padding: '2px 3px', border: '1px solid #ddd', borderRadius: 2, fontSize: 11, textAlign: 'right' }}
+              style={{ width: 58, padding: '2px 3px', border: '1px solid #ddd', borderRadius: 2, fontSize: 11, textAlign: 'left' }}
             />
           );
-          const rows: { label: string; computed?: boolean; cells: React.ReactNode[] }[] = [
-            { label: 'Nominal GDP ($B)', cells: years.map((_: number, i: number) => tsInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
+          const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct);
+
+          // Section headers as row separators
+          const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
+
+          const rows: { label: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
+            sectionRow('── Economic ──'),
+            { label: 'Nominal GDP ($B)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
             { label: 'GDP growth %', computed: true, cells: years.map((_: number, i: number) => {
               const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: `Infl ${cc.country || 'Domestic'} %`, cells: years.map((_: number, i: number) => tsInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
-            { label: 'Infl US %', cells: years.map((_: number, i: number) => tsInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
-            { label: `USD/${CUR}`, cells: years.map((_: number, i: number) => tsInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
+            { label: `Infl ${cc.country || 'Domestic'} %`, cells: years.map((_: number, i: number) => mInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
+            { label: 'Infl US %', cells: years.map((_: number, i: number) => mInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
+            { label: `USD/${CUR}`, cells: years.map((_: number, i: number) => mInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
+            sectionRow('── Demographic ──'),
+            { label: `${scopeLabel} population`, cells: years.map((_: number, i: number) => tsInput('population', 'pop_ts', i, (inputs.population?.pop_ts||[])[i]||0, false)) },
+            { label: 'Pop growth %', computed: true, cells: years.map((_: number, i: number) => {
+              const p = inputs.population?.pop_ts || [];
+              const g = (i > 0 && p[i] && p[i-1] && p[i-1] !== 0) ? ((p[i]/p[i-1])-1)*100 : 0;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
+            }) },
+            { label: 'Households (mill)', cells: years.map((_: number, i: number) => tsInput('population', 'hh_ts', i, (inputs.population?.hh_ts||[])[i]||0, false)) },
+            { label: 'Avg HH size', computed: true, cells: years.map((_: number, i: number) => {
+              const p = (inputs.population?.pop_ts||[])[i]||0;
+              const h = (inputs.population?.hh_ts||[])[i]||0;
+              const sz = (h > 0 && p > 0) ? p / (h * 1e6) : 0;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(1) : '—'}</span>;
+            }) },
+            sectionRow(`── Budget & Execution (${CUR} M) ──`),
+            { label: 'WS budget allocated', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_budget_ts', i, (inputs.bau?.ws_budget_ts||[])[i]||0, false)) },
+            { label: 'WS actual expenditure', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_expend_ts', i, (inputs.bau?.ws_expend_ts||[])[i]||0, false)) },
+            { label: 'WS execution rate', computed: true, cells: years.map((_: number, i: number) => {
+              const b = (inputs.bau?.ws_budget_ts||[])[i]||0;
+              const e = (inputs.bau?.ws_expend_ts||[])[i]||0;
+              const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
+            }) },
+            { label: 'SAN budget allocated', cells: years.map((_: number, i: number) => tsInput('bau', 'san_budget_ts', i, (inputs.bau?.san_budget_ts||[])[i]||0, false)) },
+            { label: 'SAN actual expenditure', cells: years.map((_: number, i: number) => tsInput('bau', 'san_expend_ts', i, (inputs.bau?.san_expend_ts||[])[i]||0, false)) },
+            { label: 'SAN execution rate', computed: true, cells: years.map((_: number, i: number) => {
+              const b = (inputs.bau?.san_budget_ts||[])[i]||0;
+              const e = (inputs.bau?.san_expend_ts||[])[i]||0;
+              const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
+            }) },
           ];
           return (
             <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
-                    <th style={{ padding: '4px 8px', textAlign: 'left', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 1, minWidth: 120 }}></th>
+                    <th style={{ padding: '4px 8px', textAlign: 'left', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 1, minWidth: 150 }}></th>
                     {years.map((yr: number) => (
                       <th key={yr} style={{ padding: '4px 4px', textAlign: 'center', fontSize: 10, fontWeight: yr > baseYr2 ? 600 : 500, color: yr > baseYr2 ? '#f59e0b' : '#334155', minWidth: 62 }}>
                         {yr}{yr > baseYr2 && <span style={{ fontSize: 7, verticalAlign: 'super' }}>F</span>}
@@ -261,9 +299,15 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                   </tr>
                 </thead>
                 <tbody>
-                  {rows.map((row, ri) => (
+                  {rows.map((row, ri) => row.section ? (
+                    <tr key={ri} style={{ background: '#e0e7ff' }}>
+                      <td colSpan={years.length + 1} style={{ padding: '5px 8px', fontWeight: 700, fontSize: 11, color: '#312e81', position: 'sticky', left: 0, background: '#e0e7ff', zIndex: 1 }}>
+                        {row.label}
+                      </td>
+                    </tr>
+                  ) : (
                     <tr key={ri} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
-                      <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 12, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }}>
                         {row.label}
                       </td>
                       {row.cells.map((cell, ci) => (
@@ -276,36 +320,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             </div>
           );
         })()}
-      </Section>
-
-      {/* ===== POPULATION ===== */}
-      <Section title="3. Population">
-        <SubHead text={`Start year (${startYr})`} />
-        <F label={`${scopeLabel} population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip={`${scopeLabel} population at model start year (census)`} />
-        <F label={`${scopeLabel} households, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
-        <F label="Avg household size (calculated)" value={avgHHSizeStart} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_start||0).toLocaleString()} / ${((pop.total_hh_start||0)*1e6).toLocaleString()}`} />
-        <SubHead text={`Baseline year (${baseYr})`} />
-        <F label={`${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
-        <F label={`${scopeLabel} households, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
-        <F label="Avg household size (calculated)" value={avgHHSizeBase} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_baseline||0).toLocaleString()} / ${((pop.total_hh_baseline||0)*1e6).toLocaleString()}`} />
-        <SubHead text="Computed growth rates" />
-        <F label="Population CAGR (calculated)" value={popCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`CAGR from ${startYr} to ${baseYr}: (${(pop.total_pop_baseline||0).toLocaleString()} / ${(pop.total_pop_start||0).toLocaleString()})^(1/${nYears}) - 1`} />
-        <F label="Avg household size CAGR (calculated)" value={hhSizeCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Household size: ${avgHHSizeStart.toFixed(2)} (${startYr}) → ${avgHHSizeBase.toFixed(2)} (${baseYr})`} />
-      </Section>
-
-      {/* ===== HISTORIC BUDGET & EXECUTION ===== */}
-      <Section title="4. Historic Budget & Execution">
-        <SubHead text="Water supply" />
-        <F label={`Historic WS budget allocated (${CUR} mill)`} value={inputs.bau?.ws_budget_allocated || 0} onChange={v => u('bau','ws_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total water supply budget allocated over historical period" />
-        <F label={`Historic WS actual expenditure (${CUR} mill)`} value={inputs.bau?.ws_actual_expenditure || 0} onChange={v => u('bau','ws_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual water supply expenditure over historical period" />
-        <F label="WS execution rate (calculated)" value={(inputs.bau?.ws_budget_allocated && inputs.bau?.ws_actual_expenditure) ? inputs.bau.ws_actual_expenditure / inputs.bau.ws_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
-        <SubHead text="Sanitation" />
-        <F label={`Historic SAN budget allocated (${CUR} mill)`} value={inputs.bau?.san_budget_allocated || 0} onChange={v => u('bau','san_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total sanitation budget allocated over historical period" />
-        <F label={`Historic SAN actual expenditure (${CUR} mill)`} value={inputs.bau?.san_actual_expenditure || 0} onChange={v => u('bau','san_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual sanitation expenditure over historical period" />
-        <F label="SAN execution rate (calculated)" value={(inputs.bau?.san_budget_allocated && inputs.bau?.san_actual_expenditure) ? inputs.bau.san_actual_expenditure / inputs.bau.san_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
-        <SubHead text="Historic NRW & collection data" />
-        <F label="Current NRW %" value={inputs.water_interventions?.nrw_current_pct || 0} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Current non-revenue water as share of total water produced" />
-        <F label="Current collection ratio" value={inputs.water_interventions?.ce_current_ratio || 0} onChange={v => u('water_interventions','ce_current_ratio',v)} isPercent unit="%" tip="Current fraction of billed amounts actually collected" />
       </Section>
 
       </>}
