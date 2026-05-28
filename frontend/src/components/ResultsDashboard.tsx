@@ -137,6 +137,26 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         </div>
       </div>
 
+      {/* Target adjustment */}
+      <div style={{ background: '#fefce8', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde68a' }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>Adjust targets</div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ fontSize: 11, color: '#78350f' }}>
+            <label>Target 1 year: </label>
+            <input type="number" defaultValue={inputs?.period?.target1_year || 2030}
+              style={{ width: 60, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
+          </div>
+          <div style={{ fontSize: 11, color: '#78350f' }}>
+            <label>Target 2 year: </label>
+            <input type="number" defaultValue={inputs?.period?.target2_year || 2040}
+              style={{ width: 60, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
+          </div>
+          <div style={{ fontSize: 10, color: '#92400e', fontStyle: 'italic' }}>
+            In the full tool, changing targets here will update projections in real time.
+          </div>
+        </div>
+      </div>
+
       {/* Sector tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {(['water', 'sanitation'] as const).map(s => (
