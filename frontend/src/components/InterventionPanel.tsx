@@ -97,7 +97,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
         </Section>
 
         {/* Water intervention parameters */}
-        <Section title="Water Supply Parameters">
+        <Section title="Water Supply Interventions">
           <SubHead text="Collection efficiency" />
           <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} tip="Year the intervention begins" />
           <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} tip="Year the target is achieved" />
@@ -152,7 +152,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
         </Section>
 
         {/* Sanitation intervention parameters */}
-        <Section title="Sanitation Parameters">
+        <Section title="Sanitation Interventions">
           <SubHead text="Collection efficiency" />
           <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} />
           <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} />
