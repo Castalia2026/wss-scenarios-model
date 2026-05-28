@@ -26,7 +26,7 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
   min?: number; max?: number; tip?: string; slider?: boolean; fieldType?: 'input' | 'linked' | 'computed';
 }) {
   const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
-  const rawPct = Math.round(value * 1e10) / 1e8;
+  const rawPct = Math.round(value * 1e4) / 1e2; // 2 decimal places for %
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (fieldType === 'computed' ? Math.round(value * 100) / 100 : value);
   const displayMin = min !== undefined ? (isPercent ? Math.round(min * 1e10) / 1e8 : min) : undefined;
   const displayMax = max !== undefined ? (isPercent ? Math.round(max * 1e10) / 1e8 : max) : undefined;
@@ -442,6 +442,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== BAU INVESTMENT ===== */}
       <Section title="12. Planned Investments">
+        <div style={{ fontSize: 11, color: '#475569', marginBottom: 8, padding: '6px 10px', background: '#f0f9ff', borderRadius: 4, lineHeight: 1.5, border: '1px solid #bae6fd' }}>
+          If there are programmed investments that represent a shift from historical spending — additional to past trends, with financing secured and genuinely likely to proceed — enter them here as part of the BAU scenario.
+        </div>
         <SubHead text="Investment periods" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Period unit (years)</label>
