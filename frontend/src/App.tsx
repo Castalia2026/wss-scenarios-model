@@ -204,9 +204,8 @@ export default function App() {
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
         )}
         {activeTab === 1 && inputs && (<>
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-            <SectorToggle value={sectorTab} onChange={setSectorTab} />
             <BAUForecastChart sector={sectorTab} />
           </div>
         </>)}

@@ -89,11 +89,13 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-interface Props { inputs: any; onChange: (i: any) => void; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; }
+interface Props { inputs: any; onChange: (i: any) => void; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; bauSector?: 'water' | 'sanitation'; onBauSectorChange?: (v: 'water' | 'sanitation') => void; }
 
-export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs', geoScope = 'urban' }: Props) {
+export default function InputPanel({ inputs, onChange, onCalculate, loading, showSection = 'inputs', geoScope = 'urban', bauSector: bauSectorProp, onBauSectorChange }: Props) {
   const [countries, setCountries] = useState<{name:string, currency:string}[]>([]);
-  const [bauSector, setBauSector] = useState<'water' | 'sanitation'>('water');
+  const [bauSectorLocal, setBauSectorLocal] = useState<'water' | 'sanitation'>('water');
+  const bauSector = bauSectorProp || bauSectorLocal;
+  const setBauSector = onBauSectorChange || setBauSectorLocal;
 
   React.useEffect(() => {
     fetch('/api/countries').then(r => r.json()).then(setCountries).catch(() => {});
@@ -535,6 +537,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             </button>
           </>;
         })()}
+        <SubHead text="Budget allocation" />
+        <F label="Capital expenditure % of budget" value={inputs.bau?.capex_pct_budget || 0} onChange={v => u('bau','capex_pct_budget',v)} isPercent unit="%" tip="Share of total budget that is capital expenditure" />
         <SubHead text="Sector split of WSS budget (calculated)" />
         {(() => {
           const wsGdp = inputs.macro?.ws_budget_pct_gdp || 0;
