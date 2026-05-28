@@ -279,7 +279,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             ))}
           </div>
         )}
-        <InterventionImpactChart />
+        <InterventionImpactChart sector={sectorTab} />
       </div>
     </div>
   );

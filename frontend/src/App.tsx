@@ -84,7 +84,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['Data Input', 'BAU & Costs', 'Intervention Selection', 'Results Dashboard'];
+  const tabs = ['Data Input', 'BAU & Costs', 'Interventions & Targets', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -205,7 +205,7 @@ export default function App() {
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
             <SectorToggle value={sectorTab} onChange={setSectorTab} />
-            <BAUForecastChart />
+            <BAUForecastChart sector={sectorTab} />
           </div>
         </>)}
         {activeTab === 2 && inputs && (
@@ -213,6 +213,44 @@ export default function App() {
         )}
         {activeTab === 3 && (
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
+        )}
+        {activeTab === 4 && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px' }}>
+            <h2 style={{ fontSize: 18, color: '#1e3a5f', marginBottom: 16 }}>Export Outputs</h2>
+            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Download your scenario results in various formats for reporting and further analysis.</p>
+            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+              {[
+                { label: 'PowerPoint Presentation', desc: 'Slides with charts and summary tables', icon: '📊', ext: 'pptx', endpoint: '/api/export/pptx' },
+                { label: 'Excel Workbook', desc: 'Full data tables for offline analysis', icon: '📗', ext: 'xlsx', endpoint: '/api/export/xlsx' },
+                { label: 'CSV Data', desc: 'Raw data for import into other tools', icon: '📄', ext: 'csv', endpoint: '/api/export/csv' },
+              ].map(fmt => (
+                <button key={fmt.ext} onClick={() => {
+                  fetch(fmt.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inputs || {}) })
+                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `wss_results.${fmt.ext}`; a.click(); });
+                }} style={{
+                  padding: '20px 24px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff',
+                  cursor: 'pointer', textAlign: 'left', width: 220, boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                }}>
+                  <div style={{ fontSize: 28, marginBottom: 8 }}>{fmt.icon}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e3a5f', marginBottom: 4 }}>{fmt.label}</div>
+                  <div style={{ fontSize: 11, color: '#64748b' }}>{fmt.desc}</div>
+                </button>
+              ))}
+            </div>
+            {scenarios.length > 0 && <>
+              <h3 style={{ fontSize: 15, color: '#1e3a5f', marginTop: 32, marginBottom: 12 }}>Export Individual Scenarios</h3>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                {scenarios.map((s, i) => (
+                  <button key={i} onClick={() => {
+                    fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s.inputs) })
+                      .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${s.name}.pptx`; a.click(); });
+                  }} style={{ padding: '10px 16px', border: '1px solid #bae6fd', borderRadius: 6, background: '#f0f9ff', cursor: 'pointer', fontSize: 12, color: '#0369a1' }}>
+                    📑 {s.name}
+                  </button>
+                ))}
+              </div>
+            </>}
+          </div>
         )}
 
       </div>

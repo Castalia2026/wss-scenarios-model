@@ -219,38 +219,46 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
         <SubHead text="Time-series data (year by year)" />
-        <div style={{ maxHeight: 300, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
+        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+          Enter nominal GDP and actual rates for historical years. GDP growth is calculated automatically.
+        </div>
+        <div style={{ maxHeight: 350, overflowY: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ background: '#f1f5f9', position: 'sticky', top: 0 }}>
-                <th style={{ padding: '3px 4px', textAlign: 'left' }}>Year</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>GDP gr%</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>Infl {cc.country || 'Domestic'}%</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>Infl US%</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>USD/{CUR}</th>
-                <th style={{ padding: '3px 4px', textAlign: 'right' }}>GDP $B</th>
+                <th style={{ padding: '4px 6px', textAlign: 'left' }}>Year</th>
+                <th style={{ padding: '4px 4px', textAlign: 'right' }}>Nominal GDP ($B)</th>
+                <th style={{ padding: '4px 4px', textAlign: 'right', color: '#94a3b8' }}>GDP gr%</th>
+                <th style={{ padding: '4px 4px', textAlign: 'right' }}>Infl {cc.country || 'Domestic'}%</th>
+                <th style={{ padding: '4px 4px', textAlign: 'right' }}>Infl US%</th>
+                <th style={{ padding: '4px 4px', textAlign: 'right' }}>USD/{CUR}</th>
               </tr>
             </thead>
             <tbody>
-              {inputs.macro.gdp_growth.map((_: number, i: number) => {
+              {(inputs.macro.gdp_nominal_usd || inputs.macro.gdp_growth || []).map((_: number, i: number) => {
                 const yr = (inputs.period.model_start_year || 2011) + i;
+                const isBaseline = yr <= (inputs.period.baseline_year || 2025);
                 const tsInput = (field: string, idx: number, val: number, isPct: boolean) => (
                   <input type="number" value={isPct ? Math.round(val*10000)/100 : Math.round(val*1000)/1000}
                     onChange={e => { const v=parseFloat(e.target.value); if(!isNaN(v)){
                       const arr=[...inputs.macro[field]]; arr[idx]=isPct?v/100:v;
                       onChange({...inputs, macro:{...inputs.macro, [field]:arr}});
                     }}}
-                    style={{ width: 52, padding: '1px 2px', border: '1px solid #ddd', borderRadius: 2, fontSize: 10, textAlign: 'right' }}
+                    style={{ width: 62, padding: '2px 4px', border: '1px solid #ddd', borderRadius: 2, fontSize: 11, textAlign: 'right' }}
                   />
                 );
+                // Auto-calculate GDP growth from nominal GDP
+                const gdpArr = inputs.macro.gdp_nominal_usd || [];
+                const gdpGrowth = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0)
+                  ? ((gdpArr[i] / gdpArr[i-1]) - 1) : 0;
                 return (
-                  <tr key={i} style={{ background: i % 2 ? '#fafbfc' : '#fff' }}>
-                    <td style={{ padding: '1px 4px', fontWeight: 600 }}>{yr}</td>
-                    <td style={{ padding: '1px 2px' }}>{tsInput('gdp_growth',i,inputs.macro.gdp_growth[i],true)}</td>
-                    <td style={{ padding: '1px 2px' }}>{tsInput('inflation_nepal',i,inputs.macro.inflation_nepal[i],true)}</td>
-                    <td style={{ padding: '1px 2px' }}>{tsInput('inflation_us',i,inputs.macro.inflation_us[i],true)}</td>
-                    <td style={{ padding: '1px 2px' }}>{tsInput('exchange_rate',i,inputs.macro.exchange_rate[i],false)}</td>
-                    <td style={{ padding: '1px 2px' }}>{tsInput('gdp_nominal_usd',i,inputs.macro.gdp_nominal_usd[i],false)}</td>
+                  <tr key={i} style={{ background: !isBaseline ? '#fffbeb' : i % 2 ? '#fafbfc' : '#fff' }}>
+                    <td style={{ padding: '2px 6px', fontWeight: 600, fontSize: 11 }}>{yr}{!isBaseline && <span style={{ color: '#f59e0b', fontSize: 8, marginLeft: 2 }}>F</span>}</td>
+                    <td style={{ padding: '2px 2px' }}>{tsInput('gdp_nominal_usd',i,(inputs.macro.gdp_nominal_usd||[])[i]||0,false)}</td>
+                    <td style={{ padding: '2px 6px', textAlign: 'right', color: '#94a3b8', fontSize: 10 }}>{i > 0 ? (gdpGrowth * 100).toFixed(1) + '%' : '—'}</td>
+                    <td style={{ padding: '2px 2px' }}>{tsInput('inflation_nepal',i,(inputs.macro.inflation_nepal||[])[i]||0,true)}</td>
+                    <td style={{ padding: '2px 2px' }}>{tsInput('inflation_us',i,(inputs.macro.inflation_us||[])[i]||0,true)}</td>
+                    <td style={{ padding: '2px 2px' }}>{tsInput('exchange_rate',i,(inputs.macro.exchange_rate||[])[i]||0,false)}</td>
                   </tr>
                 );
               })}
