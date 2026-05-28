@@ -29,7 +29,7 @@ function F({ label, value, onChange, unit, step, isPercent, tip, slider, fieldTy
     <div style={{ marginBottom: slider ? 6 : 4 }} title={tip || ''}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <label style={{ flex: 1, fontSize: 11, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500, cursor: tip ? 'help' : 'default' }}>
-          {label}{tip && <span style={{ color: '#94a3b8', marginLeft: 3, fontSize: 9 }}>ⓘ</span>}
+          {label}{tip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}

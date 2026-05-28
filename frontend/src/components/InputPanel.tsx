@@ -47,7 +47,7 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
       <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
         <label style={{ flex: 1, fontSize: 11, color: labelColor, lineHeight: 1.2, cursor: tooltip ? 'help' : 'default', fontWeight: fieldType === 'computed' ? 400 : 500 }}>
           {label}
-          {tooltip && <span style={{ color: '#94a3b8', marginLeft: 3, fontSize: 9 }}>ⓘ</span>}
+          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
