@@ -192,13 +192,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               placeholder="e.g. Kathmandu Valley" />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
-            <label style={{ flex: 1, fontSize: 11, color: '#94a3b8', fontWeight: 400 }}>Scope</label>
-            <span style={{ fontSize: 11, color: '#0369a1', fontWeight: 600, padding: '3px 8px', background: '#e0f2fe', borderRadius: 3 }}>
-              {geoScope.charAt(0).toUpperCase() + geoScope.slice(1)}
-            </span>
-            <span style={{ fontSize: 9, color: '#94a3b8' }}>(set in header)</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
             <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Local currency code</label>
             <input type="text" value={inputs.country_config.currency || ''}
               onChange={e => setCountryConfig('currency', e.target.value)}

@@ -93,18 +93,6 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <h1 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>WSS Strategic Scenarios Simulation Tool</h1>
           <span style={{ fontSize: 11, opacity: 0.6 }}>{inputs?.country_config?.country || ''} — {inputs?.country_config?.area || ''}</span>
-          {/* Geographic scope selector */}
-          <div style={{ display: 'flex', gap: 2, marginLeft: 8 }}>
-            {(['urban', 'rural', 'national'] as const).map(g => (
-              <button key={g} onClick={() => setGeoScope(g)} style={{
-                padding: '4px 14px', border: '1px solid rgba(255,255,255,0.3)', borderRadius: 4,
-                background: geoScope === g ? '#2563eb' : 'transparent',
-                color: '#fff', cursor: 'pointer', fontSize: 11, textTransform: 'capitalize',
-                fontWeight: geoScope === g ? 700 : 400,
-                transition: 'background 0.15s',
-              }}>{g}</button>
-            ))}
-          </div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select onChange={async (e) => {
@@ -192,7 +180,25 @@ export default function App() {
       )}
 
       {/* Main Content */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        {/* Geo scope bar — shown on tabs 0, 1, 2 */}
+        {activeTab <= 2 && (
+          <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Geographic scope:</span>
+            {(['urban', 'rural', 'national'] as const).map(g => (
+              <button key={g} onClick={() => setGeoScope(g)} style={{
+                padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                background: geoScope === g ? '#2563eb' : '#fff',
+                color: geoScope === g ? '#fff' : '#374151',
+                fontWeight: geoScope === g ? 700 : 500, fontSize: 13,
+                boxShadow: geoScope === g ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
+                textTransform: 'capitalize', transition: 'all 0.15s',
+              }}>{g}</button>
+            ))}
+          </div>
+        )}
+
+        <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
         )}
@@ -248,6 +254,7 @@ export default function App() {
           </div>
         )}
 
+        </div>
       </div>
 
       {/* Onboarding */}

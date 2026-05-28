@@ -121,22 +121,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
       </div>
 
-      {/* Interactive controls — intervention toggles */}
-      <div style={{ background: '#f0f4ff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #c7d2fe' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 6 }}>Toggle interventions to see impact</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
-            <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', padding: '3px 8px', background: '#fff', borderRadius: 4, border: '1px solid #e0e7ff' }}>
-              <input type="checkbox" defaultChecked style={{ accentColor: '#2563eb', width: 14, height: 14 }} />
-              <span>{name}</span>
-            </label>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, fontStyle: 'italic' }}>
-          In the full tool, toggling these will update the charts in real time.
-        </div>
-      </div>
-
       {/* Target adjustment */}
       <div style={{ background: '#fefce8', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde68a' }}>
         <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>Adjust targets</div>
