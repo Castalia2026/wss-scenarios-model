@@ -44,7 +44,7 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
         step={isPercent ? 1 : (step || 1)}
         readOnly={fieldType === 'computed' || fieldType === 'linked'}
         style={{
-          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'right',
+          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'left',
           border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
           background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
           color: fieldType === 'computed' ? '#475569' : '#000',
