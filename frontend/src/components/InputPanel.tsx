@@ -143,6 +143,10 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', fontSize: 12 }}>
+      <div style={{ display: 'flex', gap: 14, marginBottom: 10, fontSize: 10, color: '#64748b' }}>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#fff', border: '1px solid #ccc', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }}></span><span style={{ color: '#0000cc', fontWeight: 600 }}>Blue</span> = editable</span>
+        <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#e2e8f0', border: '1px solid #94a3b8', borderRadius: 2, marginRight: 3, verticalAlign: 'middle' }}></span><span style={{ color: '#94a3b8', fontWeight: 600 }}>Gray</span> = auto-calculated</span>
+      </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
       {isInterventions && inputs.toggles && <>
