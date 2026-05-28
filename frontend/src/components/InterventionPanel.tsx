@@ -28,23 +28,28 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (fieldType === 'computed' ? Math.round(value * 100) / 100 : value);
   const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
   return (
-    <div style={{ marginBottom: 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label style={{ flex: 1, fontSize: 13, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tip || undefined}>
-          {label}{unit && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({unit})</span>}
-          {tip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
-        </label>
-        <input type="number" value={displayVal}
-          onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
-          step={isPercent ? 1 : (step || 1)}
-          readOnly={fieldType === 'computed' || fieldType === 'linked'}
-          style={{
-            width: 100, padding: '5px 7px', borderRadius: 4, fontSize: 13, textAlign: 'right',
-            border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
-            background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
-            color: fieldType === 'computed' ? '#475569' : '#000',
-          }} />
-      </div>
+    <div style={{
+      flex: '1 1 calc(50% - 6px)', minWidth: 150, maxWidth: 'calc(50% - 6px)',
+      padding: '6px 8px', borderRadius: 6,
+      background: fieldType === 'computed' ? '#f1f5f9' : fieldType === 'linked' ? '#f0fdf4' : '#f8fafc',
+      border: '1px solid #e5e7eb',
+    }}>
+      <label style={{ display: 'block', fontSize: 11, color: labelColor, lineHeight: 1.3, marginBottom: 4, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tip || undefined}>
+        {label}
+        {unit && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({unit})</span>}
+        {tip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
+      </label>
+      <input type="number" value={displayVal}
+        onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
+        step={isPercent ? 1 : (step || 1)}
+        readOnly={fieldType === 'computed' || fieldType === 'linked'}
+        style={{
+          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'right',
+          border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
+          background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
+          color: fieldType === 'computed' ? '#475569' : '#000',
+          boxSizing: 'border-box',
+        }} />
     </div>
   );
 }
@@ -65,7 +70,7 @@ function InterventionToggle({ label, checked, onChange, children }: {
         {checked && <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500 }}>▾ Configure</span>}
       </label>
       {checked && (
-        <div style={{ padding: '10px 14px', background: '#fff' }}>
+        <div style={{ padding: '10px 14px', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
           {children}
         </div>
       )}
@@ -120,8 +125,8 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             <F label="Target NRW %" value={inputs.water_interventions.nrw_target_pct} onChange={v => u('water_interventions','nrw_target_pct',v)} isPercent unit="%" tip="Minimum 3%" />
             {(() => {
               const t = inputs.water_interventions.nrw_target_pct || 0;
-              if (t > 0 && t < 0.03) return <div style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', padding: '3px 8px', background: '#fef2f2', borderRadius: 4, marginBottom: 4 }}>⛔ Below 3% is unrealistic</div>;
-              if (t >= 0.03 && t < 0.07) return <div style={{ fontSize: 10, fontWeight: 600, color: '#92400e', padding: '3px 8px', background: '#fef3c7', borderRadius: 4, marginBottom: 4 }}>⚠ 3–7% is highly ambitious</div>;
+              if (t > 0 && t < 0.03) return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: '#dc2626', padding: '3px 8px', background: '#fef2f2', borderRadius: 4, marginBottom: 4 }}>⛔ Below 3% is unrealistic</div>;
+              if (t >= 0.03 && t < 0.07) return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: '#92400e', padding: '3px 8px', background: '#fef3c7', borderRadius: 4, marginBottom: 4 }}>⚠ 3–7% is highly ambitious</div>;
               return null;
             })()}
             <F label="Commercial losses % of NRW" value={inputs.water_interventions.nrw_commercial_loss_pct || 0} onChange={v => u('water_interventions','nrw_commercial_loss_pct',v)} isPercent unit="%" tip="Commercial + physical must sum to 100%" />
