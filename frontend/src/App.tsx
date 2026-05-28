@@ -129,11 +129,6 @@ export default function App() {
             refreshProfiles(); alert(`Profile "${name}" saved!`);
           }} style={headerBtnStyle}>💾 Save Profile</button>
           <button onClick={saveScenario} style={headerBtnStyle}>📋 Save Scenario</button>
-          <button onClick={() => {
-            // Download Excel template
-            fetch('/api/export/xlsx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inputs || {}) })
-              .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = 'wss_data_input_template.xlsx'; a.click(); });
-          }} style={headerBtnStyle}>📥 Excel Template</button>
           <button onClick={() => setShowOnboarding(true)} style={headerBtnStyle}>? Help</button>
         </div>
       </header>
