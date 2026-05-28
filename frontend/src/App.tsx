@@ -182,7 +182,7 @@ export default function App() {
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Geo scope bar — shown on tabs 0, 1, 2 */}
-        {activeTab <= 2 && (
+        {activeTab <= 3 && (
           <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Geographic scope:</span>
             {(['urban', 'rural', 'national'] as const).map(g => (
