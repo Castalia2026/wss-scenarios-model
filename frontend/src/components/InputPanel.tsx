@@ -43,11 +43,11 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
   const showSlider = slider && displayMin !== undefined && displayMax !== undefined;
 
   return (
-    <div style={{ marginBottom: showSlider ? 8 : 6 }} title={tooltip}>
+    <div style={{ marginBottom: showSlider ? 8 : 6 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label style={{ flex: 1, fontSize: 13, color: labelColor, lineHeight: 1.3, cursor: tooltip ? 'help' : 'default', fontWeight: fieldType === 'computed' ? 400 : 500 }}>
+        <label style={{ flex: 1, fontSize: 13, color: labelColor, lineHeight: 1.3, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tooltip || undefined}>
           {label}
-          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
+          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help', position: 'relative' }} title={tooltip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
