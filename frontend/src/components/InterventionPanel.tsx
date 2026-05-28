@@ -26,22 +26,22 @@ function F({ label, value, onChange, unit, step, isPercent, tip, slider, fieldTy
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (fieldType === 'computed' ? Math.round(value * 100) / 100 : value);
   const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
   return (
-    <div style={{ marginBottom: slider ? 6 : 4 }} title={tip || ''}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-        <label style={{ flex: 1, fontSize: 11, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500, cursor: tip ? 'help' : 'default' }}>
-          {label}{tip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
+    <div style={{ marginBottom: slider ? 8 : 6 }} title={tip || ''}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <label style={{ flex: 1, fontSize: 13, color: labelColor, fontWeight: fieldType === 'computed' ? 400 : 500, cursor: tip ? 'help' : 'default' }}>
+          {label}{tip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
         </label>
         <input type="number" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
           step={isPercent ? 1 : (step || 1)}
           readOnly={fieldType === 'computed' || fieldType === 'linked'}
           style={{
-            width: slider ? 60 : 90, padding: '3px 5px', borderRadius: 3, fontSize: 11, textAlign: 'right',
+            width: slider ? 70 : 100, padding: '5px 7px', borderRadius: 4, fontSize: 13, textAlign: 'right',
             border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
             background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
             color: fieldType === 'computed' ? '#475569' : '#000',
           }} />
-        {unit && <span style={{ fontSize: 10, color: '#888', minWidth: 24 }}>{unit}</span>}
+        {unit && <span style={{ fontSize: 12, color: '#64748b', minWidth: 28 }}>{unit}</span>}
       </div>
       {slider && <input type="range" value={displayVal} onChange={e => { const v = parseFloat(e.target.value); onChange(isPercent ? v / 100 : v); }}
         min={0} max={isPercent ? 100 : 100} step={isPercent ? 1 : (step || 1)}
