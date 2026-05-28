@@ -3,21 +3,21 @@ import React, { useState } from 'react';
 function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <div style={{ marginBottom: 6, border: '1px solid #ddd', borderRadius: 6, background: '#fff' }}>
+    <div style={{ marginBottom: 8, border: '1px solid #ddd', borderRadius: 8, background: '#fff' }}>
       <button onClick={() => setOpen(!open)} style={{
-        width: '100%', padding: '8px 12px', textAlign: 'left', cursor: 'pointer',
+        width: '100%', padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
         border: 'none', background: open ? '#e8f0fe' : '#fff', fontWeight: 600,
-        fontSize: 14, borderRadius: 6, display: 'flex', justifyContent: 'space-between',
+        fontSize: 14, borderRadius: 8, display: 'flex', justifyContent: 'space-between',
       }}>
         {title}<span>{open ? '▴' : '▾'}</span>
       </button>
-      {open && <div style={{ padding: '6px 12px 10px' }}>{children}</div>}
+      {open && <div style={{ padding: '10px 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>{children}</div>}
     </div>
   );
 }
 
 function SubHead({ text }: { text: string }) {
-  return <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '10px 0 6px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
+  return <div style={{ width: '100%', fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '6px 0 2px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
 }
 
 // Color convention: blue text = editable input, green text = cross-linked, gray = computed/derived
@@ -43,31 +43,35 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
   const showSlider = slider && displayMin !== undefined && displayMax !== undefined;
 
   return (
-    <div style={{ marginBottom: showSlider ? 8 : 6 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <label style={{ flex: 1, fontSize: 13, color: labelColor, lineHeight: 1.3, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tooltip || undefined}>
-          {label}
-          {tooltip && <span style={{ color: '#2563eb', marginLeft: 4, fontSize: 13, fontWeight: 700, cursor: 'help', position: 'relative' }} title={tooltip}>ⓘ</span>}
-        </label>
-        <input type="number" value={displayVal}
-          onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
-          step={isPercent ? 1 : (step || 1)}
-          min={displayMin} max={displayMax}
-          style={{
-            width: showSlider ? 70 : 100, padding: '5px 7px', borderRadius: 4, fontSize: 13, textAlign: 'right',
-            border: outOfRange ? '1.5px solid #ef4444' : fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
-            background: outOfRange ? '#fef2f2' : fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#f0fdf4' : '#fff',
-            color: fieldType === 'computed' ? '#475569' : '#000',
-          }}
-          readOnly={fieldType === 'computed' || fieldType === 'linked'}
-        />
-        {unit && <span style={{ fontSize: 12, color: '#64748b', minWidth: 28 }}>{unit}</span>}
-      </div>
+    <div style={{
+      flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)',
+      padding: '6px 8px', borderRadius: 6,
+      background: fieldType === 'computed' ? '#f1f5f9' : fieldType === 'linked' ? '#f0fdf4' : '#f8fafc',
+      border: outOfRange ? '1.5px solid #ef4444' : '1px solid #e5e7eb',
+    }}>
+      <label style={{ display: 'block', fontSize: 11, color: labelColor, lineHeight: 1.3, marginBottom: 4, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tooltip || undefined}>
+        {label}
+        {unit && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({unit})</span>}
+        {tooltip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
+      </label>
+      <input type="number" value={displayVal}
+        onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
+        step={isPercent ? 1 : (step || 1)}
+        min={displayMin} max={displayMax}
+        style={{
+          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'right',
+          border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
+          background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
+          color: fieldType === 'computed' ? '#475569' : '#000',
+          boxSizing: 'border-box',
+        }}
+        readOnly={fieldType === 'computed' || fieldType === 'linked'}
+      />
       {showSlider && (
         <input type="range" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); onChange(isPercent ? v / 100 : v); }}
           min={displayMin} max={displayMax} step={isPercent ? 1 : (step || 1)}
-          style={{ width: '100%', height: 6, marginTop: 2, accentColor: '#2563eb' }}
+          style={{ width: '100%', height: 6, marginTop: 4, accentColor: '#2563eb' }}
         />
       )}
     </div>
@@ -171,30 +175,29 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== COUNTRY CONFIG ===== */}
       <Section title="1. Country, Region & Currency">
         {inputs.country_config && <>
-          {/* Country with searchable dropdown */}
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Country</label>
+          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Country</label>
             <input type="text" list="country-list" value={inputs.country_config.country || ''}
               onChange={e => setCountryConfig('country', e.target.value)}
-              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
+              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }}
               placeholder="Type to search..."
             />
             <datalist id="country-list">
               {countries.map(c => <option key={c.name} value={c.name} />)}
             </datalist>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Region</label>
+          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Region</label>
             <input type="text" value={inputs.country_config.area || ''}
               onChange={e => setCountryConfig('area', e.target.value)}
-              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}
+              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }}
               placeholder="e.g. Kathmandu Valley" />
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', marginBottom: 6, gap: 8 }}>
-            <label style={{ flex: 1, fontSize: 13, color: '#0000cc', fontWeight: 500 }}>Currency code</label>
+          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
+            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Currency code</label>
             <input type="text" value={inputs.country_config.currency || ''}
               onChange={e => setCountryConfig('currency', e.target.value)}
-              style={{ width: 140, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }} />
+              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }} />
           </div>
         </>}
       </Section>
@@ -215,7 +218,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
         <SubHead text="Time-series data (year by year)" />
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Enter nominal GDP and actual rates for historical years. GDP growth is calculated automatically.
         </div>
         {(() => {
@@ -243,7 +246,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             { label: `USD/${CUR}`, cells: years.map((_: number, i: number) => tsInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
           ];
           return (
-            <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+            <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
@@ -353,7 +356,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== WATER TARGETS ===== */}
       <Section title="7. Water Supply Targets">
         <SubHead text="Service Targets" />
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
         </div>
         <SubHead text="Target 1 (2030)" />
@@ -376,11 +379,11 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       <Section title="8. Sanitation Targets">
         <SubHead text="On-site sanitation" />
         <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed HHs served by on-site systems (septic tanks with fecal sludge collection). Provider shares + on-site must sum to 100%." />
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Providers ({Math.round((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) * 100)}%) + On-site ({Math.round((inputs.sanitation_targets.onsite_collection_treatment_pct || 0) * 100)}%) = {Math.round(((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) + (inputs.sanitation_targets.onsite_collection_treatment_pct || 0)) * 100)}%
         </div>
         <SubHead text="Service Targets" />
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
         </div>
         <SubHead text="Target 1 (2030)" />
@@ -519,7 +522,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           const wsPct = total > 0 ? wsGdp / total : 0;
           const sanPct = total > 0 ? sanGdp / total : 0;
           return <>
-            <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+            <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
               Auto-calculated from water/sanitation budget as % of GDP (Data Input tab)
             </div>
             <F label="Water supply % of WSS budget" value={wsPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: WS GDP% / (WS GDP% + SAN GDP%) = ${(wsGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
