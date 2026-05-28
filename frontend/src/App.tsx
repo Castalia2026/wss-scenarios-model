@@ -13,7 +13,6 @@ export default function App() {
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
-  const [showGuide, setShowGuide] = useState(true);
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -199,10 +198,9 @@ export default function App() {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
-        {activeTab === 0 && inputs && (<>
+        {activeTab === 0 && inputs && (
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
-          <DataInputOverview inputs={inputs} geoScope={geoScope} />
-        </>)}
+        )}
         {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
@@ -217,19 +215,6 @@ export default function App() {
           <ResultsDashboard geoScope={geoScope} scenarios={scenarios} inputs={inputs} />
         )}
 
-        {/* Data Guide toggle + panel */}
-        <button onClick={() => setShowGuide(!showGuide)} style={{
-          position: 'absolute', right: showGuide ? 340 : 0, top: 12,
-          padding: '8px 6px', border: '1px solid #cbd5e1', borderRight: showGuide ? 'none' : '1px solid #cbd5e1',
-          borderRadius: showGuide ? '6px 0 0 6px' : '6px 0 0 6px',
-          background: showGuide ? '#eef2ff' : '#f8fafc', cursor: 'pointer',
-          fontSize: 11, color: '#4338ca', fontWeight: 600, zIndex: 10,
-          writingMode: 'vertical-rl', textOrientation: 'mixed', letterSpacing: 1,
-          boxShadow: '-2px 0 6px rgba(0,0,0,0.06)', transition: 'right 0.2s',
-        }}>
-          {showGuide ? '✕ Close' : '📋 Guide'}
-        </button>
-        {showGuide && <DataGuide tab={activeTab} />}
       </div>
 
       {/* Onboarding */}
@@ -241,44 +226,25 @@ export default function App() {
 function OnboardingModal({ onClose }: { onClose: () => void }) {
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 680, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 12 }}>WSS Strategic Scenarios Simulation Tool</h2>
+      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 560, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
+        <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 6 }}>How to use this tool</h2>
+        <p style={{ fontSize: 14, color: '#475569', marginBottom: 20, lineHeight: 1.6 }}>
+          Work through the tabs from left to right. Select your geographic scope (Urban, Rural, or National) in the header bar before you begin.
+        </p>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {[
-            { step: '1', title: 'Data Input', desc: 'Enter country data: country configuration, macroeconomic assumptions, population, service levels, and targets. Supports urban, rural, or national scope.', icon: '📝' },
-            { step: '2', title: 'BAU & Costs', desc: 'Enter unit costs for water supply and sanitation infrastructure, BAU investment data (budget allocations, planned investments), and technical parameters (asset life, treatment capacity, non-household rates).', icon: '💰' },
-            { step: '3', title: 'Intervention Selection', desc: 'Toggle interventions on/off and configure parameters. Includes: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Add custom interventions.', icon: '🔧' },
-            { step: '4', title: 'Results Dashboard', desc: 'Presents urban, rural, and national results: coverage progress charts, financing gaps, and scenario comparisons. Save scenarios and export PowerPoint slides or Excel data.', icon: '📊' },
-          ].map(s => (
-            <div key={s.step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-              <div style={{ width: 36, height: 36, borderRadius: 8, background: '#e0f2fe', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16 }}>{s.icon}</div>
-              <div>
-                <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', margin: '0 0 3px' }}>{s.title}</h3>
-                <p style={{ fontSize: 13, color: '#475569', margin: 0, lineHeight: 1.5 }}>{s.desc}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.8 }}>
+          <li style={{ marginBottom: 10 }}><strong>Data Input</strong> — Enter all country data: time scale, macroeconomics, population, service levels, and targets.</li>
+          <li style={{ marginBottom: 10 }}><strong>BAU & Costs</strong> — Enter unit costs, planned investments, and technical parameters.</li>
+          <li style={{ marginBottom: 10 }}><strong>Intervention Selection</strong> — Define and toggle interventions: collection efficiency, NRW reduction, tariff reform, borrowing, and more.</li>
+          <li style={{ marginBottom: 10 }}><strong>Results Dashboard</strong> — View projected coverage, financing gaps, and export results.</li>
+        </ol>
 
-        <div style={{ marginTop: 18, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569' }}>
-          <strong>Key features:</strong>
-          <ul style={{ margin: '6px 0 0 16px', padding: 0, lineHeight: 1.8 }}>
-            <li><strong>Geographic scope:</strong> Switch between Urban, Rural, or National in the header</li>
-            <li><strong>Tooltips:</strong> Hover over any ⓘ icon for field descriptions</li>
-            <li><strong>Validation:</strong> Warnings for invalid combinations (e.g., service levels not summing to 100%)</li>
-            <li><strong>Scenarios:</strong> Save scenarios and export individual PowerPoint slides</li>
-            <li><strong>Excel template:</strong> Download the data input sheet for offline data collection</li>
-            <li><strong>Country profiles:</strong> Load pre-built profiles or start blank for a new country</li>
-          </ul>
-        </div>
-
-        <div style={{ marginTop: 14, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e' }}>
-          <strong>Prototype note:</strong> This is an interactive mock-up for demonstration purposes. The Results Dashboard shows static example charts.
+        <div style={{ marginTop: 16, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+          <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
         </div>
 
         <button onClick={onClose}
-          style={{ marginTop: 16, width: '100%', padding: '10px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+          style={{ marginTop: 18, width: '100%', padding: '12px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
           Get Started
         </button>
       </div>

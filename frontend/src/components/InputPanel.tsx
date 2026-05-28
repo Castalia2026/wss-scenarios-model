@@ -9,7 +9,7 @@ function Section({ title, children, defaultOpen = false }: { title: string; chil
         border: 'none', background: open ? '#e8f0fe' : '#fff', fontWeight: 600,
         fontSize: 12, borderRadius: 6, display: 'flex', justifyContent: 'space-between',
       }}>
-        {title}<span>{open ? '▾' : '▸'}</span>
+        {title}<span>{open ? '▴' : '▾'}</span>
       </button>
       {open && <div style={{ padding: '6px 12px 10px' }}>{children}</div>}
     </div>
@@ -142,20 +142,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   const hhSizeCagr = cagr(avgHHSizeStart, avgHHSizeBase, nYears);
 
   return (
-    <div style={{ width: 400, overflowY: 'auto', padding: 12, background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 11 }}>
-      {(isInputs || isBAU) && geoScope && (
-        <div style={{ fontSize: 15, fontWeight: 900, color: '#fff', background: '#1e40af', padding: '12px 16px', borderRadius: 8, marginBottom: 12, textAlign: 'center', letterSpacing: 0.5 }}>
-          Entering data for: {scopeLabel} area
-          {geoScope === 'national' && <div style={{ fontWeight: 400, fontSize: 11, opacity: 0.8, marginTop: 2 }}>urban + rural → national rollup</div>}
-        </div>
-      )}
-      <h2 style={{ fontSize: 13, marginBottom: 6, color: '#64748b', fontWeight: 500 }}>
-        {isInputs ? 'Data Inputs & Assumptions' : isBAU ? 'BAU & Costs' : 'Interventions'}
-      </h2>
-      <div style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 9, color: '#64748b' }}>
-        <span><span style={{ color: '#0000cc', fontWeight: 600 }}>Blue</span> = editable input</span>
-        <span><span style={{ color: '#16a34a', fontWeight: 600 }}>Green</span> = linked from another section</span>
-      </div>
+    <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', fontSize: 12 }}>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
       {isInterventions && inputs.toggles && <>
@@ -179,7 +166,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {isInputs && <>
 
       {/* ===== COUNTRY CONFIG ===== */}
-      <Section title="0. Country & Region">
+      <Section title="1. Country & Region">
         {inputs.country_config && <>
           {/* Country with searchable dropdown */}
           <div style={{ display: 'flex', alignItems: 'center', marginBottom: 4, gap: 6 }}>
@@ -217,7 +204,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== PERIOD ===== */}
-      <Section title="1. Period">
+      <Section title="2. Time Scale">
         <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} max={inputs.period.baseline_year} tip="First year of historical data; must be before or equal to baseline year" />
         <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} max={2060} tip="Last year of projection; all years after baseline are forecasted" />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={inputs.period.model_start_year} max={new Date().getFullYear() - 1} tip="Last year with complete actual data; must be a finished year" />
@@ -227,7 +214,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== MACROECONOMICS ===== */}
-      <Section title="2. Macroeconomics">
+      <Section title="3. Macroeconomics">
         <F label="Year for real prices" value={inputs.macro.real_price_year} onChange={v => u('macro','real_price_year',v)} min={inputs.period.model_start_year} max={inputs.period.baseline_year} tip="Base year for converting nominal to real values; must be a year with actual data" />
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
@@ -273,14 +260,14 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== POPULATION ===== */}
-      <Section title="3. Population">
+      <Section title="4. Population">
         <SubHead text={`Start year (${startYr})`} />
-        <F label={`Total ${scopeLabel} population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip={`${scopeLabel} population at model start year (census)`} />
-        <F label={`Total ${scopeLabel} households, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label={`${scopeLabel} population, ${startYr}`} value={inputs.population.total_pop_start} onChange={v => u('population','total_pop_start',v)} min={10000} max={100000000} tip={`${scopeLabel} population at model start year (census)`} />
+        <F label={`${scopeLabel} households, ${startYr} (mill)`} value={inputs.population.total_hh_start} onChange={v => u('population','total_hh_start',v)} step={0.001} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
         <F label="Avg household size (calculated)" value={avgHHSizeStart} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_start||0).toLocaleString()} / ${((pop.total_hh_start||0)*1e6).toLocaleString()}`} />
         <SubHead text={`Baseline year (${baseYr})`} />
-        <F label={`Total ${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
-        <F label={`Total ${scopeLabel} households, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
+        <F label={`${scopeLabel} population, ${baseYr}`} value={inputs.population.total_pop_baseline} onChange={v => u('population','total_pop_baseline',v)} min={10000} max={100000000} tip={`${scopeLabel} population at baseline year (estimate)`} />
+        <F label={`${scopeLabel} households, ${baseYr} (mill)`} value={inputs.population.total_hh_baseline} onChange={v => u('population','total_hh_baseline',v)} step={0.01} unit="mill" min={0.001} max={50} tip={`Total ${scopeLower} households in millions`} />
         <F label="Avg household size (calculated)" value={avgHHSizeBase} onChange={() => {}} fieldType="computed" tip={`Population / (households × 1,000,000) = ${(pop.total_pop_baseline||0).toLocaleString()} / ${((pop.total_hh_baseline||0)*1e6).toLocaleString()}`} />
         <SubHead text="Computed growth rates" />
         <F label="Population CAGR (calculated)" value={popCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`CAGR from ${startYr} to ${baseYr}: (${(pop.total_pop_baseline||0).toLocaleString()} / ${(pop.total_pop_start||0).toLocaleString()})^(1/${nYears}) - 1`} />
@@ -288,7 +275,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== WATER SERVICE LEVELS ===== */}
-      <Section title="4. Water Supply Service Levels">
+      <Section title="5. Water Supply Service Levels">
         <SubHead text={`% HHs by service level, ${startYr}`} />
         <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_start} onChange={v => u('water_service','pct_serv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_start} onChange={v => u('water_service','pct_serv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -319,7 +306,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION SERVICE LEVELS ===== */}
-      <Section title="5. Sanitation Service Levels">
+      <Section title="6. Sanitation Service Levels">
         <SubHead text={`% HHs by service level, ${startYr}`} />
         <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_start} onChange={v => u('sanitation_service','pct_sserv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_start} onChange={v => u('sanitation_service','pct_sserv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -350,7 +337,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== WATER TARGETS ===== */}
-      <Section title="6. Water Supply Targets">
+      <Section title="7. Water Supply Targets">
         <SubHead text="Service Targets" />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
@@ -372,7 +359,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION TARGETS ===== */}
-      <Section title="7. Sanitation Targets">
+      <Section title="8. Sanitation Targets">
         <SubHead text="On-site sanitation" />
         <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed HHs served by on-site systems (septic tanks with fecal sludge collection). Provider shares + on-site must sum to 100%." />
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
@@ -401,7 +388,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {isBAU && <>
       {/* ===== WATER UNIT COSTS ===== */}
-      <Section title="8. Water Supply Unit Costs">
+      <Section title="9. Water Supply Unit Costs">
         <SubHead text="Distribution network cost per HH" />
         <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => u('water_costs','network_cost_per_hh_serv1',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
         <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => u('water_costs','network_cost_per_hh_serv2',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
@@ -416,7 +403,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION UNIT COSTS ===== */}
-      <Section title="9. Sanitation Unit Costs">
+      <Section title="10. Sanitation Unit Costs">
         <SubHead text="Sewerage cost per HH" />
         <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv1',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
         <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv2',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
@@ -431,7 +418,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== BAU INVESTMENT ===== */}
-      <Section title="10. BAU Investment">
+      <Section title="11. Planned Investments">
         <SubHead text="Investment periods" />
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
           <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Period unit (years)</label>
@@ -510,7 +497,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== TECHNICAL ===== */}
-      <Section title="11. Technical Inputs">
+      <Section title="12. Technical Parameters">
         <SubHead text="Water supply" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="% water sold to non-household" value={inputs.technical.ws_non_hh_pct || 0} onChange={v => u('technical','ws_non_hh_pct',v)} isPercent unit="%" tip="Share of water sold to non-household customers (commercial, industrial, institutional)" />
@@ -535,7 +522,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {isInterventions && <>
       {/* ===== WATER INTERVENTIONS ===== */}
-      <Section title="12. Water Interventions">
+      <Section title="13. Water Supply Interventions">
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -593,7 +580,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION INTERVENTIONS ===== */}
-      <Section title="13. Sanitation Interventions">
+      <Section title="14. Sanitation Interventions">
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -641,7 +628,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== CUSTOM INTERVENTIONS ===== */}
-      <Section title="14. Custom Interventions">
+      <Section title="15. Custom Interventions">
         {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
           const updateCI = (field: string, val: any) => {
             const arr = [...inputs.custom_interventions];
