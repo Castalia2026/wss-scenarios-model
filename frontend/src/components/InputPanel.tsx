@@ -60,7 +60,7 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
         step={isPercent ? 1 : (step || 1)}
         min={displayMin} max={displayMax}
         style={{
-          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'right',
+          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'left',
           border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
           background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
           color: fieldType === 'computed' ? '#475569' : '#000',
@@ -209,7 +209,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== TIME SCALES & MACROECONOMICS ===== */}
       <Section title="2. Time Scales & Macroeconomics">
         <SubHead text="Key dates" />
-        <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} max={inputs.period.baseline_year} tip="First year of historical data; must be before or equal to baseline year" />
+        <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} max={inputs.period.baseline_year ? inputs.period.baseline_year - 3 : 2022} tip="First year of historical data; must be at least 3 years before baseline year" />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={inputs.period.model_start_year} max={new Date().getFullYear() - 1} tip="Last year with complete actual data; must be a finished year" />
         <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} max={2060} tip="Last year of projection; all years after baseline are forecasted" />
         <F label="Performance improvement start" value={inputs.period.perf_improvement_start_year || (inputs.period.baseline_year + 1)} onChange={v => u('period','perf_improvement_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year when performance improvements begin" />
@@ -291,6 +291,21 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <SubHead text="Computed growth rates" />
         <F label="Population CAGR (calculated)" value={popCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`CAGR from ${startYr} to ${baseYr}: (${(pop.total_pop_baseline||0).toLocaleString()} / ${(pop.total_pop_start||0).toLocaleString()})^(1/${nYears}) - 1`} />
         <F label="Avg household size CAGR (calculated)" value={hhSizeCagr} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Household size: ${avgHHSizeStart.toFixed(2)} (${startYr}) → ${avgHHSizeBase.toFixed(2)} (${baseYr})`} />
+      </Section>
+
+      {/* ===== HISTORIC BUDGET & EXECUTION ===== */}
+      <Section title="4. Historic Budget & Execution">
+        <SubHead text="Water supply" />
+        <F label={`Historic WS budget allocated (${CUR} mill)`} value={inputs.bau?.ws_budget_allocated || 0} onChange={v => u('bau','ws_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total water supply budget allocated over historical period" />
+        <F label={`Historic WS actual expenditure (${CUR} mill)`} value={inputs.bau?.ws_actual_expenditure || 0} onChange={v => u('bau','ws_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual water supply expenditure over historical period" />
+        <F label="WS execution rate (calculated)" value={(inputs.bau?.ws_budget_allocated && inputs.bau?.ws_actual_expenditure) ? inputs.bau.ws_actual_expenditure / inputs.bau.ws_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
+        <SubHead text="Sanitation" />
+        <F label={`Historic SAN budget allocated (${CUR} mill)`} value={inputs.bau?.san_budget_allocated || 0} onChange={v => u('bau','san_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total sanitation budget allocated over historical period" />
+        <F label={`Historic SAN actual expenditure (${CUR} mill)`} value={inputs.bau?.san_actual_expenditure || 0} onChange={v => u('bau','san_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual sanitation expenditure over historical period" />
+        <F label="SAN execution rate (calculated)" value={(inputs.bau?.san_budget_allocated && inputs.bau?.san_actual_expenditure) ? inputs.bau.san_actual_expenditure / inputs.bau.san_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
+        <SubHead text="Historic NRW & collection data" />
+        <F label="Current NRW %" value={inputs.water_interventions?.nrw_current_pct || 0} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Current non-revenue water as share of total water produced" />
+        <F label="Current collection ratio" value={inputs.water_interventions?.ce_current_ratio || 0} onChange={v => u('water_interventions','ce_current_ratio',v)} isPercent unit="%" tip="Current fraction of billed amounts actually collected" />
       </Section>
 
       </>}
@@ -457,23 +472,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
       )}
 
-      {/* ===== HISTORIC BUDGET & EXECUTION ===== */}
-      <Section title="7. Historic Budget & Execution">
-        <SubHead text="Water supply" />
-        <F label={`Historic WS budget allocated (${CUR} mill)`} value={inputs.bau?.ws_budget_allocated || 0} onChange={v => u('bau','ws_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total water supply budget allocated over historical period" />
-        <F label={`Historic WS actual expenditure (${CUR} mill)`} value={inputs.bau?.ws_actual_expenditure || 0} onChange={v => u('bau','ws_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual water supply expenditure over historical period" />
-        <F label="WS execution rate (calculated)" value={(inputs.bau?.ws_budget_allocated && inputs.bau?.ws_actual_expenditure) ? inputs.bau.ws_actual_expenditure / inputs.bau.ws_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
-        <SubHead text="Sanitation" />
-        <F label={`Historic SAN budget allocated (${CUR} mill)`} value={inputs.bau?.san_budget_allocated || 0} onChange={v => u('bau','san_budget_allocated',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Total sanitation budget allocated over historical period" />
-        <F label={`Historic SAN actual expenditure (${CUR} mill)`} value={inputs.bau?.san_actual_expenditure || 0} onChange={v => u('bau','san_actual_expenditure',v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Actual sanitation expenditure over historical period" />
-        <F label="SAN execution rate (calculated)" value={(inputs.bau?.san_budget_allocated && inputs.bau?.san_actual_expenditure) ? inputs.bau.san_actual_expenditure / inputs.bau.san_budget_allocated : 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Actual expenditure / budget allocated" />
-        <SubHead text="Historic NRW & collection data" />
-        <F label="Current NRW %" value={inputs.water_interventions?.nrw_current_pct || 0} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Current non-revenue water as share of total water produced" />
-        <F label="Current collection ratio" value={inputs.water_interventions?.ce_current_ratio || 0} onChange={v => u('water_interventions','ce_current_ratio',v)} isPercent unit="%" tip="Current fraction of billed amounts actually collected" />
-      </Section>
-
       {/* ===== BAU INVESTMENT ===== */}
-      <Section title="8. Planned Investments" cols={2}>
+      <Section title="7. Planned Investments" cols={2}>
         <div style={{ fontSize: 11, color: '#475569', marginBottom: 8, padding: '6px 10px', background: '#f0f9ff', borderRadius: 4, lineHeight: 1.5, border: '1px solid #bae6fd' }}>
           If there are programmed investments that represent a shift from historical spending — additional to past trends, with financing secured and genuinely likely to proceed — enter them here as part of the BAU scenario.
         </div>
@@ -557,7 +557,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== TECHNICAL ===== */}
-      <Section title="9. Technical Parameters" cols={2}>
+      <Section title="8. Technical Parameters" cols={2}>
         <SubHead text="Water supply" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="% water sold to non-household" value={inputs.technical.ws_non_hh_pct || 0} onChange={v => u('technical','ws_non_hh_pct',v)} isPercent unit="%" tip="Share of water sold to non-household customers (commercial, industrial, institutional)" />
@@ -582,7 +582,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {isInterventions && <>
       {/* ===== WATER INTERVENTIONS ===== */}
-      <Section title="10. Water Supply Interventions" cols={2}>
+      <Section title="9. Water Supply Interventions" cols={2}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -640,7 +640,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION INTERVENTIONS ===== */}
-      <Section title="11. Sanitation Interventions" cols={2}>
+      <Section title="10. Sanitation Interventions" cols={2}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -688,7 +688,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== CUSTOM INTERVENTIONS ===== */}
-      <Section title="12. Custom Interventions" cols={2}>
+      <Section title="11. Custom Interventions" cols={2}>
         {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
           const updateCI = (field: string, val: any) => {
             const arr = [...inputs.custom_interventions];
