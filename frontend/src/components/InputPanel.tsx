@@ -214,12 +214,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== TIME SCALES & MACROECONOMICS ===== */}
       <Section title="2. Time Scales & Macroeconomics" sectionKey="macro" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
-        <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} max={inputs.period.baseline_year ? inputs.period.baseline_year - 3 : 2022} tip="First year of historical data; must be at least 3 years before baseline year" />
-        <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={inputs.period.model_start_year} max={new Date().getFullYear() - 1} tip="Last year with complete actual data; must be a finished year" />
-        <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} max={2060} tip="Last year of projection; all years after baseline are forecasted" />
-        <F label="Performance improvement start" value={inputs.period.perf_improvement_start_year || (inputs.period.baseline_year + 1)} onChange={v => u('period','perf_improvement_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year when performance improvements begin" />
-        <F label="Target 1 year" value={inputs.period.target1_year} onChange={v => u('period','target1_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="First milestone year; must be after baseline" />
-        <F label="Target 2 year" value={inputs.period.target2_year} onChange={v => u('period','target2_year',v)} min={inputs.period.target1_year} max={inputs.period.forecast_end_year} tip="Final milestone year; must equal or exceed Target 1" />
+        <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} tip="First year of historical data; must be at least 3 years before baseline year" />
+        <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
+        <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} tip="Last year of projection" />
+        <F label="Performance improvement start" value={inputs.period.perf_improvement_start_year || (inputs.period.baseline_year + 1)} onChange={v => u('period','perf_improvement_start_year',v)} tip="Year when performance improvement begins; must be greater than the baseline year" />
+        <F label="Target 1 year" value={inputs.period.target1_year} onChange={v => u('period','target1_year',v)} tip="First milestone year; must be greater than the performance improvement start year" />
+        <F label="Target 2 year" value={inputs.period.target2_year} onChange={v => u('period','target2_year',v)} min={inputs.period.target1_year} max={inputs.period.forecast_end_year} tip="Final milestone year; must be between Target 1 year and forecast end year" />
         <SubHead text="Macroeconomic assumptions" />
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
