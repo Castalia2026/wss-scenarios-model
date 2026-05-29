@@ -6,51 +6,50 @@ import {
 
 const allYears = [2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
 
-// ─── Water Supply BAU data ───
-const waterBAUData = allYears.map((y) => {
-  const t = (y - 2020) / 20;
-  const totalHH = 0.8 + t * 0.7;
-  const bauHH = 0.4 + t * 0.4 * 0.5;
-  const targetHH = y <= 2027 ? bauHH : bauHH + (y - 2027) * 0.065;
-  return {
-    year: y,
-    'Total households': +totalHH.toFixed(2),
-    'Households under BAU': +bauHH.toFixed(2),
-    'Target': +Math.min(targetHH, totalHH).toFixed(2),
-  };
-});
+// Geographic scope scaling factors (urban is largest, rural smaller, national = sum)
+const SCOPE_FACTORS: Record<string, { total: number; bau: number; tgt: number }> = {
+  urban:    { total: 1.0,  bau: 1.0,  tgt: 1.0 },
+  rural:    { total: 0.65, bau: 0.45, tgt: 0.55 },
+  national: { total: 1.65, bau: 1.45, tgt: 1.55 },
+};
 
-// ─── Sanitation BAU data (different profile) ───
-const sanBAUData = allYears.map((y) => {
-  const t = (y - 2020) / 20;
-  const totalHH = 0.8 + t * 0.7;
-  const bauHH = 0.25 + t * 0.4 * 0.4;
-  const targetHH = y <= 2027 ? bauHH : bauHH + (y - 2027) * 0.045;
-  return {
-    year: y,
-    'Total households': +totalHH.toFixed(2),
-    'Households under BAU': +bauHH.toFixed(2),
-    'Target': +Math.min(targetHH, totalHH).toFixed(2),
-  };
-});
+function makeBAUData(sector: 'water' | 'sanitation', geoScope: string) {
+  const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
+  const baseBau = sector === 'water' ? 0.4 : 0.25;
+  const bauSlope = sector === 'water' ? 0.5 : 0.4;
+  const tgtSlope = sector === 'water' ? 0.065 : 0.045;
+  return allYears.map((y) => {
+    const t = (y - 2020) / 20;
+    const totalHH = (0.8 + t * 0.7) * f.total;
+    const bauHH = (baseBau + t * 0.4 * bauSlope) * f.bau;
+    const targetHH = (y <= 2027 ? bauHH : bauHH + (y - 2027) * tgtSlope * f.tgt);
+    return {
+      year: y,
+      'Total households': +totalHH.toFixed(2),
+      'Households under BAU': +bauHH.toFixed(2),
+      'Target': +Math.min(targetHH, totalHH).toFixed(2),
+    };
+  });
+}
 
-export function BAUForecastChart({ sector = 'water' }: { sector?: 'water' | 'sanitation' }) {
-  const data = sector === 'water' ? waterBAUData : sanBAUData;
+export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sector?: 'water' | 'sanitation'; geoScope?: string }) {
+  const data = makeBAUData(sector, geoScope);
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-        {sectorLabel} — BAU Service Gap
+        {scopeLabel} {sectorLabel} — BAU Service Gap
       </h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Static example data
+        Static example data — {scopeLabel} scope
       </div>
       <ResponsiveContainer width="100%" height={360}>
         <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} domain={[0, 1.6]}>
+          <YAxis tick={{ fontSize: 10 }} domain={[0, geoScope === 'national' ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
           <Tooltip formatter={(value: number) => value.toFixed(2) + 'M'} contentStyle={{ fontSize: 11 }} />

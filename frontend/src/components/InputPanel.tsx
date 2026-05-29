@@ -27,13 +27,13 @@ function SubHead({ text }: { text: string }) {
 }
 
 // Color convention: blue text = editable input, green text = cross-linked, gray = computed/derived
-function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slider, fieldType }: {
+function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slider, fieldType, integer }: {
   label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number; isPercent?: boolean;
-  min?: number; max?: number; tip?: string; slider?: boolean; fieldType?: 'input' | 'linked' | 'computed';
+  min?: number; max?: number; tip?: string; slider?: boolean; fieldType?: 'input' | 'linked' | 'computed'; integer?: boolean;
 }) {
   const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
   const rawPct = Math.round(value * 1e4) / 1e2; // 2 decimal places for %
-  const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : Math.round(value * 100) / 100;
+  const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : (integer ? Math.round(value) : Math.round(value * 100) / 100);
   const displayMin = min !== undefined ? (isPercent ? Math.round(min * 1e10) / 1e8 : min) : undefined;
   const displayMax = max !== undefined ? (isPercent ? Math.round(max * 1e10) / 1e8 : max) : undefined;
   const outOfRange = (displayMin !== undefined && displayVal < displayMin) || (displayMax !== undefined && displayVal > displayMax);
@@ -462,10 +462,10 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {bauSector === 'water' && (
       <Section title="6. Water Supply Unit Costs" cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Distribution network cost per HH" />
-        <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => u('water_costs','network_cost_per_hh_serv1',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => u('water_costs','network_cost_per_hh_serv2',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <F label={ws[2]} value={inputs.water_costs.network_cost_per_hh_serv3} onChange={v => u('water_costs','network_cost_per_hh_serv3',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
-        <F label={ws[3]} value={inputs.water_costs.network_cost_per_hh_serv4} onChange={v => u('water_costs','network_cost_per_hh_serv4',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to the distribution network" />
+        <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => u('water_costs','network_cost_per_hh_serv1',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network" />
+        <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => u('water_costs','network_cost_per_hh_serv2',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network" />
+        <F label={ws[2]} value={inputs.water_costs.network_cost_per_hh_serv3} onChange={v => u('water_costs','network_cost_per_hh_serv3',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network" />
+        <F label={ws[3]} value={inputs.water_costs.network_cost_per_hh_serv4} onChange={v => u('water_costs','network_cost_per_hh_serv4',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network" />
         <SubHead text="Water treatment" />
         <F label="Cost per MLD water treatment" value={inputs.water_costs.ws_cost_per_mld_treatment || 0} onChange={v => u('water_costs','ws_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of water treatment capacity" />
         <SubHead text="Non-piped solutions" />
@@ -478,10 +478,10 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {bauSector === 'sanitation' && (
       <Section title="6. Sanitation Unit Costs" cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Sewerage cost per HH" />
-        <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv1',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv2',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label={ss[2]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv3} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv3',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
-        <F label={ss[3]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv4} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv4',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Capital cost to connect one HH to sewer network + house connection" />
+        <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv1',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection" />
+        <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv2',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection" />
+        <F label={ss[2]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv3} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv3',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection" />
+        <F label={ss[3]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv4} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv4',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection" />
         <SubHead text="Wastewater treatment" />
         <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.san_cost_per_mld_treatment || 0} onChange={v => u('sanitation_costs','san_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity" />
         <SubHead text="On-site sanitation" />
@@ -497,11 +497,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           If there are programmed investments that represent a shift from historical spending — additional to past trends, with financing secured and genuinely likely to proceed — enter them here as part of the BAU scenario.
         </div>
         <SubHead text="Investment periods" />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-          <label style={{ flex: 1, fontSize: 11, color: '#0000cc', fontWeight: 500 }}>Period unit (years)</label>
-          <select value={inputs.bau.period_unit_years || 5}
-            onChange={e => {
-              const unit = parseInt(e.target.value);
+        {(() => {
+          const mode = inputs.bau.period_mode || 'automatic';
+          const setMode = (m: string) => {
+            if (m === 'automatic') {
+              // Regenerate auto periods
+              const unit = inputs.bau.period_unit_years || 5;
               const startY = (inputs.period.baseline_year || 2025) + 1;
               const endY = inputs.period.forecast_end_year || 2045;
               const autoPeriods: any[] = [];
@@ -511,15 +512,51 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                 autoPeriods.push({ start: y, end: pEnd, ws_inv: 0, san_inv: 0, is_custom: false });
                 y = pEnd + 1;
               }
-              const customPeriods = (inputs.bau.investment_periods || []).filter((p: any) => p.is_custom);
-              onChange({ ...inputs, bau: { ...inputs.bau, period_unit_years: unit, investment_periods: [...autoPeriods, ...customPeriods] } });
-            }}
-            style={{ width: 90, padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 11 }}>
-            {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
-          </select>
+              onChange({ ...inputs, bau: { ...inputs.bau, period_mode: m, investment_periods: autoPeriods } });
+            } else {
+              onChange({ ...inputs, bau: { ...inputs.bau, period_mode: m, investment_periods: [] } });
+            }
+          };
+          return (
+            <div style={{ width: '100%', display: 'flex', gap: 6, marginBottom: 8 }}>
+              {(['automatic', 'custom'] as const).map(m => (
+                <button key={m} onClick={() => setMode(m)} style={{
+                  flex: 1, padding: '6px 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                  background: mode === m ? '#2563eb' : '#e5e7eb',
+                  color: mode === m ? '#fff' : '#374151', fontWeight: 600, fontSize: 12, textTransform: 'capitalize',
+                }}>{m === 'automatic' ? 'Automatic periods' : 'Custom periods'}</button>
+              ))}
+            </div>
+          );
+        })()}
+        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+          Choose either automatic (evenly-spaced) or custom periods. Periods must not overlap. Leave a period blank if there are no planned investments for those years.
         </div>
+        {(inputs.bau.period_mode || 'automatic') === 'automatic' && (
+          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+            <label style={{ flex: 1, fontSize: 12, color: '#0000cc', fontWeight: 500 }}>Period length (years)</label>
+            <select value={inputs.bau.period_unit_years || 5}
+              onChange={e => {
+                const unit = parseInt(e.target.value);
+                const startY = (inputs.period.baseline_year || 2025) + 1;
+                const endY = inputs.period.forecast_end_year || 2045;
+                const autoPeriods: any[] = [];
+                let y = startY;
+                while (y <= endY) {
+                  const pEnd = Math.min(y + unit - 1, endY);
+                  autoPeriods.push({ start: y, end: pEnd, ws_inv: 0, san_inv: 0, is_custom: false });
+                  y = pEnd + 1;
+                }
+                onChange({ ...inputs, bau: { ...inputs.bau, period_unit_years: unit, investment_periods: autoPeriods } });
+              }}
+              style={{ width: 90, padding: '5px 7px', border: '1px solid #ccc', borderRadius: 4, fontSize: 13 }}>
+              {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        )}
         {(() => {
           const periods: any[] = inputs.bau.investment_periods || [];
+          const mode = inputs.bau.period_mode || 'automatic';
           const updatePeriod = (idx: number, field: string, val: any) => {
             const arr = [...periods];
             arr[idx] = { ...arr[idx], [field]: val };
@@ -529,35 +566,42 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             const arr = periods.filter((_: any, i: number) => i !== idx);
             onChange({ ...inputs, bau: { ...inputs.bau, investment_periods: arr } });
           };
+          // Overlap detection
+          const overlaps = (a: any, ai: number) => periods.some((b, bi) => bi !== ai && a.start <= b.end && b.start <= a.end);
           return <>
-            {periods.map((p: any, idx: number) => (
-              <div key={idx} style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '6px 8px', marginBottom: 6, background: p.is_custom ? '#fef3c7' : '#f0fdf4' }}>
+            {periods.map((p: any, idx: number) => {
+              const hasOverlap = mode === 'custom' && overlaps(p, idx);
+              return (
+              <div key={idx} style={{ width: '100%', border: hasOverlap ? '1.5px solid #ef4444' : '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px', marginBottom: 6, background: hasOverlap ? '#fef2f2' : '#f0fdf4' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
-                  <span style={{ fontSize: 11, fontWeight: 600, color: '#1e3a5f', flex: 1 }}>
-                    {p.is_custom ? 'Custom: ' : `Period ${idx + 1}: `}{p.start}–{p.end}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', flex: 1 }}>
+                    Period {idx + 1}: {p.start}–{p.end}
                   </span>
-                  {p.is_custom && (
-                    <button onClick={() => removePeriod(idx)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 6px', cursor: 'pointer', fontSize: 10 }}>✕</button>
-                  )}
+                  <button onClick={() => removePeriod(idx)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', fontSize: 11 }}>✕ Remove</button>
                 </div>
-                {p.is_custom && <>
-                  <F label="Start year" value={p.start} onChange={v => updatePeriod(idx, 'start', v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} />
-                  <F label="End year" value={p.end} onChange={v => updatePeriod(idx, 'end', v)} min={p.start} max={inputs.period.forecast_end_year} />
-                </>}
-                <F label="Planned water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned water supply investment for this period" />
-                <F label="Planned sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned sanitation investment for this period" />
+                {hasOverlap && <div style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>⚠ This period overlaps with another — investments would be double-counted</div>}
+                {mode === 'custom' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <F label="Start year" value={p.start} onChange={v => updatePeriod(idx, 'start', v)} />
+                  <F label="End year" value={p.end} onChange={v => updatePeriod(idx, 'end', v)} min={p.start} />
+                </div>}
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <F label="Planned water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned water supply investment for this period" />
+                  <F label="Planned sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned sanitation investment for this period" />
+                </div>
               </div>
-            ))}
-            <button onClick={() => {
-              const newP = { start: inputs.period.baseline_year + 1, end: inputs.period.baseline_year + 5, ws_inv: 0, san_inv: 0, is_custom: true };
-              onChange({ ...inputs, bau: { ...inputs.bau, investment_periods: [...periods, newP] } });
-            }} style={{ width: '100%', padding: '6px', border: '1px dashed #2563eb', borderRadius: 4, background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', marginBottom: 8 }}>
-              + Add Custom Period
-            </button>
+            );})}
+            {mode === 'custom' && (
+              <button onClick={() => {
+                const lastEnd = periods.length > 0 ? Math.max(...periods.map((p: any) => p.end)) : inputs.period.baseline_year;
+                const newStart = lastEnd + 1;
+                const newP = { start: newStart, end: Math.min(newStart + 4, inputs.period.forecast_end_year), ws_inv: 0, san_inv: 0, is_custom: true };
+                onChange({ ...inputs, bau: { ...inputs.bau, investment_periods: [...periods, newP] } });
+              }} style={{ width: '100%', padding: '8px', border: '1px dashed #2563eb', borderRadius: 6, background: 'none', cursor: 'pointer', fontSize: 12, color: '#2563eb', marginBottom: 8 }}>
+                + Add Period
+              </button>
+            )}
           </>;
         })()}
-        <SubHead text="Budget allocation" />
-        <F label="Capital expenditure % of budget" value={inputs.bau?.capex_pct_budget || 0} onChange={v => u('bau','capex_pct_budget',v)} isPercent unit="%" tip="Share of total budget that is capital expenditure" />
         <SubHead text="Sector split of WSS budget (calculated)" />
         {(() => {
           const wsGdp = inputs.macro?.ws_budget_pct_gdp || 0;
