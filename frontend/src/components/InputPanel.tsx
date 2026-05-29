@@ -157,7 +157,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', fontSize: 12 }}>
       <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, padding: '6px 10px', background: '#f0f4ff', borderRadius: 6, lineHeight: 1.5, border: '1px solid #c7d2fe' }}>
-        <span style={{ color: '#0000cc', fontWeight: 600 }}>Blue fields</span> are editable inputs. <span style={{ color: '#64748b', fontWeight: 600, background: '#e2e8f0', padding: '1px 4px', borderRadius: 2 }}>Gray fields</span> are auto-calculated and cannot be edited.
+        <span style={{ color: '#0000cc', fontWeight: 600 }}>Blue fields</span><span style={{ color: '#1e293b' }}> are editable inputs. </span><span style={{ color: '#94a3b8', fontWeight: 600 }}>Gray fields</span><span style={{ color: '#1e293b' }}> are auto-calculated and cannot be edited.</span>
       </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
@@ -221,7 +221,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Target 1 year" value={inputs.period.target1_year} onChange={v => u('period','target1_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="First milestone year; must be after baseline" />
         <F label="Target 2 year" value={inputs.period.target2_year} onChange={v => u('period','target2_year',v)} min={inputs.period.target1_year} max={inputs.period.forecast_end_year} tip="Final milestone year; must equal or exceed Target 1" />
         <SubHead text="Macroeconomic assumptions" />
-        <F label="Year for real prices" value={inputs.macro.real_price_year} onChange={v => u('macro','real_price_year',v)} min={inputs.period.model_start_year} max={inputs.period.baseline_year} tip="Base year for converting nominal to real values; must be a year with actual data" />
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
         <SubHead text="Year-by-year data" />
@@ -248,42 +247,42 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           // Section headers as row separators
           const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
 
-          const rows: { label: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
+          const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
             sectionRow('── Economic ──'),
-            { label: 'Nominal GDP ($B)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
-            { label: 'GDP growth %', computed: true, cells: years.map((_: number, i: number) => {
+            { label: 'Nominal GDP ($B)', tip: 'Gross domestic product in current US dollars (billions)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
+            { label: 'GDP growth %', tip: 'Year-on-year GDP growth rate, auto-calculated from nominal GDP', computed: true, cells: years.map((_: number, i: number) => {
               const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: `Infl ${cc.country || 'Domestic'} %`, cells: years.map((_: number, i: number) => mInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
-            { label: 'Infl US %', cells: years.map((_: number, i: number) => mInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
-            { label: `USD/${CUR}`, cells: years.map((_: number, i: number) => mInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
+            { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual consumer price inflation rate for the domestic economy', cells: years.map((_: number, i: number) => mInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
+            { label: 'Infl US %', tip: 'Annual US consumer price inflation rate', cells: years.map((_: number, i: number) => mInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
+            { label: `USD/${CUR}`, tip: 'Exchange rate: US dollars per unit of local currency', cells: years.map((_: number, i: number) => mInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
             sectionRow('── Demographic ──'),
-            { label: `${scopeLabel} population`, cells: years.map((_: number, i: number) => tsInput('population', 'pop_ts', i, (inputs.population?.pop_ts||[])[i]||0, false)) },
-            { label: 'Pop growth %', computed: true, cells: years.map((_: number, i: number) => {
+            { label: `${scopeLabel} population`, tip: `Total ${scopeLower} population (census or estimate)`, cells: years.map((_: number, i: number) => tsInput('population', 'pop_ts', i, (inputs.population?.pop_ts||[])[i]||0, false)) },
+            { label: 'Pop growth %', tip: 'Year-on-year population growth, auto-calculated', computed: true, cells: years.map((_: number, i: number) => {
               const p = inputs.population?.pop_ts || [];
               const g = (i > 0 && p[i] && p[i-1] && p[i-1] !== 0) ? ((p[i]/p[i-1])-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: 'Households (mill)', cells: years.map((_: number, i: number) => tsInput('population', 'hh_ts', i, (inputs.population?.hh_ts||[])[i]||0, false)) },
-            { label: 'Avg HH size', computed: true, cells: years.map((_: number, i: number) => {
+            { label: 'Households (mill)', tip: 'Total number of households in millions', cells: years.map((_: number, i: number) => tsInput('population', 'hh_ts', i, (inputs.population?.hh_ts||[])[i]||0, false)) },
+            { label: 'Avg HH size', tip: 'Average household size, auto-calculated from population ÷ households', computed: true, cells: years.map((_: number, i: number) => {
               const p = (inputs.population?.pop_ts||[])[i]||0;
               const h = (inputs.population?.hh_ts||[])[i]||0;
               const sz = (h > 0 && p > 0) ? p / (h * 1e6) : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(1) : '—'}</span>;
             }) },
             sectionRow(`── Budget & Execution (${CUR} M) ──`),
-            { label: 'WS budget allocated', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_budget_ts', i, (inputs.bau?.ws_budget_ts||[])[i]||0, false)) },
-            { label: 'WS actual expenditure', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_expend_ts', i, (inputs.bau?.ws_expend_ts||[])[i]||0, false)) },
-            { label: 'WS execution rate', computed: true, cells: years.map((_: number, i: number) => {
+            { label: 'WS budget allocated', tip: 'Water supply budget allocated by government for this year', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_budget_ts', i, (inputs.bau?.ws_budget_ts||[])[i]||0, false)) },
+            { label: 'WS actual expenditure', tip: 'Actual water supply expenditure for this year', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_expend_ts', i, (inputs.bau?.ws_expend_ts||[])[i]||0, false)) },
+            { label: 'WS execution rate', tip: 'Budget execution rate: actual expenditure ÷ allocated budget', computed: true, cells: years.map((_: number, i: number) => {
               const b = (inputs.bau?.ws_budget_ts||[])[i]||0;
               const e = (inputs.bau?.ws_expend_ts||[])[i]||0;
               const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
             }) },
-            { label: 'SAN budget allocated', cells: years.map((_: number, i: number) => tsInput('bau', 'san_budget_ts', i, (inputs.bau?.san_budget_ts||[])[i]||0, false)) },
-            { label: 'SAN actual expenditure', cells: years.map((_: number, i: number) => tsInput('bau', 'san_expend_ts', i, (inputs.bau?.san_expend_ts||[])[i]||0, false)) },
-            { label: 'SAN execution rate', computed: true, cells: years.map((_: number, i: number) => {
+            { label: 'SAN budget allocated', tip: 'Sanitation budget allocated by government for this year', cells: years.map((_: number, i: number) => tsInput('bau', 'san_budget_ts', i, (inputs.bau?.san_budget_ts||[])[i]||0, false)) },
+            { label: 'SAN actual expenditure', tip: 'Actual sanitation expenditure for this year', cells: years.map((_: number, i: number) => tsInput('bau', 'san_expend_ts', i, (inputs.bau?.san_expend_ts||[])[i]||0, false)) },
+            { label: 'SAN execution rate', tip: 'Budget execution rate: actual expenditure ÷ allocated budget', computed: true, cells: years.map((_: number, i: number) => {
               const b = (inputs.bau?.san_budget_ts||[])[i]||0;
               const e = (inputs.bau?.san_expend_ts||[])[i]||0;
               const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
@@ -312,8 +311,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                     </tr>
                   ) : (
                     <tr key={ri} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
-                      <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }}>
+                      <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }} title={row.tip || undefined}>
                         {row.label}
+                        {row.tip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 11, fontWeight: 700, cursor: 'help' }} title={row.tip}>ⓘ</span>}
                       </td>
                       {row.cells.map((cell, ci) => (
                         <td key={ci} style={{ padding: '2px 2px', textAlign: 'center' }}>{cell}</td>
