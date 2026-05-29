@@ -173,18 +173,18 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #DDE3EA', background: '#F1F3F5', display: 'inline-block' }} />
-          Auto-calculated (cannot edit)
+          Cannot edit (auto-calculated)
         </span>
       </div>
 
       {/* Area-scope banner — all inputs below apply to this area */}
       <div style={{
-        display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+        display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, textAlign: 'left',
         padding: '8px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
         background: '#EBF6FB', border: '1px solid #b6e0f0', color: '#0073A8',
       }}>
-        <span style={{ fontSize: 14 }}>📍</span>
-        Entering <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> data — every field on this page is {scopeLower}-specific.
+        <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
+        <span>Entering <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> data — every field on this page is {scopeLower}-specific.</span>
       </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
@@ -353,7 +353,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
 
           const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
-            sectionRow('── Economic ──'),
+            sectionRow('Economic'),
             { label: 'Nominal GDP ($B)', tip: 'Gross domestic product in current US dollars (billions)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
             { label: 'GDP growth %', tip: 'Year-on-year GDP growth rate, auto-calculated from nominal GDP', computed: true, cells: years.map((_: number, i: number) => {
               const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
@@ -362,7 +362,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual consumer price inflation rate for the domestic economy', cells: years.map((_: number, i: number) => mInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
             { label: 'Infl US %', tip: 'Annual US consumer price inflation rate', cells: years.map((_: number, i: number) => mInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
             { label: `USD/${CUR}`, tip: 'Exchange rate: US dollars per unit of local currency', cells: years.map((_: number, i: number) => mInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
-            sectionRow('── Demographic ──'),
+            sectionRow('Demographic'),
             { label: `${scopeLabel} population`, tip: `Total ${scopeLower} population (census or estimate)`, cells: years.map((_: number, i: number) => tsInput('population', 'pop_ts', i, (inputs.population?.pop_ts||[])[i]||0, false)) },
             { label: 'Pop growth %', tip: 'Year-on-year population growth, auto-calculated', computed: true, cells: years.map((_: number, i: number) => {
               const p = inputs.population?.pop_ts || [];
@@ -376,7 +376,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               const sz = (h > 0 && p > 0) ? p / (h * 1e6) : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(1) : '—'}</span>;
             }) },
-            sectionRow(`── Budget & Execution (${CUR} M) ──`),
+            sectionRow(`Budget & Execution (${CUR} M)`),
             { label: 'WS budget allocated', tip: budgetMode === 'pct_gdp' ? 'Calculated from “Water supply budget as % of GDP” × nominal GDP' : 'Water supply budget allocated by government for this year', computed: budgetMode === 'pct_gdp', cells: years.map((_: number, i: number) => budgetCell('ws_budget_ts', 'ws_budget_pct_gdp', i)) },
             { label: 'WS actual expenditure', tip: 'Actual water supply expenditure for this year', cells: years.map((_: number, i: number) => tsInput('bau', 'ws_expend_ts', i, (inputs.bau?.ws_expend_ts||[])[i]||0, false)) },
             { label: 'WS execution rate', tip: 'Budget execution rate: actual expenditure ÷ allocated budget', computed: true, cells: years.map((_: number, i: number) => {
@@ -393,13 +393,13 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
             }) },
-            sectionRow(`── ${scopeLabel} water service levels (% HH) ──`),
+            sectionRow(`${scopeLabel} water service levels (% HH)`),
             svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
             svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
             svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
             svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
             svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
-            sectionRow(`── ${scopeLabel} sanitation service levels (% HH) ──`),
+            sectionRow(`${scopeLabel} sanitation service levels (% HH)`),
             svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
             svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
             svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
@@ -454,7 +454,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {(isBAU || isInputs) && <>
       {isBAU && (
         <div style={{
-          marginTop: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 6,
+          marginTop: 0, marginBottom: 14, padding: '8px 14px', borderRadius: 6, textAlign: 'left',
           background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#5b21b6', fontSize: 12, lineHeight: 1.5,
         }}>
           <strong>🔗 BAU data entry</strong> — these same fields also appear on the <strong>Data Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on Data Inputs stay in sync.

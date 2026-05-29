@@ -58,22 +58,46 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
   );
 }
 
-// Toggle with inline expand for parameters
+// Toggle with an independently collapsible parameter panel.
+// The panel auto-opens the first time the intervention is switched on; after that the user
+// expands/collapses it manually with the Configure/Hide control.
 function InterventionToggle({ label, checked, onChange, children, onFocus }: {
   label: string; checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; onFocus?: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  const prevChecked = React.useRef(checked);
+  const autoExpanded = React.useRef(false);
+
+  React.useEffect(() => {
+    if (checked && !prevChecked.current && !autoExpanded.current) {
+      // first time this intervention is turned on → reveal its parameters
+      setExpanded(true);
+      autoExpanded.current = true;
+    }
+    if (!checked) setExpanded(false); // turning it off collapses the panel
+    prevChecked.current = checked;
+  }, [checked]);
+
+  const showParams = checked && expanded;
   return (
     <div style={{ marginBottom: 8, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
-      <label style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', cursor: 'pointer',
-        background: checked ? '#eef2ff' : '#fafbfc', borderBottom: checked ? '1px solid #c7d2fe' : 'none',
-      }} onClick={() => { if (!checked && onFocus) onFocus(); }}>
-        <input type="checkbox" checked={checked} onChange={e => { onChange(e.target.checked); if (e.target.checked && onFocus) onFocus(); }}
-          style={{ width: 18, height: 18, accentColor: '#2563eb' }} />
-        <span style={{ fontSize: 13, color: checked ? '#1e3a5f' : '#94a3b8', fontWeight: checked ? 600 : 400, flex: 1 }}>{label}</span>
-        {checked && <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500 }}>▾ Configure</span>}
-      </label>
-      {checked && (
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
+        background: checked ? '#eef2ff' : '#fafbfc', borderBottom: showParams ? '1px solid #c7d2fe' : 'none',
+      }}>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer' }}>
+          <input type="checkbox" checked={checked} onChange={e => { onChange(e.target.checked); if (e.target.checked && onFocus) onFocus(); }}
+            style={{ width: 18, height: 18, accentColor: '#2563eb' }} />
+          <span style={{ fontSize: 13, color: checked ? '#1e3a5f' : '#94a3b8', fontWeight: checked ? 600 : 400 }}>{label}</span>
+        </label>
+        {checked && (
+          <button onClick={() => { const e = !expanded; setExpanded(e); if (e && onFocus) onFocus(); }}
+            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', fontWeight: 600, padding: '2px 4px' }}>
+            {expanded ? '▴ Hide' : '▾ Configure'}
+          </button>
+        )}
+      </div>
+      {showParams && (
         <div style={{ padding: '10px 14px', background: '#fff', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start' }}>
           {children}
         </div>
@@ -102,12 +126,12 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
         {/* Area-scope banner */}
         <div style={{
-          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+          display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 12, textAlign: 'left',
           padding: '8px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
           background: '#EBF6FB', border: '1px solid #b6e0f0', color: '#0073A8',
         }}>
-          <span style={{ fontSize: 14 }}>📍</span>
-          Configuring <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> interventions — every field below is {scopeLower}-specific.
+          <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
+          <span>Configuring <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> interventions — every field below is {scopeLower}-specific.</span>
         </div>
 
         {/* Sector toggle */}
