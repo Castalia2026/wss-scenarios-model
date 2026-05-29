@@ -118,7 +118,7 @@ export default function App() {
             refreshProfiles(); alert(`Profile "${name}" saved!`);
           }} style={headerBtnStyle}>💾 Save Profile</button>
           <button onClick={saveScenario} style={headerBtnStyle}>📋 Save Scenario</button>
-          <button onClick={() => setShowOnboarding(true)} style={headerBtnStyle}>? Help</button>
+          <button id="tool-overview-btn" onClick={() => setShowOnboarding(true)} style={headerBtnStyle}>📖 Tool Overview</button>
         </div>
       </header>
 
@@ -282,30 +282,74 @@ export default function App() {
 }
 
 function OnboardingModal({ onClose }: { onClose: () => void }) {
+  const [closing, setClosing] = React.useState(false);
+  const [showArrow, setShowArrow] = React.useState(false);
+
+  const handleGetStarted = () => {
+    // Show arrow animation pointing to the Tool Overview button
+    setClosing(true);
+    setShowArrow(true);
+    setTimeout(() => {
+      setShowArrow(false);
+      onClose();
+    }, 1800);
+  };
+
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }} onClick={onClose}>
-      <div style={{ background: '#fff', borderRadius: 12, maxWidth: 560, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 6 }}>How to use this tool</h2>
-        <p style={{ fontSize: 14, color: '#475569', marginBottom: 20, lineHeight: 1.6 }}>
-          Work through the tabs from left to right. Select your geographic scope (Urban, Rural, or National) in the header bar before you begin.
-        </p>
-
-        <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.8 }}>
-          <li style={{ marginBottom: 10 }}><strong>Data Input</strong> — Enter all country data: time scale, macroeconomics, population, service levels, and targets.</li>
-          <li style={{ marginBottom: 10 }}><strong>BAU & Costs</strong> — Enter unit costs, planned investments, and technical parameters.</li>
-          <li style={{ marginBottom: 10 }}><strong>Intervention Selection</strong> — Define and toggle interventions: collection efficiency, NRW reduction, tariff reform, borrowing, and more.</li>
-          <li style={{ marginBottom: 10 }}><strong>Results Dashboard</strong> — View projected coverage, financing gaps, and export results.</li>
-        </ol>
-
-        <div style={{ marginTop: 16, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
-          <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
+    <div style={{ position: 'fixed', inset: 0, background: closing ? 'rgba(0,0,0,0.15)' : 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.5s' }} onClick={closing ? undefined : onClose}>
+      {/* Arrow animation pointing to Tool Overview button */}
+      {showArrow && (
+        <div style={{
+          position: 'fixed', top: 8, right: 100, zIndex: 1100,
+          animation: 'pulseArrow 0.6s ease-in-out infinite',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 13, color: '#fff', background: '#2563eb', padding: '6px 14px', borderRadius: 20, fontWeight: 600, boxShadow: '0 2px 12px rgba(37,99,235,0.5)' }}>
+            Click here to reopen ↗
+          </span>
         </div>
+      )}
+      <style>{`@keyframes pulseArrow { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }`}</style>
 
-        <button onClick={onClose}
-          style={{ marginTop: 18, width: '100%', padding: '12px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
-          Get Started
-        </button>
-      </div>
+      {!closing && (
+        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 600, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
+          <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 6 }}>Tool Overview</h2>
+          <p style={{ fontSize: 14, color: '#475569', marginBottom: 20, lineHeight: 1.6 }}>
+            Work through the tabs from left to right. Select your geographic scope (Urban, Rural, or National) before entering data.
+          </p>
+
+          <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
+            <li style={{ marginBottom: 12 }}>
+              <strong>Data Input</strong> — Enter country information, key dates, and year-by-year macroeconomic, demographic, and budget data in a single time-series table.
+            </li>
+            <li style={{ marginBottom: 12 }}>
+              <strong>BAU & Costs</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, unit costs, planned investments, and technical parameters.
+            </li>
+            <li style={{ marginBottom: 12 }}>
+              <strong>Interventions & Targets</strong> — Toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance. Add custom interventions.
+            </li>
+            <li style={{ marginBottom: 12 }}>
+              <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see impact. Charts show BAU vs intervention scenarios.
+            </li>
+            <li style={{ marginBottom: 12 }}>
+              <strong>Export</strong> — Download results as PowerPoint, Excel, or CSV for reporting and further analysis.
+            </li>
+          </ol>
+
+          <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0f4ff', borderRadius: 8, fontSize: 13, color: '#312e81', border: '1px solid #c7d2fe' }}>
+            <strong>Tip:</strong> You can reopen this overview anytime by clicking <strong>"📖 Tool Overview"</strong> in the top-right corner of the header.
+          </div>
+
+          <div style={{ marginTop: 12, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
+            <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
+          </div>
+
+          <button onClick={handleGetStarted}
+            style={{ marginTop: 18, width: '100%', padding: '12px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+            Get Started
+          </button>
+        </div>
+      )}
     </div>
   );
 }
