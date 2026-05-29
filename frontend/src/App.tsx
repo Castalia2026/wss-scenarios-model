@@ -211,7 +211,7 @@ export default function App() {
           </div>
         </>)}
         {activeTab === 2 && inputs && (
-          <InterventionPanel inputs={inputs} onChange={handleSetInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} />
+          <InterventionPanel inputs={inputs} onChange={handleSetInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {/* Guide panel — tabs 0, 1, 2 */}
         {activeTab <= 2 && (
