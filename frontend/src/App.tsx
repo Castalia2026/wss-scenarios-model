@@ -86,7 +86,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['General Inputs', 'BAU & Costs', 'Interventions & Targets', 'Results Dashboard', 'Export'];
+  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Interventions & Targets', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -207,7 +207,7 @@ export default function App() {
         {activeTab === 1 && inputs && (<>
           <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-            <BAUForecastChart sector={sectorTab} />
+            <BAUForecastChart sector={sectorTab} geoScope={geoScope} />
           </div>
         </>)}
         {activeTab === 2 && inputs && (
