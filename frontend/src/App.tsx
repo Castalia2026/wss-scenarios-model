@@ -86,7 +86,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['Data Input', 'BAU & Costs', 'Interventions & Targets', 'Results Dashboard', 'Export'];
+  const tabs = ['General Inputs', 'BAU & Costs', 'Interventions & Targets', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -321,7 +321,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
           <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
             <li style={{ marginBottom: 12 }}>
-              <strong>Data Input</strong> — Enter country information, key dates, and year-by-year macroeconomic, demographic, and budget data in a single time-series table.
+              <strong>General Inputs</strong> — Enter country information, key dates, and year-by-year macroeconomic, demographic, and budget data in a single time-series table.
             </li>
             <li style={{ marginBottom: 12 }}>
               <strong>BAU & Costs</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, unit costs, planned investments, and technical parameters.
