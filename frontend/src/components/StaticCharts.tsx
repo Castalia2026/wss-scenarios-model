@@ -8,10 +8,19 @@ const allYears = [2020,2021,2022,2023,2024,2025,2026,2027,2028,2029,2030,2031,20
 
 // Geographic scope scaling factors (urban is largest, rural smaller, national = sum)
 const SCOPE_FACTORS: Record<string, { total: number; bau: number; tgt: number }> = {
-  urban:    { total: 1.0,  bau: 1.0,  tgt: 1.0 },
-  rural:    { total: 0.65, bau: 0.45, tgt: 0.55 },
-  national: { total: 1.65, bau: 1.45, tgt: 1.55 },
+  urban:       { total: 1.0,  bau: 1.0,  tgt: 1.0 },
+  rural:       { total: 0.65, bau: 0.45, tgt: 0.55 },
+  // Urban + Rural is entered separately then aggregated, so it equals the national sum
+  urban_rural: { total: 1.65, bau: 1.45, tgt: 1.55 },
+  national:    { total: 1.65, bau: 1.45, tgt: 1.55 },
 };
+
+function scopeLabelFor(geoScope: string) {
+  return geoScope === 'national' ? 'National'
+    : geoScope === 'rural' ? 'Rural'
+    : geoScope === 'urban_rural' ? 'Urban + Rural'
+    : 'Urban';
+}
 
 function makeBAUData(sector: 'water' | 'sanitation', geoScope: string) {
   const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
@@ -35,7 +44,7 @@ function makeBAUData(sector: 'water' | 'sanitation', geoScope: string) {
 export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sector?: 'water' | 'sanitation'; geoScope?: string }) {
   const data = makeBAUData(sector, geoScope);
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
-  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
+  const scopeLabel = scopeLabelFor(geoScope);
   const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
@@ -49,41 +58,22 @@ export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sec
         <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} domain={[0, geoScope === 'national' ? 3 : 1.6]}>
+          <YAxis tick={{ fontSize: 10 }} domain={[0, (geoScope === 'national' || geoScope === 'urban_rural') ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
           <Tooltip formatter={(value: number) => value.toFixed(2) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          {/* BAU shaded area */}
-          <Area type="monotone" dataKey="Households under BAU" fill="#d1d5db" stroke="#9ca3af" fillOpacity={0.6}
+          {/* BAU shaded area — box legend */}
+          <Area type="monotone" dataKey="Households under BAU" fill="#7dd3fc" stroke="#0ea5e9" fillOpacity={0.55} legendType="rect"
             name={`Households with ${serviceLabel} under BAU`} />
-          {/* Total HHs dashed line */}
-          <Line type="monotone" dataKey="Total households" stroke="#9ca3af" strokeWidth={2.5} dot={false}
+          {/* Total HHs dashed line — line legend */}
+          <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={false} legendType="plainline"
             strokeDasharray="8 4" name="Total households" />
-          {/* Target line */}
-          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false}
+          {/* Target line — line legend */}
+          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false} legendType="plainline"
             name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
-      {/* Right-side annotation labels for last data point */}
-      {(() => {
-        const last = data[data.length - 1];
-        const items = [
-          { color: '#9ca3af', label: 'Total households', value: last['Total households'] },
-          { color: '#d1d5db', label: `HHs with ${serviceLabel} (BAU)`, value: last['Households under BAU'] },
-          { color: '#16a34a', label: 'Target', value: last['Target'] },
-        ];
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4, fontSize: 10, color: '#475569' }}>
-            {items.map((it, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, display: 'inline-block', flexShrink: 0 }} />
-                <span>{it.label}: <b>{it.value.toFixed(2)}M</b> ({last.year})</span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
     </div>
   );
 }
@@ -117,17 +107,17 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
 }
 
 const INTV_COLORS = {
-  'BAU': '#d1d5db',
-  'Collection & NRW': '#93c5fd',
-  'Capital efficiency': '#3b82f6',
-  'Tariff increase': '#1d4ed8',
-  'Borrowing': '#1e3a5f',
+  'BAU': '#cbd5e1',            // light gray
+  'Collection & NRW': '#0ea5e9', // sky blue
+  'Capital efficiency': '#6366f1', // indigo
+  'Tariff increase': '#f59e0b',   // amber
+  'Borrowing': '#ec4899',         // pink
 };
 
 export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }: { sector?: 'water' | 'sanitation'; geoScope?: string }) {
   const data = makeIntvData(sector, geoScope);
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
-  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
+  const scopeLabel = scopeLabelFor(geoScope);
   const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
@@ -141,53 +131,30 @@ export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }
         <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} domain={[0, geoScope === 'national' ? 3 : 1.6]}>
+          <YAxis tick={{ fontSize: 10 }} domain={[0, (geoScope === 'national' || geoScope === 'urban_rural') ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
           <Tooltip formatter={(value: number) => value.toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          {/* Stacked intervention areas */}
-          <Area type="monotone" dataKey="BAU" stackId="1" fill={INTV_COLORS['BAU']} stroke="#9ca3af" fillOpacity={0.7}
+          {/* Stacked intervention areas — box legend */}
+          <Area type="monotone" dataKey="BAU" stackId="1" fill={INTV_COLORS['BAU']} stroke="#94a3b8" fillOpacity={0.75} legendType="rect"
             name={`Households with ${serviceLabel} under BAU`} />
-          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={INTV_COLORS['Collection & NRW']} stroke={INTV_COLORS['Collection & NRW']} fillOpacity={0.7}
+          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={INTV_COLORS['Collection & NRW']} stroke={INTV_COLORS['Collection & NRW']} fillOpacity={0.75} legendType="rect"
             name="Increased collection efficiency & NRW reduction" />
-          <Area type="monotone" dataKey="Capital efficiency" stackId="1" fill={INTV_COLORS['Capital efficiency']} stroke={INTV_COLORS['Capital efficiency']} fillOpacity={0.7}
+          <Area type="monotone" dataKey="Capital efficiency" stackId="1" fill={INTV_COLORS['Capital efficiency']} stroke={INTV_COLORS['Capital efficiency']} fillOpacity={0.75} legendType="rect"
             name="Increased efficiency in capital expenditure" />
-          <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.7}
+          <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.75} legendType="rect"
             name="Tariff increase" />
-          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.7}
+          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.75} legendType="rect"
             name="Borrow against future cashflow" />
-          {/* Total HHs dashed line */}
-          <Line type="monotone" dataKey="Total households" stroke="#9ca3af" strokeWidth={2.5} dot={false}
-            strokeDasharray="8 4" />
-          {/* Target line */}
-          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false}
+          {/* Total HHs dashed line — line legend */}
+          <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={false} legendType="plainline"
+            strokeDasharray="8 4" name="Total households" />
+          {/* Target line — line legend */}
+          <Line type="monotone" dataKey="Target" stroke="#16a34a" strokeWidth={3} dot={false} legendType="plainline"
             name="Target" />
         </ComposedChart>
       </ResponsiveContainer>
-      {/* Right-side annotation labels for last data point */}
-      {(() => {
-        const last = data[data.length - 1];
-        const items = [
-          { color: '#9ca3af', label: 'Total households', value: last['Total households'] },
-          { color: INTV_COLORS['BAU'], label: `HHs (BAU)`, value: last['BAU'] },
-          { color: INTV_COLORS['Collection & NRW'], label: 'Collection & NRW', value: last['Collection & NRW'] },
-          { color: INTV_COLORS['Capital efficiency'], label: 'Capital efficiency', value: last['Capital efficiency'] },
-          { color: INTV_COLORS['Tariff increase'], label: 'Tariff increase', value: last['Tariff increase'] },
-          { color: INTV_COLORS['Borrowing'], label: 'Borrowing', value: last['Borrowing'] },
-          { color: '#16a34a', label: 'Target', value: last['Target'] },
-        ];
-        return (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px 16px', marginTop: 4, fontSize: 10, color: '#475569' }}>
-            {items.map((it, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 2, background: it.color, display: 'inline-block', flexShrink: 0 }} />
-                <span>{it.label}: <b>{it.value.toFixed(3)}M</b> ({last.year})</span>
-              </div>
-            ))}
-          </div>
-        );
-      })()}
     </div>
   );
 }

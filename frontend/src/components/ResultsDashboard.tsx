@@ -107,7 +107,7 @@ const BAU_LINE_COLORS: Record<string, string> = {
 };
 
 interface Props {
-  geoScope: 'urban' | 'rural' | 'national';
+  geoScope: 'urban' | 'rural' | 'urban_rural' | 'national';
   scenarios: { name: string; inputs: any }[];
   inputs: any;
 }
@@ -169,7 +169,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
       </div>
 
       {/* Three charts per the spec: rural, urban, national */}
-      {geoScope === 'national' ? (
+      {(geoScope === 'national' || geoScope === 'urban_rural') ? (
         <>
           <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
