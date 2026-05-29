@@ -16,7 +16,7 @@ function Section({ title, children, defaultOpen = false, cols = 3, sectionKey, o
       }}>
         {title}<span>{open ? '▴' : '▾'}</span>
       </button>
-      {open && <div style={{ padding: '10px 14px 12px', display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '12px 16px', alignItems: 'end' }}>{children}</div>}
+      {open && <div style={{ padding: '10px 14px 12px', display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '12px 16px', alignItems: 'start' }}>{children}</div>}
     </div>
   );
 }
@@ -56,7 +56,7 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
     }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500 }} title={tooltip || undefined}>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500, minHeight: 32 }} title={tooltip || undefined}>
         {label}
         {tooltip && <span style={{
           width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
@@ -258,6 +258,21 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           );
           const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct);
 
+          // Service level cell: editable for historical years, non-editable (derived from targets) for forecast years
+          const svcCell = (section: string, field: string, idx: number) => {
+            const yr = years[idx];
+            const val = (inputs[section]?.[field] || [])[idx] || 0;
+            if (yr <= baseYr2) {
+              return tsInput(section, field, idx, val, true);
+            }
+            // forecast year — derived from BAU targets, shown gray non-editable
+            return <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title="Derived from targets set on the BAU tab">—</span>;
+          };
+          const svcRow = (label: string, section: string, field: string) => ({
+            label, tip: 'Share of households at this service level. Historical years are editable; forecast years are derived from the targets you set on the BAU tab.',
+            cells: years.map((_: number, i: number) => svcCell(section, field, i)),
+          });
+
           // Section headers as row separators
           const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
 
@@ -302,6 +317,18 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
             }) },
+            sectionRow('── Water service levels (% HH) ──'),
+            svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
+            svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
+            svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
+            svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
+            svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
+            sectionRow('── Sanitation service levels (% HH) ──'),
+            svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
+            svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
+            svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
+            svcRow(`% ${ss[3]}`, 'sanitation_service', 'sserv4_ts'),
+            svcRow(`% ${ss[4]}`, 'sanitation_service', 'sserv5_ts'),
           ];
           return (
             <div style={{ gridColumn: '1 / -1', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
@@ -327,7 +354,12 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                     <tr key={ri} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
                       <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }} title={row.tip || undefined}>
                         {row.label}
-                        {row.tip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 11, fontWeight: 700, cursor: 'help' }} title={row.tip}>ⓘ</span>}
+                        {row.tip && <span style={{
+                          width: 14, height: 14, borderRadius: '50%', marginLeft: 5,
+                          background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex',
+                          alignItems: 'center', justifyContent: 'center', cursor: 'help', verticalAlign: 'middle',
+                          fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
+                        }} title={row.tip}>i</span>}
                       </td>
                       {row.cells.map((cell, ci) => (
                         <td key={ci} style={{ padding: '2px 2px', textAlign: 'center' }}>{cell}</td>
@@ -355,74 +387,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         ))}
       </div>
 
-      {/* ===== SERVICE LEVELS (sector-dependent) ===== */}
-      {bauSector === 'water' && (
-      <Section title="4. Water Supply Service Levels" cols={2} sectionKey="ws_service_levels" onFocus={onSectionFocus}>
-        <SubHead text={`% HHs by service level, ${startYr}`} />
-        {(() => { const s = (inputs.water_service.pct_serv1_start||0)+(inputs.water_service.pct_serv2_start||0)+(inputs.water_service.pct_serv3_start||0)+(inputs.water_service.pct_serv4_start||0)+(inputs.water_service.pct_serv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_start} onChange={v => u('water_service','pct_serv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_start} onChange={v => u('water_service','pct_serv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_start} onChange={v => u('water_service','pct_serv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_start} onChange={v => u('water_service','pct_serv4_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_start} onChange={v => u('water_service','pct_serv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-
-        <SubHead text={`% HHs by service level, ${baseYr}`} />
-        {(() => { const s = (inputs.water_service.pct_serv1_baseline||0)+(inputs.water_service.pct_serv2_baseline||0)+(inputs.water_service.pct_serv3_baseline||0)+(inputs.water_service.pct_serv4_baseline||0)+(inputs.water_service.pct_serv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_baseline} onChange={v => u('water_service','pct_serv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_baseline} onChange={v => u('water_service','pct_serv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_baseline} onChange={v => u('water_service','pct_serv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[3]}`} value={inputs.water_service.pct_serv4_baseline} onChange={v => u('water_service','pct_serv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_baseline} onChange={v => u('water_service','pct_serv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        {nYears > 0 && <>
-          <SubHead text="Service level CAGRs (calculated)" />
-          {[
-            { name: ws[0], s: inputs.water_service.pct_serv1_start, b: inputs.water_service.pct_serv1_baseline },
-            { name: ws[1], s: inputs.water_service.pct_serv2_start, b: inputs.water_service.pct_serv2_baseline },
-            { name: ws[2], s: inputs.water_service.pct_serv3_start, b: inputs.water_service.pct_serv3_baseline },
-            { name: ws[3], s: inputs.water_service.pct_serv4_start, b: inputs.water_service.pct_serv4_baseline },
-            { name: ws[4], s: inputs.water_service.pct_serv5_start, b: inputs.water_service.pct_serv5_baseline },
-          ].map((lv, i) => (
-            <F key={i} label={`CAGR ${lv.name}`} value={cagr(lv.s || 0.0001, lv.b || 0.0001, nYears)} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`${(lv.s*100).toFixed(2)}% → ${(lv.b*100).toFixed(2)}% over ${nYears} years`} />
-          ))}
-        </>}
-      </Section>
-      )}
-
-      {bauSector === 'sanitation' && (
-      <Section title="4. Sanitation Service Levels" cols={2} sectionKey="san_service_levels" onFocus={onSectionFocus}>
-        <SubHead text={`% HHs by service level, ${startYr}`} />
-        {(() => { const s = (inputs.sanitation_service.pct_sserv1_start||0)+(inputs.sanitation_service.pct_sserv2_start||0)+(inputs.sanitation_service.pct_sserv3_start||0)+(inputs.sanitation_service.pct_sserv4_start||0)+(inputs.sanitation_service.pct_sserv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_start} onChange={v => u('sanitation_service','pct_sserv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_start} onChange={v => u('sanitation_service','pct_sserv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_start} onChange={v => u('sanitation_service','pct_sserv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_start} onChange={v => u('sanitation_service','pct_sserv4_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_start} onChange={v => u('sanitation_service','pct_sserv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-
-        <SubHead text={`% HHs by service level, ${baseYr}`} />
-        {(() => { const s = (inputs.sanitation_service.pct_sserv1_baseline||0)+(inputs.sanitation_service.pct_sserv2_baseline||0)+(inputs.sanitation_service.pct_sserv3_baseline||0)+(inputs.sanitation_service.pct_sserv4_baseline||0)+(inputs.sanitation_service.pct_sserv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_baseline} onChange={v => u('sanitation_service','pct_sserv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_baseline} onChange={v => u('sanitation_service','pct_sserv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_baseline} onChange={v => u('sanitation_service','pct_sserv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_service.pct_sserv4_baseline} onChange={v => u('sanitation_service','pct_sserv4_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_baseline} onChange={v => u('sanitation_service','pct_sserv5_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
-        {nYears > 0 && <>
-          <SubHead text="Service level CAGRs (calculated)" />
-          {[
-            { name: ss[0], s: inputs.sanitation_service.pct_sserv1_start, b: inputs.sanitation_service.pct_sserv1_baseline },
-            { name: ss[1], s: inputs.sanitation_service.pct_sserv2_start, b: inputs.sanitation_service.pct_sserv2_baseline },
-            { name: ss[2], s: inputs.sanitation_service.pct_sserv3_start, b: inputs.sanitation_service.pct_sserv3_baseline },
-            { name: ss[3], s: inputs.sanitation_service.pct_sserv4_start, b: inputs.sanitation_service.pct_sserv4_baseline },
-            { name: ss[4], s: inputs.sanitation_service.pct_sserv5_start, b: inputs.sanitation_service.pct_sserv5_baseline },
-          ].map((lv, i) => (
-            <F key={i} label={`CAGR ${lv.name}`} value={cagr(lv.s || 0.0001, lv.b || 0.0001, nYears)} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`${(lv.s*100).toFixed(2)}% → ${(lv.b*100).toFixed(2)}% over ${nYears} years`} />
-          ))}
-        </>}
-      </Section>
-      )}
-
       {/* ===== TARGETS (sector-dependent) ===== */}
       {bauSector === 'water' && (
-      <Section title="5. Water Supply Targets" cols={2} sectionKey="ws_targets" onFocus={onSectionFocus}>
+      <Section title="3. Water Supply Targets" cols={2} sectionKey="ws_targets" onFocus={onSectionFocus}>
         <SubHead text="Service Targets" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
@@ -445,7 +412,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title="5. Sanitation Targets" cols={2} sectionKey="san_targets" onFocus={onSectionFocus}>
+      <Section title="3. Sanitation Targets" cols={2} sectionKey="san_targets" onFocus={onSectionFocus}>
         <SubHead text="On-site sanitation" />
         <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed households served by on-site systems (septic tanks with fecal sludge collection), as opposed to sewered systems." />
         <SubHead text="Service Targets" />
@@ -471,7 +438,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== UNIT COSTS (sector-dependent) ===== */}
       {bauSector === 'water' && (
-      <Section title="6. Water Supply Unit Costs" cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
+      <Section title="4. Water Supply Unit Costs" cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Distribution network cost per HH" />
         <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => u('water_costs','network_cost_per_hh_serv1',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network. Costs are for the baseline year." />
         <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => u('water_costs','network_cost_per_hh_serv2',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network. Costs are for the baseline year." />
@@ -487,7 +454,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title="6. Sanitation Unit Costs" cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
+      <Section title="4. Sanitation Unit Costs" cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Sewerage cost per HH" />
         <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv1',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection. Costs are for the baseline year." />
         <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv2',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection. Costs are for the baseline year." />
@@ -503,8 +470,8 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       )}
 
       {/* ===== BAU INVESTMENT ===== */}
-      <Section title="7. Planned Investments" cols={2} sectionKey="planned_investments" onFocus={onSectionFocus}>
-        <div style={{ fontSize: 11, color: '#475569', marginBottom: 8, padding: '6px 10px', background: '#f0f9ff', borderRadius: 4, lineHeight: 1.5, border: '1px solid #bae6fd' }}>
+      <Section title="5. Planned Investments" cols={2} sectionKey="planned_investments" onFocus={onSectionFocus}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', marginBottom: 8, padding: '6px 10px', background: '#f0f9ff', borderRadius: 4, lineHeight: 1.5, border: '1px solid #bae6fd' }}>
           If there are programmed investments that represent a shift from historical spending — additional to past trends, with financing secured and genuinely likely to proceed — enter them here as part of the BAU scenario.
         </div>
         <SubHead text="Investment periods" />
@@ -591,11 +558,11 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                   <button onClick={() => removePeriod(idx)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '3px 8px', cursor: 'pointer', fontSize: 11 }}>✕ Remove</button>
                 </div>
                 {hasOverlap && <div style={{ fontSize: 10, fontWeight: 600, color: '#dc2626', marginBottom: 4 }}>⚠ This period overlaps with another — investments would be double-counted</div>}
-                {mode === 'custom' && <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                {mode === 'custom' && <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start', marginBottom: 8 }}>
                   <F label="Start year" value={p.start} onChange={v => updatePeriod(idx, 'start', v)} />
                   <F label="End year" value={p.end} onChange={v => updatePeriod(idx, 'end', v)} min={p.start} />
                 </div>}
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start' }}>
                   <F label="Planned water supply investment" value={p.ws_inv || 0} onChange={v => updatePeriod(idx, 'ws_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned water supply investment for this period" />
                   <F label="Planned sanitation investment" value={p.san_inv || 0} onChange={v => updatePeriod(idx, 'san_inv', v)} step={100} unit={`${CUR} M`} min={0} max={1000000} tip="Planned sanitation investment for this period" />
                 </div>
@@ -631,7 +598,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== TECHNICAL ===== */}
-      <Section title="8. Technical Parameters" cols={2} sectionKey="technical" onFocus={onSectionFocus}>
+      <Section title="6. Technical Parameters" cols={2} sectionKey="technical" onFocus={onSectionFocus}>
         <SubHead text="Water supply" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="% water sold to non-household" value={inputs.technical.ws_non_hh_pct || 0} onChange={v => u('technical','ws_non_hh_pct',v)} isPercent unit="%" tip="Share of water sold to non-household customers (commercial, industrial, institutional)" />
@@ -656,7 +623,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {isInterventions && <>
       {/* ===== WATER INTERVENTIONS ===== */}
-      <Section title="9. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
+      <Section title="7. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -714,7 +681,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== SANITATION INTERVENTIONS ===== */}
-      <Section title="10. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
+      <Section title="8. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -762,7 +729,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </Section>
 
       {/* ===== CUSTOM INTERVENTIONS ===== */}
-      <Section title="11. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
+      <Section title="9. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
         {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
           const updateCI = (field: string, val: any) => {
             const arr = [...inputs.custom_interventions];

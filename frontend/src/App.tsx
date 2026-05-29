@@ -86,7 +86,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Intervention Inputs', 'Results Dashboard', 'Export'];
+  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Intervention Inputs & Graph', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -317,44 +317,45 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
       <style>{`@keyframes bounceArrow { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }`}</style>
 
       {!closing && (
-        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 600, width: '92%', maxHeight: '85vh', overflowY: 'auto', padding: '28px 36px' }} onClick={e => e.stopPropagation()}>
-          <h2 style={{ fontSize: 22, color: '#002244', marginBottom: 6 }}>Tool Overview</h2>
-          <p style={{ fontSize: 14, color: '#475569', marginBottom: 20, lineHeight: 1.6 }}>
+        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 820, width: '94%', maxHeight: '94vh', overflowY: 'auto', padding: '20px 32px' }} onClick={e => e.stopPropagation()}>
+          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 4px' }}>Tool Overview</h2>
+          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px', lineHeight: 1.5 }}>
             Work through the tabs from left to right. Select your geographic scope (Urban, Rural, or National) before entering data.
           </p>
 
-          <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
-            <li style={{ marginBottom: 12 }}>
+          <ol style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
+            <li style={{ marginBottom: 5 }}>
               <strong>General Inputs</strong> — Enter country, region & currency, then a single year-by-year table covering economic data (GDP, inflation, exchange rate), demographics (population, households), and budget & execution (allocated and actual spend). Growth rates and execution rates are auto-calculated.
             </li>
-            <li style={{ marginBottom: 12 }}>
+            <li style={{ marginBottom: 5 }}>
               <strong>BAU Inputs & Graph</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, and unit costs for the selected sector, plus shared planned investments and technical parameters. The BAU graph on the right updates with your inputs and geographic scope.
             </li>
-            <li style={{ marginBottom: 12 }}>
-              <strong>Intervention Inputs</strong> — Switch between Water Supply and Sanitation, then toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and (for sanitation) microfinance. Add custom interventions at the bottom.
+            <li style={{ marginBottom: 5 }}>
+              <strong>Intervention Inputs & Graph</strong> — Switch between Water Supply and Sanitation, then toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and (for sanitation) microfinance. Add custom interventions at the bottom.
             </li>
-            <li style={{ marginBottom: 12 }}>
+            <li style={{ marginBottom: 5 }}>
               <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see their impact. Charts compare BAU vs intervention scenarios.
             </li>
-            <li style={{ marginBottom: 12 }}>
+            <li style={{ marginBottom: 5 }}>
               <strong>Export</strong> — Download results as PowerPoint, Excel, or CSV for reporting and further analysis.
             </li>
           </ol>
 
-          <div style={{ marginTop: 16, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569', border: '1px solid #e2e8f0' }}>
+          <div style={{ marginTop: 10, padding: '8px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#475569', border: '1px solid #e2e8f0', lineHeight: 1.45 }}>
             <strong>Geographic scope:</strong> Use the Urban / Rural / National selector at the top of the first three tabs. National combines urban and rural. The Guide panel on the right of input tabs opens automatically with help for whichever section you are editing.
           </div>
 
-          <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0f4ff', borderRadius: 8, fontSize: 13, color: '#312e81', border: '1px solid #c7d2fe' }}>
-            <strong>Tip:</strong> You can reopen this overview anytime by clicking <strong>"📖 Tool Overview"</strong> in the top-right corner of the header.
-          </div>
-
-          <div style={{ marginTop: 12, padding: '12px 16px', background: '#fef3c7', borderRadius: 8, fontSize: 13, color: '#92400e' }}>
-            <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
+          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+            <div style={{ flex: 1, padding: '8px 14px', background: '#f0f4ff', borderRadius: 8, fontSize: 12, color: '#312e81', border: '1px solid #c7d2fe', lineHeight: 1.45 }}>
+              <strong>Tip:</strong> Reopen this overview anytime via <strong>"📖 Tool Overview"</strong> in the top-right of the header.
+            </div>
+            <div style={{ flex: 1, padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e', lineHeight: 1.45 }}>
+              <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
+            </div>
           </div>
 
           <button onClick={handleGetStarted}
-            style={{ marginTop: 18, width: '100%', padding: '12px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
+            style={{ marginTop: 12, width: '100%', padding: '11px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
             Get Started
           </button>
         </div>
@@ -377,30 +378,162 @@ function SectorToggle({ value, onChange }: { value: 'water' | 'sanitation'; onCh
   );
 }
 
+// ── Guide content helpers ──
+const gSub: React.CSSProperties = { fontWeight: 700, color: '#1e40af', fontSize: 11.5, margin: '12px 0 4px' };
+const gFieldLbl: React.CSSProperties = { fontWeight: 700, color: '#334155' };
+const gNote: React.CSSProperties = { display: 'block', fontStyle: 'italic', color: '#64748b', margin: '2px 0 0' };
+const gFieldWrap: React.CSSProperties = { marginBottom: 8 };
+function GFind({ items }: { items: string[] }) {
+  return (
+    <div style={{ margin: '3px 0 0' }}>
+      <div style={{ fontWeight: 600, color: '#475569' }}>How to find it:</div>
+      <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+        {items.map((it, i) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
+      </ul>
+    </div>
+  );
+}
+
 // Contextual guide content keyed by sectionKey
-const contextualGuide: Record<string, { title: string; content: string; sources?: { name: string; url: string }[] }> = {
+const contextualGuide: Record<string, { title: string; content: React.ReactNode; sources?: { name: string; url: string }[] }> = {
   country: {
-    title: 'Country, Region & Currency',
-    content: 'Select the country and sub-national region for the analysis. The currency code determines the unit for all monetary inputs throughout the tool. Changing the country will auto-fill the currency if recognized.',
+    title: 'Country & Region',
+    content: 'Select the country and sub-national region for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed.',
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
   macro: {
     title: 'Time Scales & Macroeconomics',
-    content: 'Define the analysis time frame and enter year-by-year macroeconomic data. Model start year must be at least 3 years before baseline. Enter nominal GDP (not real) — the tool converts to real prices. GDP growth is auto-calculated. Population, household, and budget execution data are also entered here by year. For forecast years, enter projected values.',
-    sources: [
-      { name: 'IMF World Economic Outlook', url: 'https://www.imf.org/en/Publications/WEO' },
-      { name: 'World Bank Indicators', url: 'https://data.worldbank.org/' },
-      { name: 'UN Population Division', url: 'https://population.un.org/wpp/' },
-    ],
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool.</p>
+
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Model Start Year:</span> The first year of the analysis period. The tool will compute information for every year from the Model Start Year up to the Baseline Year, building the historical record used to construct the Business-as-Usual (BAU) scenario.
+          <span style={gNote}>Note: You must have data for at least two historical years from the Model start year to the baseline year, with a gap of at least 2 years, for the tool to build the BAU scenario optimally. For example, if the baseline year is 2026, the model start year must be at least 2022, with data available for inputting the 2022 and 2024 numbers.</span>
+        </div>
+
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Baseline Year:</span> The present year or the most recent year with complete data, marking the end of the historical analysis period.
+          <span style={gNote}>Note: The Baseline Year must be within three years of the present.</span>
+        </div>
+
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Forecast End Year:</span> The last year of the tool's projection.
+          <span style={gNote}>Note: Must be in the future.</span>
+        </div>
+
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Performance improvement start:</span> The year in which interventions start closing the service level gap.
+          <span style={gNote}>Note: This should be after the baseline year with a reasonable gap for the interventions to take effect. For example, if the baseline is 2026, the financing might not be received for a year, and it might take another year for the intervention's effects to start showing, so 2028 would be a reasonable start year for performance improvement.</span>
+        </div>
+
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Target year:</span> This is the first interim year for which targets will be set. For example, if national targets aim to reach 100% access by 2050, there would be interim targets such as 60% access by 2030 and 80% access by 2040. In this case, the first target year would be 2030, the target year 2 would be 2040, and the model end year would be 2050.
+          <span style={gNote}>Note: If there is only one interim target year, please set target year 2 to the same as the model end year.</span>
+        </div>
+
+        <div style={gSub}>Macroeconomic assumptions</div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Water supply budget as % of GDP:</span> Please enter an average % of total GDP that is spent on providing water supply services in the region.
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Sanitation supply budget as % of GDP:</span> Please enter an average % of total GDP that is spent on providing sanitation supply services in the region.
+        </div>
+
+        <div style={gSub}>Year-by-year data</div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Nominal GDP ($B):</span> The total monetary value of all goods and services produced in the selected country in a given year, expressed in billions of US dollars (current prices). This is used to contextualize investment needs and fiscal capacity over the analysis period.
+          <GFind items={[
+            'World Bank – data.worldbank.org/indicator/NY.GDP.MKTP.CD (GDP in current USD by country)',
+            'IMF World Economic Outlook Database – imf.org/en/Publications/WEO',
+            "Your country's central bank or ministry of finance",
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Inflation Local (%):</span> The annual inflation rate for the selected country, expressed as a percentage. Used to adjust local currency monetary values over time.
+          <GFind items={[
+            'World Bank – data.worldbank.org/indicator/FP.CPI.TOTL.ZG',
+            'IMF World Economic Outlook Database – imf.org/en/Publications/WEO',
+            'Your country\'s central bank or national statistics office (search "[country] central bank CPI inflation")',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Inflation US (%):</span> The annual US inflation rate, expressed as a percentage. Used to adjust USD-denominated values over time.
+          <GFind items={[
+            'US Bureau of Labor Statistics (BLS) – bls.gov/cpi',
+            'Federal Reserve Economic Data (FRED) – fred.stlouisfed.org/series/FPCPITOTLZGUSA',
+            'World Bank – data.worldbank.org/indicator/FP.CPI.TOTL.ZG?locations=US',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>USD to Local Currency Exchange Rate (USD/local currency):</span> The number of local currency units per 1 US Dollar for each year of the analysis. Used to convert between USD and local currency throughout the model.
+          <span style={gNote}>Note: Use annual average rates rather than spot rates for consistency across the analysis period.</span>
+          <GFind items={[
+            'OANDA – oanda.com/currency-converter (historical average exchange rates)',
+            'Federal Reserve Economic Data (FRED) – fred.stlouisfed.org (search your currency pair, e.g. "USD to NPR")',
+            'World Bank – data.worldbank.org/indicator/PA.NUS.FCRF (official exchange rates by country)',
+            "Your country's central bank (most publish official annual average exchange rates)",
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Urban Population:</span> The total number of people living in urban areas within the selected region for each year of the analysis. This forms the baseline from which the model calculates growth and infrastructure demand.
+          <GFind items={[
+            'World Bank – data.worldbank.org/indicator/SP.URB.TOTL',
+            'UN World Urbanization Prospects – population.un.org/wup',
+            'Your country\'s national statistics office (for sub-national breakdowns, search "[country] national statistics population census")',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Households (in millions):</span> The total number of occupied households in the selected urban area for each year of the analysis. Used to estimate residential demand for water and sanitation services.
+          <GFind items={[
+            "Your country's national statistics office or census bureau (search \"[country] housing census households\")",
+            'UN Statistics Division – unstats.un.org',
+          ]} />
+          <span style={gNote}>Note: If household data is unavailable, it can be estimated by dividing the urban population by the average household size.</span>
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Water Supply (WS) Budget Allocated (in millions):</span> The total budget allocated for water supply infrastructure and services in a given year, expressed in millions of local currency. Sourced from government budget documents.
+          <GFind items={[
+            "Your country's Ministry of Finance (annual budget documents and Red Books)",
+            "Your country's Ministry of Water Supply or equivalent sector ministry",
+            'Municipal or utility budget reports (for sub-national analysis)',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Water Supply (WS) Actual Expenditure (in millions):</span> The amount actually spent on water supply in a given year, expressed in millions of local currency. May differ from the allocated budget due to implementation delays or capacity constraints.
+          <GFind items={[
+            "Your country's Ministry of Finance (budget execution reports or annual financial statements)",
+            "Your country's Ministry of Water Supply or equivalent sector ministry",
+            'National audit reports or public financial management systems',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Sanitation (SAN) Budget Allocated (in millions):</span> The total budget allocated for sanitation infrastructure and services in a given year, expressed in millions of local currency.
+          <GFind items={[
+            "Your country's Ministry of Finance (annual budget documents)",
+            "Your country's Ministry of Water Supply, Sanitation, or equivalent sector ministry",
+            'Municipal or utility budget reports (for sub-national analysis)',
+          ]} />
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Sanitation (SAN) Actual Expenditure (in Millions):</span> The amount actually spent on sanitation in a given year, expressed in millions of local currency.
+          <GFind items={[
+            "Your country's Ministry of Finance (budget execution reports or annual financial statements)",
+            "Your country's Ministry of Water Supply, Sanitation, or equivalent sector ministry",
+            'National audit reports or public financial management systems',
+          ]} />
+        </div>
+      </div>
+    ),
   },
   ws_service_levels: {
     title: 'Water Supply Service Levels',
-    content: 'Enter the percentage of households at each of the 5 JMP service levels for both the start year and baseline year. All 5 levels must sum to 100%. The model uses these to calculate historical CAGRs and project BAU service levels forward. Enter data for all historical years you have — minimum 2 data points required.',
+    content: 'Enter the percentage of households at each of the 5 JMP service levels for both the start year and baseline year. All 5 levels must sum to 100%. The model uses these to calculate historical CAGRs and project BAU service levels forward. Enter data for all historical years you have data for. If some are empty and data is unavailable, that is fine, but a minimum of 2 data points is required.',
     sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
   },
   san_service_levels: {
-    title: 'Sanitation Service Levels',
-    content: 'Same as water supply but for the 5 sanitation service levels. Includes sewered and on-site sanitation. All 5 levels must sum to 100%.',
+    title: 'Sanitation Supply Service Levels',
+    content: 'Enter the percentage of households at each of the 5 JMP service levels for both the start year and baseline year. All 5 levels must sum to 100%. The model uses these to calculate historical CAGRs and project BAU service levels forward. Enter data for all historical years you have data for. If some are empty and data is unavailable, that is fine, but a minimum of 2 data points is required.',
     sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
   },
   ws_targets: {
@@ -415,12 +548,12 @@ const contextualGuide: Record<string, { title: string; content: string; sources?
   },
   ws_unit_costs: {
     title: 'Water Supply Unit Costs',
-    content: 'Enter the capital cost per household to connect to the distribution network at each service level (except No Service). Also enter the cost per MLD of water treatment and costs for non-piped solutions. All costs should be in real terms at the base year price level.',
+    content: "Enter the capital cost per household to connect to the distribution network at each service level (except No Service). Also, enter the cost per MLD of water treatment and costs for non-piped solutions. All costs should be in real terms at the base year price level. You can use costs for each distribution network and water treatment from the utility's data, and average prices for non-piped solutions from web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   san_unit_costs: {
-    title: 'Sanitation Unit Costs',
-    content: 'Enter sewerage cost per household at each service level, cost per MLD of wastewater treatment, on-site facility capex, and fecal sludge treatment costs.',
+    title: 'Sanitation Supply Unit Costs',
+    content: "Enter sewerage cost per household at each service level, cost per MLD of wastewater treatment, on-site facility capex, and fecal sludge treatment costs. All costs should be in real terms at the base year price level. You can use costs for each distribution network and water treatment from the utility's data, and average costs for on-site solutions from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   planned_investments: {
@@ -438,7 +571,7 @@ const contextualGuide: Record<string, { title: string; content: string; sources?
   },
   ws_interventions: {
     title: 'Water Supply Interventions',
-    content: 'Define intervention parameters for water supply: collection efficiency, NRW reduction (target minimum 3%), capital efficiency, tariff reform, borrowing, and budget execution improvement. Each intervention can be toggled on/off. NRW target cannot go below 3% — even the best utilities globally achieve only 3-5%.',
+    content: 'Define intervention parameters for water supply: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Each intervention can be toggled on/off. The NRW target cannot go below 3%, as even the best utilities globally achieve only 3-5%.',
   },
   san_interventions: {
     title: 'Sanitation Interventions',
@@ -502,7 +635,7 @@ function DataGuide({ tab, activeSection }: { tab: number; activeSection: string 
                         {s.url !== '#' ? (
                           <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: '#4338ca' }}>{s.name}</a>
                         ) : (
-                          <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>{s.name} (URL to be added)</span>
+                          <span style={{ color: '#475569' }}>{s.name}</span>
                         )}
                       </div>
                     ))}

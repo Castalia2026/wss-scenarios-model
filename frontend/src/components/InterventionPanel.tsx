@@ -32,7 +32,7 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
     }}>
-      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500 }} title={tip || undefined}>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500, minHeight: 32 }} title={tip || undefined}>
         {label}
         {tip && <span style={{
           width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
@@ -74,7 +74,7 @@ function InterventionToggle({ label, checked, onChange, children, onFocus }: {
         {checked && <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500 }}>▾ Configure</span>}
       </label>
       {checked && (
-        <div style={{ padding: '10px 14px', background: '#fff', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'end' }}>
+        <div style={{ padding: '10px 14px', background: '#fff', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start' }}>
           {children}
         </div>
       )}
@@ -126,7 +126,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             <F label="Start year" value={inputs.water_interventions.nrw_start_year} onChange={v => u('water_interventions','nrw_start_year',v)} tip="Year the NRW reduction programme begins" />
             <F label="Target year" value={inputs.water_interventions.nrw_target_year} onChange={v => u('water_interventions','nrw_target_year',v)} tip="Year the target NRW level is achieved" />
             <F label="Current NRW %" value={inputs.water_interventions.nrw_current_pct} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Current non-revenue water: share of water produced that is not billed (physical leaks + commercial losses)" />
-            <F label="Target NRW %" value={inputs.water_interventions.nrw_target_pct} onChange={v => u('water_interventions','nrw_target_pct',v)} isPercent unit="%" tip="Target non-revenue water for the model end year. Minimum 3% — even the best utilities cannot go below this." />
+            <F label="Target NRW %" value={inputs.water_interventions.nrw_target_pct} onChange={v => u('water_interventions','nrw_target_pct',v)} isPercent unit="%" tip="Target non-revenue water for the model end year (minimum 3%)." />
             {(() => {
               const t = inputs.water_interventions.nrw_target_pct || 0;
               if (t > 0 && t < 0.03) return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: '#dc2626', padding: '3px 8px', background: '#fef2f2', borderRadius: 4, marginBottom: 4 }}>⛔ Below 3% is unrealistic</div>;
