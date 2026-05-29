@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { InterventionImpactChart } from './StaticCharts';
 
-function Section({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+function Section({ title, children, defaultOpen = false, sectionKey, onFocus }: { title: string; children: React.ReactNode; defaultOpen?: boolean; sectionKey?: string; onFocus?: (key: string) => void }) {
   const [open, setOpen] = useState(defaultOpen);
+  const handleClick = () => { const willOpen = !open; setOpen(willOpen); if (willOpen && sectionKey && onFocus) onFocus(sectionKey); };
   return (
     <div style={{ marginBottom: 8, border: '1px solid #ddd', borderRadius: 8, background: '#fff' }}>
-      <button onClick={() => setOpen(!open)} style={{
+      <button onClick={handleClick} style={{
         width: '100%', padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
         border: 'none', background: open ? '#e8f0fe' : '#fff', fontWeight: 600,
         fontSize: 14, borderRadius: 8, display: 'flex', justifyContent: 'space-between',
@@ -229,7 +230,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
         {/* ===== CUSTOM INTERVENTIONS (always visible) ===== */}
         <div style={{ marginTop: 16 }}>
-          <Section title="Custom Interventions">
+          <Section title="Custom Interventions" sectionKey="custom_interventions" onFocus={onSectionFocus}>
             <div style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '6px 8px', borderRadius: 4, marginBottom: 8 }}>
               Custom interventions are saved with your scenario. In the full tool, they will affect calculations.
             </div>
