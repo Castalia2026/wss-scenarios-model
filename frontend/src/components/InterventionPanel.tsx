@@ -182,7 +182,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
           <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.ws_budget_execution_enabled ?? false} onChange={v => toggleIntv('ws_budget_execution_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
             <F label="Start year" value={inputs.water_interventions.budget_exec_start_year || 0} onChange={v => u('water_interventions','budget_exec_start_year',v)} tip="Year budget execution improvements begin" />
-            <F label="Current execution rate (calculated)" value={inputs.water_interventions.budget_exec_current_rate || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Current budget execution rate, calculated from actual expenditure ÷ allocated budget in General Inputs" />
+            <F label="Current execution rate (calculated)" value={inputs.water_interventions.budget_exec_current_rate || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Current budget execution rate, calculated from actual expenditure ÷ allocated budget in Data Inputs" />
             <F label="Target execution rate" value={inputs.water_interventions.budget_exec_target_rate || 0} onChange={v => u('water_interventions','budget_exec_target_rate',v)} isPercent unit="%" tip="Target share of allocated budget that is actually spent each year" />
           </InterventionToggle>
         </>}
@@ -226,7 +226,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
           <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.san_budget_execution_enabled ?? false} onChange={v => toggleIntv('san_budget_execution_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
             <F label="Start year" value={inputs.sanitation_interventions.budget_exec_start_year || 0} onChange={v => u('sanitation_interventions','budget_exec_start_year',v)} tip="Year budget execution improvements begin" />
-            <F label="Current execution rate (calculated)" value={inputs.sanitation_interventions.budget_exec_current_rate || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Current budget execution rate, calculated from actual expenditure ÷ allocated budget in General Inputs" />
+            <F label="Current execution rate (calculated)" value={inputs.sanitation_interventions.budget_exec_current_rate || 0} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Current budget execution rate, calculated from actual expenditure ÷ allocated budget in Data Inputs" />
             <F label="Target execution rate" value={inputs.sanitation_interventions.budget_exec_target_rate || 0} onChange={v => u('sanitation_interventions','budget_exec_target_rate',v)} isPercent unit="%" tip="Target share of allocated budget that is actually spent each year" />
           </InterventionToggle>
 

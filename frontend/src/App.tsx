@@ -99,7 +99,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Intervention Inputs & Graph', 'Results Dashboard', 'Export'];
+  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -351,36 +351,45 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
       {!closing && (
         <div style={{ background: '#fff', borderRadius: 12, maxWidth: 820, width: '94%', maxHeight: '94vh', overflowY: 'auto', padding: '20px 32px' }} onClick={e => e.stopPropagation()}>
-          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 4px' }}>Tool Overview</h2>
-          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px', lineHeight: 1.5 }}>
-            Work through the tabs from left to right. Select your geographic scope (Urban, Rural, Urban + Rural, or National) before entering data.
+          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 4px' }}>How to use this tool</h2>
+          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px', lineHeight: 1.5 }}>
+            Follow these steps in order. Tabs run left to right, and the <strong>Guide</strong> panel on the right of each input tab gives field-by-field help for whatever section you are editing.
           </p>
 
-          <ol style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
-            <li style={{ marginBottom: 5 }}>
-              <strong>General Inputs</strong> — Enter country, region & currency, then a single year-by-year table covering economic data (GDP, inflation, exchange rate), demographics (population, households), and budget & execution (allocated and actual spend). Growth rates and execution rates are auto-calculated.
+          {/* Step 1 — emphasised because these selections come first */}
+          <div style={{ display: 'flex', gap: 10, padding: '10px 14px', borderRadius: 8, background: '#EBF6FB', border: '1px solid #b6e0f0', marginBottom: 10 }}>
+            <div style={{ flexShrink: 0, width: 22, height: 22, borderRadius: '50%', background: '#0073A8', color: '#fff', fontWeight: 700, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>1</div>
+            <div style={{ fontSize: 13, color: '#0e3a52', lineHeight: 1.45 }}>
+              <strong>Make your selections first.</strong>
+              <ul style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                <li><strong>Geographic scope</strong> — use the selector at the top of the screen before entering any data: <strong>Urban</strong> or <strong>Rural</strong> (one area-specific data set), <strong>Urban + Rural</strong> (enter both via the Urban | Rural sub-toggle; the graph aggregates them to national), or <strong>National</strong> (a single national data set).</li>
+                <li><strong>Sector</strong> — on the input tabs, use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering. Switch between the two to complete both.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Steps 2+ — one per tab */}
+          <ol start={2} style={{ margin: 0, padding: '0 0 0 20px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
+            <li style={{ marginBottom: 6 }}>
+              <strong>Data Inputs</strong> — In <em>§1 Country, Region &amp; Currency</em> select your country (currency auto-fills). In <em>§2 Time Scales &amp; Macroeconomics</em> set the key dates, choose how to provide the WSS budget (as % of GDP or directly year-by-year), then complete the year-by-year table: economic data (GDP, inflation, exchange rate), demographics (population, households), budget &amp; execution, and historical water/sanitation service levels. Growth rates, household size, and execution rates calculate automatically; forecast-year service levels are derived from your BAU targets. The BAU data entry also appears further down this tab — select Water Supply or Sanitation there to fill each sector.
             </li>
-            <li style={{ marginBottom: 5 }}>
-              <strong>BAU Inputs & Graph</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, and unit costs for the selected sector, plus shared planned investments and technical parameters. The BAU graph on the right updates with your inputs and geographic scope.
+            <li style={{ marginBottom: 6 }}>
+              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, <em>Planned Investments</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab, and the BAU graph on the right updates live as you type.
             </li>
-            <li style={{ marginBottom: 5 }}>
-              <strong>Intervention Inputs & Graph</strong> — Switch between Water Supply and Sanitation, then toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and (for sanitation) microfinance. Add custom interventions at the bottom.
+            <li style={{ marginBottom: 6 }}>
+              <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on/off with its toggle and set its parameters (collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation). Add your own under <em>Custom Interventions</em> at the bottom; the impact graph updates live.
             </li>
-            <li style={{ marginBottom: 5 }}>
-              <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see their impact. Charts compare BAU vs intervention scenarios.
+            <li style={{ marginBottom: 6 }}>
+              <strong>Results Dashboard</strong> — Compare BAU vs intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap.
             </li>
-            <li style={{ marginBottom: 5 }}>
-              <strong>Export</strong> — Download results as PowerPoint, Excel, or CSV for reporting and further analysis.
+            <li style={{ marginBottom: 0 }}>
+              <strong>Export</strong> — Download your results as PowerPoint, Excel or CSV.
             </li>
           </ol>
 
-          <div style={{ marginTop: 10, padding: '8px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#475569', border: '1px solid #e2e8f0', lineHeight: 1.45 }}>
-            <strong>Geographic scope:</strong> Use the Urban / Rural / Urban + Rural / National selector at the top of the first four tabs. <strong>Urban</strong> and <strong>Rural</strong> each take one area-specific data set; <strong>Urban + Rural</strong> lets you enter both (via an Urban | Rural sub-toggle) and aggregates them to national in the graph; <strong>National</strong> takes a single national data set. The Guide panel on the right of input tabs opens automatically with help for whichever section you are editing.
-          </div>
-
-          <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
+          <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <div style={{ flex: 1, padding: '8px 14px', background: '#f0f4ff', borderRadius: 8, fontSize: 12, color: '#312e81', border: '1px solid #c7d2fe', lineHeight: 1.45 }}>
-              <strong>Tip:</strong> Reopen this overview anytime via <strong>"📖 Tool Overview"</strong> in the top-right of the header.
+              <strong>Tip:</strong> Reopen this guide anytime via <strong>"📖 Tool Overview"</strong> in the top-right of the header.
             </div>
             <div style={{ flex: 1, padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e', lineHeight: 1.45 }}>
               <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
@@ -642,11 +651,11 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 
 // Which guide sections belong to each tab (only these show in that tab's Guide panel)
 const guideKeysByTab: Record<number, string[]> = {
-  // General Inputs — includes the BAU data entry duplicated onto this tab
+  // Data Inputs — includes the BAU data entry duplicated onto this tab
   0: ['country', 'macro', 'ws_service_levels', 'san_service_levels', 'ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
-  // BAU Inputs & Graph
+  // BAU Scenario
   1: ['ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
-  // Intervention Inputs & Graph
+  // Intervention Design
   2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
 };
 
