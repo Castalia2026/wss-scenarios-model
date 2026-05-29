@@ -92,11 +92,23 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
     onChange({ ...inputs, toggles: { ...inputs.toggles, [field]: value } });
   };
   const CUR = inputs?.country_config?.currency || 'LCU';
+  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
+  const scopeLower = scopeLabel.toLowerCase();
 
   return (
     <div style={{ display: 'flex', width: '100%', overflow: 'hidden' }}>
       {/* Left: intervention controls */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 12 }}>
+
+        {/* Area-scope banner */}
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+          padding: '8px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+          background: '#EBF6FB', border: '1px solid #b6e0f0', color: '#0073A8',
+        }}>
+          <span style={{ fontSize: 14 }}>📍</span>
+          Configuring <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> interventions — every field below is {scopeLower}-specific.
+        </div>
 
         {/* Sector toggle */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
@@ -111,7 +123,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
         {/* ===== WATER SUPPLY INTERVENTIONS ===== */}
         {sectorTab === 'water' && <>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>Water Supply Interventions</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Water Supply Interventions</h3>
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? true} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
             <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />
@@ -177,7 +189,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
         {/* ===== SANITATION INTERVENTIONS ===== */}
         {sectorTab === 'sanitation' && <>
-          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>Sanitation Interventions</h3>
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Sanitation Interventions</h3>
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.san_collection_enabled ?? true} onChange={v => toggleIntv('san_collection_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
             <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />

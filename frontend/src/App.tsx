@@ -11,7 +11,9 @@ export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(true);
   const [profileList, setProfileList] = useState<string[]>([]);
   const [scenarios, setScenarios] = useState<{name: string, inputs: any}[]>([]);
-  const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
+  const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'urban_rural' | 'national'>('urban');
+  const [subArea, setSubArea] = useState<'urban' | 'rural'>('urban');
+  const [altInputs, setAltInputs] = useState<Record<string, any>>({});
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
   const [showGuide, setShowGuide] = useState(false);
   const [guideSection, setGuideSection] = useState<string | null>(null);
@@ -47,6 +49,17 @@ export default function App() {
   const handleSetInputs = useCallback((newInputs: any) => {
     setInputs(resizeMacroArrays(newInputs));
   }, [resizeMacroArrays]);
+
+  // Which single area the input forms currently represent.
+  // For "urban_rural" mode the Urban|Rural sub-toggle decides; the graph aggregates to national.
+  const inputScope = geoScope === 'urban_rural' ? subArea : geoScope; // 'urban' | 'rural' | 'national'
+  // 'urban' is the primary dataset (held in `inputs`); other areas keep their own dataset in altInputs.
+  const activeInputs = inputScope === 'urban' ? inputs : (altInputs[inputScope] ?? inputs);
+  const handleSetActiveInputs = useCallback((newInputs: any) => {
+    const resized = resizeMacroArrays(newInputs);
+    if (inputScope === 'urban') setInputs(resized);
+    else setAltInputs(prev => ({ ...prev, [inputScope]: resized }));
+  }, [resizeMacroArrays, inputScope]);
 
   const saveScenario = () => {
     const name = prompt('Name this scenario:');
@@ -185,33 +198,53 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Geo scope bar — shown on tabs 0, 1, 2 */}
         {activeTab <= 3 && (
-          <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Geographic scope:</span>
-            {(['urban', 'rural', 'national'] as const).map(g => (
-              <button key={g} onClick={() => setGeoScope(g)} style={{
+            {([
+              { key: 'urban', label: 'Urban' },
+              { key: 'rural', label: 'Rural' },
+              { key: 'urban_rural', label: 'Urban + Rural' },
+              { key: 'national', label: 'National' },
+            ] as const).map(g => (
+              <button key={g.key} onClick={() => setGeoScope(g.key)} style={{
                 padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                background: geoScope === g ? '#2563eb' : '#fff',
-                color: geoScope === g ? '#fff' : '#374151',
-                fontWeight: geoScope === g ? 700 : 500, fontSize: 13,
-                boxShadow: geoScope === g ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
-                textTransform: 'capitalize', transition: 'all 0.15s',
-              }}>{g}</button>
+                background: geoScope === g.key ? '#2563eb' : '#fff',
+                color: geoScope === g.key ? '#fff' : '#374151',
+                fontWeight: geoScope === g.key ? 700 : 500, fontSize: 13,
+                boxShadow: geoScope === g.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
+                transition: 'all 0.15s',
+              }}>{g.label}</button>
             ))}
+            {geoScope === 'urban_rural' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, paddingLeft: 12, borderLeft: '1px solid #c7d2fe' }}>
+                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
+                {(['urban', 'rural'] as const).map(a => (
+                  <button key={a} onClick={() => setSubArea(a)} style={{
+                    padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
+                    background: subArea === a ? '#312e81' : '#fff',
+                    color: subArea === a ? '#fff' : '#475569',
+                    fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s',
+                    textTransform: 'capitalize',
+                  }}>{a}</button>
+                ))}
+                <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Urban &amp; Rural are entered separately and aggregated to National in the graph.</span>
+              </div>
+            )}
           </div>
         )}
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {activeTab === 1 && inputs && (<>
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
             <BAUForecastChart sector={sectorTab} geoScope={geoScope} />
           </div>
         </>)}
         {activeTab === 2 && inputs && (
-          <InterventionPanel inputs={inputs} onChange={handleSetInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={geoScope} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InterventionPanel inputs={activeInputs} onChange={handleSetActiveInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={inputScope} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {/* Guide panel — tabs 0, 1, 2 */}
         {activeTab <= 2 && (
@@ -320,7 +353,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
         <div style={{ background: '#fff', borderRadius: 12, maxWidth: 820, width: '94%', maxHeight: '94vh', overflowY: 'auto', padding: '20px 32px' }} onClick={e => e.stopPropagation()}>
           <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 4px' }}>Tool Overview</h2>
           <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px', lineHeight: 1.5 }}>
-            Work through the tabs from left to right. Select your geographic scope (Urban, Rural, or National) before entering data.
+            Work through the tabs from left to right. Select your geographic scope (Urban, Rural, Urban + Rural, or National) before entering data.
           </p>
 
           <ol style={{ margin: 0, padding: '0 0 0 18px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
@@ -342,7 +375,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           </ol>
 
           <div style={{ marginTop: 10, padding: '8px 14px', background: '#f8fafc', borderRadius: 8, fontSize: 12, color: '#475569', border: '1px solid #e2e8f0', lineHeight: 1.45 }}>
-            <strong>Geographic scope:</strong> Use the Urban / Rural / National selector at the top of the first three tabs. National combines urban and rural. The Guide panel on the right of input tabs opens automatically with help for whichever section you are editing.
+            <strong>Geographic scope:</strong> Use the Urban / Rural / Urban + Rural / National selector at the top of the first four tabs. <strong>Urban</strong> and <strong>Rural</strong> each take one area-specific data set; <strong>Urban + Rural</strong> lets you enter both (via an Urban | Rural sub-toggle) and aggregates them to national in the graph; <strong>National</strong> takes a single national data set. The Guide panel on the right of input tabs opens automatically with help for whichever section you are editing.
           </div>
 
           <div style={{ display: 'flex', gap: 10, marginTop: 10 }}>
@@ -383,12 +416,36 @@ const gSub: React.CSSProperties = { fontWeight: 700, color: '#1e40af', fontSize:
 const gFieldLbl: React.CSSProperties = { fontWeight: 700, color: '#334155' };
 const gNote: React.CSSProperties = { display: 'block', fontStyle: 'italic', color: '#64748b', margin: '2px 0 0' };
 const gFieldWrap: React.CSSProperties = { marginBottom: 8 };
+
+// Turn bare domain/URL substrings (e.g. "data.worldbank.org/indicator/...") into clickable links
+const URL_RE = /((?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s()]*)?)/gi;
+function linkify(text: string): React.ReactNode[] {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let key = 0;
+  let m: RegExpExecArray | null;
+  URL_RE.lastIndex = 0;
+  while ((m = URL_RE.exec(text)) !== null) {
+    const url = m[0];
+    // Require a path or at least a multi-part domain to avoid matching things like "e.g."
+    if (!url.includes('/') && url.split('.').length < 2) continue;
+    if (m.index > lastIndex) parts.push(text.slice(lastIndex, m.index));
+    const href = url.startsWith('http') ? url : `https://${url}`;
+    parts.push(
+      <a key={key++} href={href} target="_blank" rel="noopener noreferrer" style={{ color: '#4338ca', wordBreak: 'break-all' }}>{url}</a>
+    );
+    lastIndex = m.index + url.length;
+  }
+  if (lastIndex < text.length) parts.push(text.slice(lastIndex));
+  return parts.length ? parts : [text];
+}
+
 function GFind({ items }: { items: string[] }) {
   return (
     <div style={{ margin: '3px 0 0' }}>
       <div style={{ fontWeight: 600, color: '#475569' }}>How to find it:</div>
       <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
-        {items.map((it, i) => <li key={i} style={{ marginBottom: 2 }}>{it}</li>)}
+        {items.map((it, i) => <li key={i} style={{ marginBottom: 2 }}>{linkify(it)}</li>)}
       </ul>
     </div>
   );
@@ -583,6 +640,16 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
 };
 
+// Which guide sections belong to each tab (only these show in that tab's Guide panel)
+const guideKeysByTab: Record<number, string[]> = {
+  // General Inputs — includes the BAU data entry duplicated onto this tab
+  0: ['country', 'macro', 'ws_service_levels', 'san_service_levels', 'ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
+  // BAU Inputs & Graph
+  1: ['ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
+  // Intervention Inputs & Graph
+  2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
+};
+
 function DataGuide({ tab, activeSection }: { tab: number; activeSection: string | null }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const activeRef = React.useRef<HTMLDivElement>(null);
@@ -593,8 +660,8 @@ function DataGuide({ tab, activeSection }: { tab: number; activeSection: string 
     }
   }, [activeSection]);
 
-  // Show all guide sections, highlight the active one
-  const allKeys = Object.keys(contextualGuide);
+  // Only show the guide sections relevant to the current tab, highlight the active one
+  const allKeys = (guideKeysByTab[tab] || Object.keys(contextualGuide)).filter(k => contextualGuide[k]);
 
   return (
     <div ref={scrollRef} style={{
