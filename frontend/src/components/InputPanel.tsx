@@ -342,10 +342,10 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
               return tsInput(section, field, idx, val, true);
             }
             // forecast year — derived from BAU targets, shown gray non-editable
-            return <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title="Derived from targets set on the BAU tab">—</span>;
+            return <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title="Derived from targets set on the BAU Scenario tab">—</span>;
           };
           const svcRow = (label: string, section: string, field: string) => ({
-            label, tip: 'Share of households at this service level. Historical years are editable; forecast years are derived from the targets you set on the BAU tab.',
+            label, tip: 'Share of households at this service level. Historical years are editable; forecast years are derived from the targets you set on the BAU Scenario tab.',
             cells: years.map((_: number, i: number) => svcCell(section, field, i)),
           });
 
@@ -457,7 +457,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           marginTop: 8, marginBottom: 14, padding: '10px 14px', borderRadius: 6,
           background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#5b21b6', fontSize: 12, lineHeight: 1.5,
         }}>
-          <strong>🔗 BAU data entry</strong> — these same fields also appear on the <strong>General Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on General Inputs stay in sync.
+          <strong>🔗 BAU data entry</strong> — these same fields also appear on the <strong>Data Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on Data Inputs stay in sync.
         </div>
       )}
       {/* Sector toggle for BAU */}
@@ -673,7 +673,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           const sanPct = total > 0 ? sanGdp / total : 0;
           return <>
             <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-              Auto-calculated from water/sanitation budget as % of GDP (Data Input tab)
+              Auto-calculated from water/sanitation budget as % of GDP (Data Inputs tab)
             </div>
             <F label="Water supply % of WSS budget" value={wsPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: WS GDP% / (WS GDP% + SAN GDP%) = ${(wsGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
             <F label="Sanitation % of WSS budget" value={sanPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: SAN GDP% / (WS GDP% + SAN GDP%) = ${(sanGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
