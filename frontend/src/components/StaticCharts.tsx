@@ -89,39 +89,32 @@ export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sec
 }
 
 // ─── Intervention Impact Charts ───
-const waterIntvData = allYears.map((y) => {
-  const t = (y - 2020) / 20;
-  const totalHH = 0.8 + t * 0.7;
-  const bauHH = 0.4 + t * 0.4 * 0.5;
-  const intv = y <= 2027 ? 0 : (y - 2027);
-  return {
-    year: y,
-    'Total households': +totalHH.toFixed(2),
-    'BAU': +bauHH.toFixed(2),
-    'Collection & NRW': +(intv * 0.025).toFixed(3),
-    'Capital efficiency': +(intv * 0.018).toFixed(3),
-    'Tariff increase': +(intv * 0.012).toFixed(3),
-    'Borrowing': +(intv * 0.008).toFixed(3),
-    'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * 0.065, totalHH).toFixed(2),
-  };
-});
-
-const sanIntvData = allYears.map((y) => {
-  const t = (y - 2020) / 20;
-  const totalHH = 0.8 + t * 0.7;
-  const bauHH = 0.25 + t * 0.4 * 0.4;
-  const intv = y <= 2027 ? 0 : (y - 2027);
-  return {
-    year: y,
-    'Total households': +totalHH.toFixed(2),
-    'BAU': +bauHH.toFixed(2),
-    'Collection & NRW': +(intv * 0.015).toFixed(3),
-    'Capital efficiency': +(intv * 0.012).toFixed(3),
-    'Tariff increase': +(intv * 0.008).toFixed(3),
-    'Borrowing': +(intv * 0.005).toFixed(3),
-    'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * 0.045, totalHH).toFixed(2),
-  };
-});
+function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
+  const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
+  const baseBau = sector === 'water' ? 0.4 : 0.25;
+  const bauSlope = sector === 'water' ? 0.5 : 0.4;
+  const tgtSlope = sector === 'water' ? 0.065 : 0.045;
+  const ceSlope = sector === 'water' ? 0.025 : 0.015;
+  const capSlope = sector === 'water' ? 0.018 : 0.012;
+  const tarSlope = sector === 'water' ? 0.012 : 0.008;
+  const borSlope = sector === 'water' ? 0.008 : 0.005;
+  return allYears.map((y) => {
+    const t = (y - 2020) / 20;
+    const intv = y <= 2027 ? 0 : (y - 2027);
+    const totalHH = (0.8 + t * 0.7) * f.total;
+    const bauHH = (baseBau + t * 0.4 * bauSlope) * f.bau;
+    return {
+      year: y,
+      'Total households': +totalHH.toFixed(2),
+      'BAU': +bauHH.toFixed(2),
+      'Collection & NRW': +(intv * ceSlope * f.tgt).toFixed(3),
+      'Capital efficiency': +(intv * capSlope * f.tgt).toFixed(3),
+      'Tariff increase': +(intv * tarSlope * f.tgt).toFixed(3),
+      'Borrowing': +(intv * borSlope * f.tgt).toFixed(3),
+      'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * tgtSlope * f.tgt, totalHH).toFixed(2),
+    };
+  });
+}
 
 const INTV_COLORS = {
   'BAU': '#d1d5db',
@@ -131,23 +124,24 @@ const INTV_COLORS = {
   'Borrowing': '#1e3a5f',
 };
 
-export function InterventionImpactChart({ sector = 'water' }: { sector?: 'water' | 'sanitation' }) {
-  const data = sector === 'water' ? waterIntvData : sanIntvData;
+export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }: { sector?: 'water' | 'sanitation'; geoScope?: string }) {
+  const data = makeIntvData(sector, geoScope);
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
   return (
     <div>
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-        {sectorLabel} — Service Gap After Interventions
+        {scopeLabel} {sectorLabel} — Service Gap After Interventions
       </h3>
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Static example data
+        Static example data — {scopeLabel} scope
       </div>
       <ResponsiveContainer width="100%" height={380}>
         <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} domain={[0, 1.6]}>
+          <YAxis tick={{ fontSize: 10 }} domain={[0, geoScope === 'national' ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
           <Tooltip formatter={(value: number) => value.toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />

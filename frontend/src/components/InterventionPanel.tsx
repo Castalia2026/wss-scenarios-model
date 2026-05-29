@@ -79,9 +79,9 @@ function InterventionToggle({ label, checked, onChange, children, onFocus }: {
   );
 }
 
-interface Props { inputs: any; onChange: (i: any) => void; sectorTab?: 'water' | 'sanitation'; onSectorChange?: (v: 'water' | 'sanitation') => void; onSectionFocus?: (key: string) => void; }
+interface Props { inputs: any; onChange: (i: any) => void; sectorTab?: 'water' | 'sanitation'; onSectorChange?: (v: 'water' | 'sanitation') => void; onSectionFocus?: (key: string) => void; geoScope?: string; }
 
-export default function InterventionPanel({ inputs, onChange, sectorTab = 'water', onSectorChange, onSectionFocus }: Props) {
+export default function InterventionPanel({ inputs, onChange, sectorTab = 'water', onSectorChange, onSectionFocus, geoScope = 'urban' }: Props) {
   const u = (section: string, field: string, value: number) => {
     onChange({ ...inputs, [section]: { ...inputs[section], [field]: value } });
   };
@@ -305,7 +305,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
       {/* Right: intervention impact chart */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-        <InterventionImpactChart sector={sectorTab} />
+        <InterventionImpactChart sector={sectorTab} geoScope={geoScope} />
       </div>
     </div>
   );
