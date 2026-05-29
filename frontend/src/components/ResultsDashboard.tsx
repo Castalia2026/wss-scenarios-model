@@ -60,12 +60,12 @@ function MockChart({ data, title }: { data: any[]; title: string }) {
           <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
           <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} />
-          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} />
-          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={COLORS.loan} stroke={COLORS.loan} fillOpacity={0.6} />
-          <Line type="monotone" dataKey="Target" stroke={COLORS.target} strokeWidth={2.5} dot={false} strokeDasharray="6 3" />
+          <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} legendType="rect" />
+          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />
+          <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />
+          <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} legendType="rect" />
+          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={COLORS.loan} stroke={COLORS.loan} fillOpacity={0.6} legendType="rect" />
+          <Line type="monotone" dataKey="Target" stroke={COLORS.target} strokeWidth={2.5} dot={false} strokeDasharray="6 3" legendType="plainline" />
         </ComposedChart>
       </ResponsiveContainer>
     </div>
