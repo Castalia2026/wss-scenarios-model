@@ -86,7 +86,7 @@ export default function App() {
     }
   }
 
-  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Interventions & Targets', 'Results Dashboard', 'Export'];
+  const tabs = ['General Inputs', 'BAU Inputs & Graph', 'Intervention Inputs', 'Results Dashboard', 'Export'];
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -327,7 +327,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>BAU & Costs</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, unit costs, planned investments, and technical parameters.
             </li>
             <li style={{ marginBottom: 12 }}>
-              <strong>Interventions & Targets</strong> — Toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance. Add custom interventions.
+              <strong>Intervention Inputs</strong> — Toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance. Add custom interventions.
             </li>
             <li style={{ marginBottom: 12 }}>
               <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see impact. Charts show BAU vs intervention scenarios.
