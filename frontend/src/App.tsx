@@ -198,25 +198,27 @@ export default function App() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Geo scope bar — shown on tabs 0, 1, 2 */}
         {activeTab <= 3 && (
-          <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Geographic scope:</span>
-            {([
-              { key: 'urban', label: 'Urban' },
-              { key: 'rural', label: 'Rural' },
-              { key: 'urban_rural', label: 'Urban + Rural' },
-              { key: 'national', label: 'National' },
-            ] as const).map(g => (
-              <button key={g.key} onClick={() => setGeoScope(g.key)} style={{
-                padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                background: geoScope === g.key ? '#2563eb' : '#fff',
-                color: geoScope === g.key ? '#fff' : '#374151',
-                fontWeight: geoScope === g.key ? 700 : 500, fontSize: 13,
-                boxShadow: geoScope === g.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
-                transition: 'all 0.15s',
-              }}>{g.label}</button>
-            ))}
+          <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Geographic scope:</span>
+              {([
+                { key: 'urban', label: 'Urban' },
+                { key: 'rural', label: 'Rural' },
+                { key: 'urban_rural', label: 'Urban + Rural' },
+                { key: 'national', label: 'National' },
+              ] as const).map(g => (
+                <button key={g.key} onClick={() => setGeoScope(g.key)} style={{
+                  padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                  background: geoScope === g.key ? '#2563eb' : '#fff',
+                  color: geoScope === g.key ? '#fff' : '#374151',
+                  fontWeight: geoScope === g.key ? 700 : 500, fontSize: 13,
+                  boxShadow: geoScope === g.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
+                  transition: 'all 0.15s',
+                }}>{g.label}</button>
+              ))}
+            </div>
             {geoScope === 'urban_rural' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 8, paddingLeft: 12, borderLeft: '1px solid #c7d2fe' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
                 <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
                 {(['urban', 'rural'] as const).map(a => (
                   <button key={a} onClick={() => setSubArea(a)} style={{
@@ -350,7 +352,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
       <style>{`@keyframes bounceArrow { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }`}</style>
 
       {!closing && (
-        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 820, width: '94%', maxHeight: '94vh', overflowY: 'auto', padding: '20px 32px' }} onClick={e => e.stopPropagation()}>
+        <div style={{ background: '#fff', borderRadius: 12, maxWidth: 1040, width: '96%', maxHeight: '96vh', overflowY: 'auto', padding: '22px 40px' }} onClick={e => e.stopPropagation()}>
           <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 4px' }}>How to use this tool</h2>
           <p style={{ fontSize: 13, color: '#475569', margin: '0 0 12px', lineHeight: 1.5 }}>
             Follow these steps in order. Tabs run left to right, and the <strong>Guide</strong> panel on the right of each input tab gives field-by-field help for whatever section you are editing.
@@ -371,19 +373,19 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           {/* Steps 2+ — one per tab */}
           <ol start={2} style={{ margin: 0, padding: '0 0 0 20px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>§1 Country, Region &amp; Currency</em> select your country (currency auto-fills). In <em>§2 Time Scales &amp; Macroeconomics</em> set the key dates, choose how to provide the WSS budget (as % of GDP or directly year-by-year), then complete the year-by-year table: economic data (GDP, inflation, exchange rate), demographics (population, households), budget &amp; execution, and historical water/sanitation service levels. Growth rates, household size, and execution rates calculate automatically; forecast-year service levels are derived from your BAU targets. The BAU data entry also appears further down this tab — select Water Supply or Sanitation there to fill each sector.
+              <strong>Data Inputs</strong> — In <em>Country, Region &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates and choose how to provide the WSS budget (as % of GDP or directly year-by-year). Then complete the year-by-year table, which covers economic data (GDP, inflation, exchange rate), demographics (population, households), budget &amp; execution, and historical water and sanitation service levels. Growth rates, household size, and execution rates are calculated for you. Forecast-year service levels are derived from your BAU targets. The BAU data entry also appears further down this tab, where you select Water Supply or Sanitation to fill each sector.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, <em>Planned Investments</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab, and the BAU graph on the right updates live as you type.
+              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections, which are <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, <em>Planned Investments</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on/off with its toggle and set its parameters (collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation). Add your own under <em>Custom Interventions</em> at the bottom; the impact graph updates live.
+              <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation. Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Results Dashboard</strong> — Compare BAU vs intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap.
+              <strong>Results Dashboard</strong> — Compare BAU and intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap.
             </li>
             <li style={{ marginBottom: 0 }}>
-              <strong>Export</strong> — Download your results as PowerPoint, Excel or CSV.
+              <strong>Export</strong> — Download your results as PowerPoint, Excel, or CSV.
             </li>
           </ol>
 

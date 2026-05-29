@@ -26,17 +26,20 @@ function makeBAUData(sector: 'water' | 'sanitation', geoScope: string) {
   const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
   const baseBau = sector === 'water' ? 0.4 : 0.25;
   const bauSlope = sector === 'water' ? 0.5 : 0.4;
-  const tgtSlope = sector === 'water' ? 0.065 : 0.045;
+  const tgtStart = 2027;                                   // performance improvement begins
+  const tgtEnd = allYears[allYears.length - 1];            // target reaches 100% (total HHs) here
   return allYears.map((y) => {
     const t = (y - 2020) / 20;
     const totalHH = (0.8 + t * 0.7) * f.total;
     const bauHH = (baseBau + t * 0.4 * bauSlope) * f.bau;
-    const targetHH = (y <= 2027 ? bauHH : bauHH + (y - 2027) * tgtSlope * f.tgt);
+    // Target ramps from the BAU line at tgtStart up to the Total-households line (100%) at tgtEnd
+    const frac = y <= tgtStart ? 0 : Math.min(1, (y - tgtStart) / (tgtEnd - tgtStart));
+    const targetHH = bauHH + frac * (totalHH - bauHH);
     return {
       year: y,
       'Total households': +totalHH.toFixed(2),
       'Households under BAU': +bauHH.toFixed(2),
-      'Target': +Math.min(targetHH, totalHH).toFixed(2),
+      'Target': +targetHH.toFixed(2),
     };
   });
 }
@@ -83,16 +86,19 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
   const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
   const baseBau = sector === 'water' ? 0.4 : 0.25;
   const bauSlope = sector === 'water' ? 0.5 : 0.4;
-  const tgtSlope = sector === 'water' ? 0.065 : 0.045;
   const ceSlope = sector === 'water' ? 0.025 : 0.015;
   const capSlope = sector === 'water' ? 0.018 : 0.012;
   const tarSlope = sector === 'water' ? 0.012 : 0.008;
   const borSlope = sector === 'water' ? 0.008 : 0.005;
+  const tgtStart = 2027;                                   // performance improvement begins
+  const tgtEnd = allYears[allYears.length - 1];            // target reaches 100% (total HHs) here
   return allYears.map((y) => {
     const t = (y - 2020) / 20;
     const intv = y <= 2027 ? 0 : (y - 2027);
     const totalHH = (0.8 + t * 0.7) * f.total;
     const bauHH = (baseBau + t * 0.4 * bauSlope) * f.bau;
+    // Target ramps from the BAU line at tgtStart up to the Total-households line (100%) at tgtEnd
+    const tFrac = y <= tgtStart ? 0 : Math.min(1, (y - tgtStart) / (tgtEnd - tgtStart));
     return {
       year: y,
       'Total households': +totalHH.toFixed(2),
@@ -101,7 +107,7 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
       'Capital efficiency': +(intv * capSlope * f.tgt).toFixed(3),
       'Tariff increase': +(intv * tarSlope * f.tgt).toFixed(3),
       'Borrowing': +(intv * borSlope * f.tgt).toFixed(3),
-      'Target': +Math.min(y <= 2027 ? bauHH : bauHH + intv * tgtSlope * f.tgt, totalHH).toFixed(2),
+      'Target': +(bauHH + tFrac * (totalHH - bauHH)).toFixed(2),
     };
   });
 }
