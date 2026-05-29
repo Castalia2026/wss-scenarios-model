@@ -321,21 +321,25 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
           <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 14, color: '#334155', lineHeight: 1.7 }}>
             <li style={{ marginBottom: 12 }}>
-              <strong>General Inputs</strong> — Enter country information, key dates, and year-by-year macroeconomic, demographic, and budget data in a single time-series table.
+              <strong>General Inputs</strong> — Enter country, region & currency, then a single year-by-year table covering economic data (GDP, inflation, exchange rate), demographics (population, households), and budget & execution (allocated and actual spend). Growth rates and execution rates are auto-calculated.
             </li>
             <li style={{ marginBottom: 12 }}>
-              <strong>BAU & Costs</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, unit costs, planned investments, and technical parameters.
+              <strong>BAU Inputs & Graph</strong> — Switch between Water Supply and Sanitation to enter service levels, targets, and unit costs for the selected sector, plus shared planned investments and technical parameters. The BAU graph on the right updates with your inputs and geographic scope.
             </li>
             <li style={{ marginBottom: 12 }}>
-              <strong>Intervention Inputs</strong> — Toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance. Add custom interventions.
+              <strong>Intervention Inputs</strong> — Switch between Water Supply and Sanitation, then toggle interventions on/off and configure their parameters. Includes collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and (for sanitation) microfinance. Add custom interventions at the bottom.
             </li>
             <li style={{ marginBottom: 12 }}>
-              <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see impact. Charts show BAU vs intervention scenarios.
+              <strong>Results Dashboard</strong> — View projected coverage and financing gaps. Toggle interventions and adjust targets to see their impact. Charts compare BAU vs intervention scenarios.
             </li>
             <li style={{ marginBottom: 12 }}>
               <strong>Export</strong> — Download results as PowerPoint, Excel, or CSV for reporting and further analysis.
             </li>
           </ol>
+
+          <div style={{ marginTop: 16, padding: '12px 16px', background: '#f8fafc', borderRadius: 8, fontSize: 13, color: '#475569', border: '1px solid #e2e8f0' }}>
+            <strong>Geographic scope:</strong> Use the Urban / Rural / National selector at the top of the first three tabs. National combines urban and rural. The Guide panel on the right of input tabs opens automatically with help for whichever section you are editing.
+          </div>
 
           <div style={{ marginTop: 16, padding: '12px 16px', background: '#f0f4ff', borderRadius: 8, fontSize: 13, color: '#312e81', border: '1px solid #c7d2fe' }}>
             <strong>Tip:</strong> You can reopen this overview anytime by clicking <strong>"📖 Tool Overview"</strong> in the top-right corner of the header.
