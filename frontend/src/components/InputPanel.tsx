@@ -177,14 +177,22 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         </span>
       </div>
 
-      {/* Area-scope banner — all inputs below apply to this area */}
+      {/* Area-scope banner — all inputs below apply to this area (also carries the BAU note on the BAU tab) */}
       <div style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, textAlign: 'left',
-        padding: '8px 14px', borderRadius: 6, fontSize: 12.5, fontWeight: 600,
+        display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, textAlign: 'left',
+        padding: '8px 14px', borderRadius: 6, fontSize: 12.5,
         background: '#EBF6FB', border: '1px solid #b6e0f0', color: '#0073A8',
       }}>
-        <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
-        <span>Entering <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> data — every field on this page is {scopeLower}-specific.</span>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 600 }}>
+          <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
+          <span>Entering <span style={{ textTransform: 'capitalize' }}>{scopeLabel}</span> data — every field on this page is {scopeLower}-specific.</span>
+        </div>
+        {isBAU && (
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 500, lineHeight: 1.5 }}>
+            <span style={{ fontSize: 14, lineHeight: 1.3 }}>🔗</span>
+            <span><strong>BAU data entry</strong> — these same fields also appear on the <strong>Data Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on Data Inputs stay in sync.</span>
+          </div>
+        )}
       </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
@@ -452,14 +460,6 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       </>}
 
       {(isBAU || isInputs) && <>
-      {isBAU && (
-        <div style={{
-          marginTop: 0, marginBottom: 14, padding: '8px 14px', borderRadius: 6, textAlign: 'left',
-          background: '#f5f3ff', border: '1px solid #ddd6fe', color: '#5b21b6', fontSize: 12, lineHeight: 1.5,
-        }}>
-          <strong>🔗 BAU data entry</strong> — these same fields also appear on the <strong>Data Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on Data Inputs stay in sync.
-        </div>
-      )}
       {/* Sector toggle for BAU */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
         {(['water', 'sanitation'] as const).map(s => (
