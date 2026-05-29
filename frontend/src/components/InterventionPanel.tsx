@@ -27,30 +27,33 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
 }) {
   const rawPct = Math.round(value * 1e4) / 1e2;
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : Math.round(value * 100) / 100;
-  const labelColor = fieldType === 'linked' ? '#16a34a' : fieldType === 'computed' ? '#94a3b8' : '#0000cc';
+  const isDerived = fieldType === 'computed' || fieldType === 'linked';
   return (
     <div style={{
-      flex: '1 1 calc(50% - 6px)', minWidth: 150, maxWidth: 'calc(50% - 6px)',
-      padding: '6px 8px', borderRadius: 6,
-      background: fieldType === 'computed' ? '#f1f5f9' : fieldType === 'linked' ? '#f0fdf4' : '#f8fafc',
-      border: '1px solid #e5e7eb',
+      display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
     }}>
-      <label style={{ display: 'block', fontSize: 11, color: labelColor, lineHeight: 1.3, marginBottom: 4, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tip || undefined}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500 }} title={tip || undefined}>
         {label}
-        {unit && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({unit})</span>}
-        {tip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tip}>ⓘ</span>}
+        {tip && <span style={{
+          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+          background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'help',
+          fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
+        }} title={tip}>i</span>}
       </label>
       <input type="number" value={displayVal}
         onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
         step={isPercent ? 1 : (step || 1)}
-        readOnly={fieldType === 'computed' || fieldType === 'linked'}
+        readOnly={isDerived}
         style={{
-          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'left',
-          border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
-          background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
-          color: fieldType === 'computed' ? '#475569' : '#000',
-          boxSizing: 'border-box',
+          width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+          border: isDerived ? '1px solid #DDE3EA' : '1px solid #F0D070',
+          background: isDerived ? '#F1F3F5' : '#FFF9E6',
+          color: isDerived ? '#6B7785' : '#3A4452',
+          cursor: isDerived ? 'not-allowed' : 'text',
+          boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
         }} />
+      {unit && <span style={{ fontSize: 11, color: '#6B7785' }}>{unit}</span>}
     </div>
   );
 }
@@ -71,7 +74,7 @@ function InterventionToggle({ label, checked, onChange, children, onFocus }: {
         {checked && <span style={{ fontSize: 10, color: '#2563eb', fontWeight: 500 }}>▾ Configure</span>}
       </label>
       {checked && (
-        <div style={{ padding: '10px 14px', background: '#fff', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start' }}>
+        <div style={{ padding: '10px 14px', background: '#fff', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'end' }}>
           {children}
         </div>
       )}
@@ -93,7 +96,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
   return (
     <div style={{ display: 'flex', width: '100%', overflow: 'hidden' }}>
       {/* Left: intervention controls */}
-      <div style={{ width: 480, overflowY: 'auto', padding: '16px 20px', background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 12 }}>
+      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 12 }}>
 
         {/* Sector toggle */}
         <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
@@ -126,8 +129,8 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             <F label="Target NRW %" value={inputs.water_interventions.nrw_target_pct} onChange={v => u('water_interventions','nrw_target_pct',v)} isPercent unit="%" tip="Target non-revenue water for the model end year. Minimum 3% — even the best utilities cannot go below this." />
             {(() => {
               const t = inputs.water_interventions.nrw_target_pct || 0;
-              if (t > 0 && t < 0.03) return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: '#dc2626', padding: '3px 8px', background: '#fef2f2', borderRadius: 4, marginBottom: 4 }}>⛔ Below 3% is unrealistic</div>;
-              if (t >= 0.03 && t < 0.07) return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: '#92400e', padding: '3px 8px', background: '#fef3c7', borderRadius: 4, marginBottom: 4 }}>⚠ 3–7% is highly ambitious</div>;
+              if (t > 0 && t < 0.03) return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: '#dc2626', padding: '3px 8px', background: '#fef2f2', borderRadius: 4, marginBottom: 4 }}>⛔ Below 3% is unrealistic</div>;
+              if (t >= 0.03 && t < 0.07) return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: '#92400e', padding: '3px 8px', background: '#fef3c7', borderRadius: 4, marginBottom: 4 }}>⚠ 3–7% is highly ambitious</div>;
               return null;
             })()}
             <F label="Commercial losses % of NRW" value={inputs.water_interventions.nrw_commercial_loss_pct || 0} onChange={v => u('water_interventions','nrw_commercial_loss_pct',v)} isPercent unit="%" tip="Share of NRW from commercial losses (metering errors, theft, unbilled use). Commercial + physical must sum to 100%." />

@@ -287,13 +287,16 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
   const [showArrow, setShowArrow] = React.useState(false);
 
   const handleGetStarted = () => {
-    // Show arrow animation pointing to the Tool Overview button
+    // Show arrow animation pointing to the Tool Overview button — only the first time
+    const seen = localStorage.getItem('wss_overview_arrow_seen');
     setClosing(true);
-    setShowArrow(true);
-    setTimeout(() => {
-      setShowArrow(false);
-      onClose();
-    }, 1800);
+    if (!seen) {
+      setShowArrow(true);
+      localStorage.setItem('wss_overview_arrow_seen', '1');
+      setTimeout(() => { setShowArrow(false); onClose(); }, 1800);
+    } else {
+      setTimeout(() => { onClose(); }, 300);
+    }
   };
 
   return (

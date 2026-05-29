@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 
 function Section({ title, children, defaultOpen = false, cols = 3, sectionKey, onFocus }: { title: string; children: React.ReactNode; defaultOpen?: boolean; cols?: number; sectionKey?: string; onFocus?: (key: string) => void }) {
   const [open, setOpen] = useState(defaultOpen);
-  const basis = cols === 2 ? 'calc(50% - 6px)' : 'calc(33.33% - 6px)';
   const handleClick = () => {
     const willOpen = !open;
     setOpen(willOpen);
@@ -12,18 +11,21 @@ function Section({ title, children, defaultOpen = false, cols = 3, sectionKey, o
     <div style={{ marginBottom: 8, border: '1px solid #ddd', borderRadius: 8, background: '#fff' }}>
       <button onClick={handleClick} style={{
         width: '100%', padding: '10px 14px', textAlign: 'left', cursor: 'pointer',
-        border: 'none', background: open ? '#e8f0fe' : '#fff', fontWeight: 600,
+        border: 'none', background: open ? '#EBF6FB' : '#fff', color: open ? '#0073A8' : '#002244', fontWeight: 600,
         fontSize: 14, borderRadius: 8, display: 'flex', justifyContent: 'space-between',
       }}>
         {title}<span>{open ? '▴' : '▾'}</span>
       </button>
-      {open && <div style={{ padding: '10px 14px 12px', display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'flex-start', ['--field-basis' as any]: basis }}>{children}</div>}
+      {open && <div style={{ padding: '10px 14px 12px', display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '12px 16px', alignItems: 'end' }}>{children}</div>}
     </div>
   );
 }
 
+// Full-width span helper for grid layout
+const FULL = { gridColumn: '1 / -1' } as const;
+
 function SubHead({ text }: { text: string }) {
-  return <div style={{ width: '100%', fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '6px 0 2px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
+  return <div style={{ gridColumn: '1 / -1', fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '6px 0 2px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
 }
 
 // Color convention: blue text = editable input, green text = cross-linked, gray = computed/derived
@@ -48,31 +50,36 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
 
   const showSlider = slider && displayMin !== undefined && displayMax !== undefined;
 
+  // World Bank SSST style: editable = cream, derived = gray
+  const isDerived = fieldType === 'computed' || fieldType === 'linked';
   return (
     <div style={{
-      flex: '1 1 var(--field-basis, calc(33.33% - 6px))', minWidth: 150, maxWidth: 'var(--field-basis, calc(33.33% - 6px))',
-      padding: '6px 8px', borderRadius: 6,
-      background: fieldType === 'computed' ? '#f1f5f9' : fieldType === 'linked' ? '#f0fdf4' : '#f8fafc',
-      border: outOfRange ? '1.5px solid #ef4444' : '1px solid #e5e7eb',
+      display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
     }}>
-      <label style={{ display: 'block', fontSize: 11, color: labelColor, lineHeight: 1.3, marginBottom: 4, fontWeight: fieldType === 'computed' ? 400 : 500 }} title={tooltip || undefined}>
+      <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500 }} title={tooltip || undefined}>
         {label}
-        {unit && <span style={{ color: '#94a3b8', fontWeight: 400 }}> ({unit})</span>}
-        {tooltip && <span style={{ color: '#2563eb', marginLeft: 3, fontSize: 12, fontWeight: 700, cursor: 'help' }} title={tooltip}>ⓘ</span>}
+        {tooltip && <span style={{
+          width: 14, height: 14, borderRadius: '50%', flexShrink: 0,
+          background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'help',
+          fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
+        }} title={tooltip}>i</span>}
       </label>
       <input type="number" value={displayVal}
         onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
         step={isPercent ? 1 : (step || 1)}
         min={displayMin} max={displayMax}
         style={{
-          width: '100%', padding: '6px 8px', borderRadius: 4, fontSize: 14, textAlign: 'left',
-          border: fieldType === 'computed' ? '1px solid #94a3b8' : '1px solid #ccc',
-          background: fieldType === 'computed' ? '#e2e8f0' : fieldType === 'linked' ? '#e8f5e9' : '#fff',
-          color: fieldType === 'computed' ? '#475569' : '#000',
-          boxSizing: 'border-box',
+          width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+          border: outOfRange ? '1.5px solid #E74C3C' : isDerived ? '1px solid #DDE3EA' : '1px solid #F0D070',
+          background: outOfRange ? '#FFE9E9' : isDerived ? '#F1F3F5' : '#FFF9E6',
+          color: isDerived ? '#6B7785' : '#3A4452',
+          cursor: isDerived ? 'not-allowed' : 'text',
+          boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
         }}
-        readOnly={fieldType === 'computed' || fieldType === 'linked'}
+        readOnly={isDerived}
       />
+      {unit && <span style={{ fontSize: 11, color: '#6B7785' }}>{unit}</span>}
       {showSlider && (
         <input type="range" value={displayVal}
           onChange={e => { const v = parseFloat(e.target.value); onChange(isPercent ? v / 100 : v); }}
@@ -156,8 +163,15 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', fontSize: 12 }}>
-      <div style={{ fontSize: 11, color: '#475569', marginBottom: 10, padding: '6px 10px', background: '#f0f4ff', borderRadius: 6, lineHeight: 1.5, border: '1px solid #c7d2fe' }}>
-        <span style={{ color: '#0000cc', fontWeight: 600 }}>Blue fields</span><span style={{ color: '#1e293b' }}> are editable inputs. </span><span style={{ color: '#94a3b8', fontWeight: 600 }}>Gray fields</span><span style={{ color: '#1e293b' }}> are auto-calculated and cannot be edited.</span>
+      <div style={{ display: 'flex', gap: 18, fontSize: 12, marginBottom: 12, color: '#3A4452', alignItems: 'center' }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #F0D070', background: '#FFF9E6', display: 'inline-block' }} />
+          Editable input
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #DDE3EA', background: '#F1F3F5', display: 'inline-block' }} />
+          Auto-calculated (cannot edit)
+        </span>
       </div>
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
@@ -184,29 +198,29 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       {/* ===== COUNTRY CONFIG ===== */}
       <Section title="1. Country, Region & Currency" sectionKey="country" onFocus={onSectionFocus}>
         {inputs.country_config && <>
-          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Country</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Country</label>
             <input type="text" list="country-list" value={inputs.country_config.country || ''}
               onChange={e => setCountryConfig('country', e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 4, fontSize: 13, color: '#3A4452', boxSizing: 'border-box', outline: 'none' }}
               placeholder="Type to search..."
             />
             <datalist id="country-list">
               {countries.map(c => <option key={c.name} value={c.name} />)}
             </datalist>
           </div>
-          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Region</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Region</label>
             <input type="text" value={inputs.country_config.area || ''}
               onChange={e => setCountryConfig('area', e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }}
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 4, fontSize: 13, color: '#3A4452', boxSizing: 'border-box', outline: 'none' }}
               placeholder="e.g. Kathmandu Valley" />
           </div>
-          <div style={{ flex: '1 1 calc(33.33% - 6px)', minWidth: 150, maxWidth: 'calc(33.33% - 6px)', padding: '6px 8px', borderRadius: 6, background: '#f8fafc', border: '1px solid #e5e7eb' }}>
-            <label style={{ display: 'block', fontSize: 11, color: '#0000cc', fontWeight: 500, marginBottom: 4 }}>Currency code</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+            <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Currency code</label>
             <input type="text" value={inputs.country_config.currency || ''}
               onChange={e => setCountryConfig('currency', e.target.value)}
-              style={{ width: '100%', padding: '6px 8px', border: '1px solid #ccc', borderRadius: 4, fontSize: 14, boxSizing: 'border-box' }} />
+              style={{ width: '100%', padding: '7px 10px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 4, fontSize: 13, color: '#3A4452', boxSizing: 'border-box', outline: 'none' }} />
           </div>
         </>}
       </Section>
@@ -224,7 +238,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label="Water supply budget as % of GDP" value={inputs.macro.ws_budget_pct_gdp || 0} onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%" tip="Water supply budget as share of GDP" />
         <F label="Sanitation budget as % of GDP" value={inputs.macro.san_budget_pct_gdp || 0} onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%" tip="Sanitation budget as share of GDP" />
         <SubHead text="Year-by-year data" />
-        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Enter data for historical years. Forecast years are projected. GDP growth, population growth, avg household size, and execution rates are auto-calculated.
         </div>
         {(() => {
@@ -239,7 +253,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                 if (section === 'macro') onChange({...inputs, macro:{...inputs.macro, [field]:a}});
                 else onChange({...inputs, [section]:{...inputs[section], [field]:a}});
               }}}
-              style={{ width: 58, padding: '2px 3px', border: '1px solid #ddd', borderRadius: 2, fontSize: 11, textAlign: 'left' }}
+              style={{ width: 58, padding: '3px 4px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, textAlign: 'left', color: '#3A4452', outline: 'none' }}
             />
           );
           const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct);
@@ -290,7 +304,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             }) },
           ];
           return (
-            <div style={{ width: '100%', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+            <div style={{ gridColumn: '1 / -1', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
               <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
@@ -343,9 +357,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== SERVICE LEVELS (sector-dependent) ===== */}
       {bauSector === 'water' && (
-      <Section title="4. Water Supply Service Levels" sectionKey="ws_service_levels" onFocus={onSectionFocus}>
+      <Section title="4. Water Supply Service Levels" cols={2} sectionKey="ws_service_levels" onFocus={onSectionFocus}>
         <SubHead text={`% HHs by service level, ${startYr}`} />
-        {(() => { const s = (inputs.water_service.pct_serv1_start||0)+(inputs.water_service.pct_serv2_start||0)+(inputs.water_service.pct_serv3_start||0)+(inputs.water_service.pct_serv4_start||0)+(inputs.water_service.pct_serv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.water_service.pct_serv1_start||0)+(inputs.water_service.pct_serv2_start||0)+(inputs.water_service.pct_serv3_start||0)+(inputs.water_service.pct_serv4_start||0)+(inputs.water_service.pct_serv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_start} onChange={v => u('water_service','pct_serv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_start} onChange={v => u('water_service','pct_serv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_start} onChange={v => u('water_service','pct_serv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -353,7 +367,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`% HHs ${ws[4]}`} value={inputs.water_service.pct_serv5_start} onChange={v => u('water_service','pct_serv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
 
         <SubHead text={`% HHs by service level, ${baseYr}`} />
-        {(() => { const s = (inputs.water_service.pct_serv1_baseline||0)+(inputs.water_service.pct_serv2_baseline||0)+(inputs.water_service.pct_serv3_baseline||0)+(inputs.water_service.pct_serv4_baseline||0)+(inputs.water_service.pct_serv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.water_service.pct_serv1_baseline||0)+(inputs.water_service.pct_serv2_baseline||0)+(inputs.water_service.pct_serv3_baseline||0)+(inputs.water_service.pct_serv4_baseline||0)+(inputs.water_service.pct_serv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% HHs ${ws[0]}`} value={inputs.water_service.pct_serv1_baseline} onChange={v => u('water_service','pct_serv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[1]}`} value={inputs.water_service.pct_serv2_baseline} onChange={v => u('water_service','pct_serv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% HHs ${ws[2]}`} value={inputs.water_service.pct_serv3_baseline} onChange={v => u('water_service','pct_serv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -375,9 +389,9 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title="4. Sanitation Service Levels" sectionKey="san_service_levels" onFocus={onSectionFocus}>
+      <Section title="4. Sanitation Service Levels" cols={2} sectionKey="san_service_levels" onFocus={onSectionFocus}>
         <SubHead text={`% HHs by service level, ${startYr}`} />
-        {(() => { const s = (inputs.sanitation_service.pct_sserv1_start||0)+(inputs.sanitation_service.pct_sserv2_start||0)+(inputs.sanitation_service.pct_sserv3_start||0)+(inputs.sanitation_service.pct_sserv4_start||0)+(inputs.sanitation_service.pct_sserv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.sanitation_service.pct_sserv1_start||0)+(inputs.sanitation_service.pct_sserv2_start||0)+(inputs.sanitation_service.pct_sserv3_start||0)+(inputs.sanitation_service.pct_sserv4_start||0)+(inputs.sanitation_service.pct_sserv5_start||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_start} onChange={v => u('sanitation_service','pct_sserv1_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_start} onChange={v => u('sanitation_service','pct_sserv2_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_start} onChange={v => u('sanitation_service','pct_sserv3_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -385,7 +399,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         <F label={`% ${ss[4]}`} value={inputs.sanitation_service.pct_sserv5_start} onChange={v => u('sanitation_service','pct_sserv5_start',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
 
         <SubHead text={`% HHs by service level, ${baseYr}`} />
-        {(() => { const s = (inputs.sanitation_service.pct_sserv1_baseline||0)+(inputs.sanitation_service.pct_sserv2_baseline||0)+(inputs.sanitation_service.pct_sserv3_baseline||0)+(inputs.sanitation_service.pct_sserv4_baseline||0)+(inputs.sanitation_service.pct_sserv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.sanitation_service.pct_sserv1_baseline||0)+(inputs.sanitation_service.pct_sserv2_baseline||0)+(inputs.sanitation_service.pct_sserv3_baseline||0)+(inputs.sanitation_service.pct_sserv4_baseline||0)+(inputs.sanitation_service.pct_sserv5_baseline||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ss[0]}`} value={inputs.sanitation_service.pct_sserv1_baseline} onChange={v => u('sanitation_service','pct_sserv1_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[1]}`} value={inputs.sanitation_service.pct_sserv2_baseline} onChange={v => u('sanitation_service','pct_sserv2_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
         <F label={`% ${ss[2]}`} value={inputs.sanitation_service.pct_sserv3_baseline} onChange={v => u('sanitation_service','pct_sserv3_baseline',v)} isPercent unit="%" min={0} max={1.0} tip={`Share of ${scopeLower} HHs at this service level; all 5 must sum to 100%`} />
@@ -408,20 +422,20 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
       {/* ===== TARGETS (sector-dependent) ===== */}
       {bauSector === 'water' && (
-      <Section title="5. Water Supply Targets" sectionKey="ws_targets" onFocus={onSectionFocus}>
+      <Section title="5. Water Supply Targets" cols={2} sectionKey="ws_targets" onFocus={onSectionFocus}>
         <SubHead text="Service Targets" />
-        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
         </div>
         <SubHead text="Target 1 (2030)" />
-        {(() => { const s = (inputs.water_targets.target1_serv1||0)+(inputs.water_targets.target1_serv2||0)+(inputs.water_targets.target1_serv3||0)+(inputs.water_targets.target1_serv4||0)+(inputs.water_targets.target1_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.water_targets.target1_serv1||0)+(inputs.water_targets.target1_serv2||0)+(inputs.water_targets.target1_serv3||0)+(inputs.water_targets.target1_serv4||0)+(inputs.water_targets.target1_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ws[0]}`} value={inputs.water_targets.target1_serv1} onChange={v => u('water_targets','target1_serv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[1]}`} value={inputs.water_targets.target1_serv2} onChange={v => u('water_targets','target1_serv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[2]}`} value={inputs.water_targets.target1_serv3} onChange={v => u('water_targets','target1_serv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[3]}`} value={inputs.water_targets.target1_serv4} onChange={v => u('water_targets','target1_serv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[4]}`} value={inputs.water_targets.target1_serv5} onChange={v => u('water_targets','target1_serv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <SubHead text="Target 2 (2040)" />
-        {(() => { const s = (inputs.water_targets.target2_serv1||0)+(inputs.water_targets.target2_serv2||0)+(inputs.water_targets.target2_serv3||0)+(inputs.water_targets.target2_serv4||0)+(inputs.water_targets.target2_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.water_targets.target2_serv1||0)+(inputs.water_targets.target2_serv2||0)+(inputs.water_targets.target2_serv3||0)+(inputs.water_targets.target2_serv4||0)+(inputs.water_targets.target2_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ws[0]}`} value={inputs.water_targets.target2_serv1} onChange={v => u('water_targets','target2_serv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[1]}`} value={inputs.water_targets.target2_serv2} onChange={v => u('water_targets','target2_serv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
         <F label={`% ${ws[2]}`} value={inputs.water_targets.target2_serv3} onChange={v => u('water_targets','target2_serv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
@@ -431,25 +445,22 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title="5. Sanitation Targets" sectionKey="san_targets" onFocus={onSectionFocus}>
+      <Section title="5. Sanitation Targets" cols={2} sectionKey="san_targets" onFocus={onSectionFocus}>
         <SubHead text="On-site sanitation" />
-        <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed HHs served by on-site systems (septic tanks with fecal sludge collection). Provider shares + on-site must sum to 100%." />
-        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Providers ({Math.round((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) * 100)}%) + On-site ({Math.round((inputs.sanitation_targets.onsite_collection_treatment_pct || 0) * 100)}%) = {Math.round(((inputs.sanitation_targets.providers || []).reduce((s: number, p: any) => s + p.share_pct, 0) + (inputs.sanitation_targets.onsite_collection_treatment_pct || 0)) * 100)}%
-        </div>
+        <F label="On-site with collection & treatment %" value={inputs.sanitation_targets.onsite_collection_treatment_pct} onChange={v => u('sanitation_targets','onsite_collection_treatment_pct',v)} isPercent unit="%" min={0} max={1.0} tip="Share of safely managed households served by on-site systems (septic tanks with fecal sludge collection), as opposed to sewered systems." />
         <SubHead text="Service Targets" />
-        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Number of HHs per level calculated automatically from population
         </div>
         <SubHead text="Target 1 (2030)" />
-        {(() => { const s = (inputs.sanitation_targets.target1_sserv1||0)+(inputs.sanitation_targets.target1_sserv2||0)+(inputs.sanitation_targets.target1_sserv3||0)+(inputs.sanitation_targets.target1_sserv4||0)+(inputs.sanitation_targets.target1_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.sanitation_targets.target1_sserv1||0)+(inputs.sanitation_targets.target1_sserv2||0)+(inputs.sanitation_targets.target1_sserv3||0)+(inputs.sanitation_targets.target1_sserv4||0)+(inputs.sanitation_targets.target1_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ss[0]}`} value={inputs.sanitation_targets.target1_sserv1} onChange={v => u('sanitation_targets','target1_sserv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[1]}`} value={inputs.sanitation_targets.target1_sserv2} onChange={v => u('sanitation_targets','target1_sserv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[2]}`} value={inputs.sanitation_targets.target1_sserv3} onChange={v => u('sanitation_targets','target1_sserv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[3]}`} value={inputs.sanitation_targets.target1_sserv4} onChange={v => u('sanitation_targets','target1_sserv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[4]}`} value={inputs.sanitation_targets.target1_sserv5} onChange={v => u('sanitation_targets','target1_sserv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <SubHead text="Target 2 (2040)" />
-        {(() => { const s = (inputs.sanitation_targets.target2_sserv1||0)+(inputs.sanitation_targets.target2_sserv2||0)+(inputs.sanitation_targets.target2_sserv3||0)+(inputs.sanitation_targets.target2_sserv4||0)+(inputs.sanitation_targets.target2_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ width: '100%', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>Sum: {Math.round(s*10000)/100}%{bad?' (must be 100%)':' OK'}</div>; })()}
+        {(() => { const s = (inputs.sanitation_targets.target2_sserv1||0)+(inputs.sanitation_targets.target2_sserv2||0)+(inputs.sanitation_targets.target2_sserv3||0)+(inputs.sanitation_targets.target2_sserv4||0)+(inputs.sanitation_targets.target2_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
         <F label={`% ${ss[0]}`} value={inputs.sanitation_targets.target2_sserv1} onChange={v => u('sanitation_targets','target2_sserv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[1]}`} value={inputs.sanitation_targets.target2_sserv2} onChange={v => u('sanitation_targets','target2_sserv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
         <F label={`% ${ss[2]}`} value={inputs.sanitation_targets.target2_sserv3} onChange={v => u('sanitation_targets','target2_sserv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
@@ -518,7 +529,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             }
           };
           return (
-            <div style={{ width: '100%', display: 'flex', gap: 6, marginBottom: 8 }}>
+            <div style={{ gridColumn: '1 / -1', display: 'flex', gap: 6, marginBottom: 8 }}>
               {(['automatic', 'custom'] as const).map(m => (
                 <button key={m} onClick={() => setMode(m)} style={{
                   flex: 1, padding: '6px 12px', border: 'none', borderRadius: 6, cursor: 'pointer',
@@ -529,11 +540,11 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             </div>
           );
         })()}
-        <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 8, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Choose either automatic (evenly-spaced) or custom periods. Periods must not overlap. Leave a period blank if there are no planned investments for those years.
         </div>
         {(inputs.bau.period_mode || 'automatic') === 'automatic' && (
-          <div style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
+          <div style={{ gridColumn: '1 / -1', display: 'flex', alignItems: 'center', gap: 6, marginBottom: 8 }}>
             <label style={{ flex: 1, fontSize: 12, color: '#0000cc', fontWeight: 500 }}>Period length (years)</label>
             <select value={inputs.bau.period_unit_years || 5}
               onChange={e => {
@@ -572,7 +583,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
             {periods.map((p: any, idx: number) => {
               const hasOverlap = mode === 'custom' && overlaps(p, idx);
               return (
-              <div key={idx} style={{ width: '100%', border: hasOverlap ? '1.5px solid #ef4444' : '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px', marginBottom: 6, background: hasOverlap ? '#fef2f2' : '#f0fdf4' }}>
+              <div key={idx} style={{ gridColumn: '1 / -1', border: hasOverlap ? '1.5px solid #ef4444' : '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px', marginBottom: 6, background: hasOverlap ? '#fef2f2' : '#f0fdf4' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                   <span style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', flex: 1 }}>
                     Period {idx + 1}: {p.start}–{p.end}
@@ -596,7 +607,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
                 const newStart = lastEnd + 1;
                 const newP = { start: newStart, end: Math.min(newStart + 4, inputs.period.forecast_end_year), ws_inv: 0, san_inv: 0, is_custom: true };
                 onChange({ ...inputs, bau: { ...inputs.bau, investment_periods: [...periods, newP] } });
-              }} style={{ width: '100%', padding: '8px', border: '1px dashed #2563eb', borderRadius: 6, background: 'none', cursor: 'pointer', fontSize: 12, color: '#2563eb', marginBottom: 8 }}>
+              }} style={{ gridColumn: '1 / -1', padding: '8px', border: '1px dashed #2563eb', borderRadius: 6, background: 'none', cursor: 'pointer', fontSize: 12, color: '#2563eb', marginBottom: 8 }}>
                 + Add Period
               </button>
             )}
@@ -610,7 +621,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
           const wsPct = total > 0 ? wsGdp / total : 0;
           const sanPct = total > 0 ? sanGdp / total : 0;
           return <>
-            <div style={{ width: '100%', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+            <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
               Auto-calculated from water/sanitation budget as % of GDP (Data Input tab)
             </div>
             <F label="Water supply % of WSS budget" value={wsPct} onChange={() => {}} fieldType="computed" isPercent unit="%" tip={`Calculated: WS GDP% / (WS GDP% + SAN GDP%) = ${(wsGdp*100).toFixed(2)}% / ${(total*100).toFixed(2)}%`} />
