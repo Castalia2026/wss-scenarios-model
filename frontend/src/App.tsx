@@ -14,6 +14,7 @@ export default function App() {
   const [geoScope, setGeoScope] = useState<'urban' | 'rural' | 'national'>('urban');
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
   const [showGuide, setShowGuide] = useState(false);
+  const [guideSection, setGuideSection] = useState<string | null>(null);
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -201,10 +202,10 @@ export default function App() {
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" />
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {activeTab === 1 && inputs && (<>
-          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} />
+          <InputPanel inputs={inputs} onChange={handleSetInputs} geoScope={geoScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
             <BAUForecastChart sector={sectorTab} />
           </div>
@@ -226,7 +227,7 @@ export default function App() {
             }}>
               {showGuide ? '✕ Close' : '📋 Guide'}
             </button>
-            {showGuide && <DataGuide tab={activeTab} />}
+            {showGuide && <DataGuide tab={activeTab} activeSection={guideSection} />}
           </>
         )}
 
@@ -770,50 +771,142 @@ const guideData: Record<number, { title: string; sections: { heading: string; it
   },
 };
 
-function DataGuide({ tab }: { tab: number }) {
-  const guide = guideData[tab];
-  if (!guide) return null;
+// Contextual guide content keyed by sectionKey
+const contextualGuide: Record<string, { title: string; content: string; sources?: { name: string; url: string }[] }> = {
+  country: {
+    title: 'Country, Region & Currency',
+    content: 'Select the country and sub-national region for the analysis. The currency code determines the unit for all monetary inputs throughout the tool. Changing the country will auto-fill the currency if recognized.',
+    sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
+  },
+  macro: {
+    title: 'Time Scales & Macroeconomics',
+    content: 'Define the analysis time frame and enter year-by-year macroeconomic data. Model start year must be at least 3 years before baseline. Enter nominal GDP (not real) — the tool converts to real prices. GDP growth is auto-calculated. Population, household, and budget execution data are also entered here by year. For forecast years, enter projected values.',
+    sources: [
+      { name: 'IMF World Economic Outlook', url: 'https://www.imf.org/en/Publications/WEO' },
+      { name: 'World Bank Indicators', url: 'https://data.worldbank.org/' },
+      { name: 'UN Population Division', url: 'https://population.un.org/wpp/' },
+    ],
+  },
+  ws_service_levels: {
+    title: 'Water Supply Service Levels',
+    content: 'Enter the percentage of households at each of the 5 JMP service levels for both the start year and baseline year. All 5 levels must sum to 100%. The model uses these to calculate historical CAGRs and project BAU service levels forward. Enter data for all historical years you have — minimum 2 data points required.',
+    sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
+  },
+  san_service_levels: {
+    title: 'Sanitation Service Levels',
+    content: 'Same as water supply but for the 5 sanitation service levels. Includes sewered and on-site sanitation. All 5 levels must sum to 100%.',
+    sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
+  },
+  ws_targets: {
+    title: 'Water Supply Targets',
+    content: 'Enter current national targets for water supply service levels at Target 1 and Target 2 years. These represent the government\'s policy targets. Playing with alternative targets is done on the Results Dashboard.',
+    sources: [{ name: 'National WASH strategy document', url: '#' }],
+  },
+  san_targets: {
+    title: 'Sanitation Targets',
+    content: 'Enter current national targets for sanitation service levels. Include the on-site sanitation share separately.',
+    sources: [{ name: 'National WASH strategy document', url: '#' }],
+  },
+  ws_unit_costs: {
+    title: 'Water Supply Unit Costs',
+    content: 'Enter the capital cost per household to connect to the distribution network at each service level (except No Service). Also enter the cost per MLD of water treatment and costs for non-piped solutions. All costs should be in real terms at the base year price level.',
+    sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
+  },
+  san_unit_costs: {
+    title: 'Sanitation Unit Costs',
+    content: 'Enter sewerage cost per household at each service level, cost per MLD of wastewater treatment, on-site facility capex, and fecal sludge treatment costs.',
+    sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
+  },
+  planned_investments: {
+    title: 'Planned Investments',
+    content: 'If there are programmed investments that are additional to historical spending trends — with financing secured and genuinely likely to proceed — enter them here by period. These represent a shift from BAU that we are confident will happen. Select the period length and enter planned water supply and sanitation investments per period.',
+    sources: [{ name: 'Government budget documents / MTEF', url: '#' }],
+  },
+  technical: {
+    title: 'Technical Parameters',
+    content: 'Enter infrastructure parameters: asset useful life, non-household water share, treatment capacity (existing and planned), WHO water requirements, wastewater factors, and fecal sludge data. Treatment capacity figures should come from utility records or feasibility studies.',
+    sources: [
+      { name: 'WHO water requirements guideline', url: 'https://www.who.int/publications/i/item/9789241548151' },
+      { name: 'IBNET', url: 'https://www.ib-net.org/' },
+    ],
+  },
+  ws_interventions: {
+    title: 'Water Supply Interventions',
+    content: 'Define intervention parameters for water supply: collection efficiency, NRW reduction (target minimum 3%), capital efficiency, tariff reform, borrowing, and budget execution improvement. Each intervention can be toggled on/off. NRW target cannot go below 3% — even the best utilities globally achieve only 3-5%.',
+  },
+  san_interventions: {
+    title: 'Sanitation Interventions',
+    content: 'Define sanitation intervention parameters. Collection efficiency uses the same ratios as water supply (enter sewer tariff as % of water tariff). Includes capital efficiency, tariff reform, borrowing, budget execution, and microfinance for on-site sanitation.',
+  },
+  custom_interventions: {
+    title: 'Custom Interventions',
+    content: 'Add custom interventions for scenarios not covered by the standard set — for example, donor grants, climate finance, or PPP contributions. Choose from fixed annual amount, growing revenue stream, or per-household subsidy.',
+  },
+};
+
+function DataGuide({ tab, activeSection }: { tab: number; activeSection: string | null }) {
+  const scrollRef = React.useRef<HTMLDivElement>(null);
+  const activeRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (activeRef.current) {
+      activeRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, [activeSection]);
+
+  // Show all guide sections, highlight the active one
+  const allKeys = Object.keys(contextualGuide);
+
   return (
-    <div style={{
-      width: 340, borderLeft: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto',
+    <div ref={scrollRef} style={{
+      width: 320, borderLeft: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto',
       padding: '16px 18px', fontSize: 11, flexShrink: 0,
     }}>
-      <h3 style={{ fontSize: 13, fontWeight: 700, color: '#312e81', margin: '0 0 12px', borderBottom: '2px solid #c7d2fe', paddingBottom: 6 }}>
-        {guide.title}
+      <h3 style={{ fontSize: 14, fontWeight: 700, color: '#312e81', margin: '0 0 6px', borderBottom: '2px solid #c7d2fe', paddingBottom: 6 }}>
+        Guide
       </h3>
-      {guide.sections.map((sec, si) => (
-        <div key={si} style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6, background: '#e0e7ff', padding: '4px 8px', borderRadius: 4 }}>
-            {sec.heading}
-          </div>
-          {sec.items.map((item, ii) => (
-            <div key={ii} style={{ marginBottom: 8, paddingLeft: 8, borderLeft: '2px solid #e0e7ff' }}>
-              <div style={{ fontWeight: 600, color: '#334155', marginBottom: 2 }}>{item.field}</div>
-              <div style={{ color: '#64748b', lineHeight: 1.4 }}>
-                {item.source}
-                {item.url !== '#' && (
-                  <a href={item.url} target="_blank" rel="noopener noreferrer"
-                    style={{ display: 'block', color: '#4338ca', fontSize: 10, marginTop: 2, wordBreak: 'break-all' }}>
-                    {item.url}
-                  </a>
-                )}
-                {item.url === '#' && (
-                  <span style={{ display: 'block', color: '#94a3b8', fontSize: 10, marginTop: 2, fontStyle: 'italic' }}>
-                    URL placeholder — to be updated
-                  </span>
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      ))}
-      <div style={{ marginTop: 12, padding: '8px 10px', background: '#fef3c7', borderRadius: 6, fontSize: 10, color: '#92400e' }}>
-        <strong>Tip:</strong> If a specific data source is unavailable for your country, check the World Bank Open Data portal or contact the local WASH sector coordinator.
-        <a href="https://data.worldbank.org/" target="_blank" rel="noopener noreferrer"
-          style={{ display: 'block', color: '#92400e', marginTop: 4 }}>
-          https://data.worldbank.org/
-        </a>
+      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 12 }}>
+        Click on any input section to see guidance here.
       </div>
+
+      {allKeys.map(key => {
+        const g = contextualGuide[key];
+        const isActive = activeSection === key;
+        return (
+          <div key={key} ref={isActive ? activeRef : undefined} style={{
+            marginBottom: 10, padding: '8px 10px', borderRadius: 6,
+            background: isActive ? '#eef2ff' : '#fff',
+            border: isActive ? '2px solid #2563eb' : '1px solid #e5e7eb',
+            transition: 'all 0.3s',
+          }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#1e40af' : '#475569', marginBottom: 4 }}>
+              {isActive && <span style={{ color: '#2563eb', marginRight: 4 }}>▶</span>}
+              {g.title}
+            </div>
+            {isActive && (
+              <>
+                <div style={{ fontSize: 11, color: '#334155', lineHeight: 1.5, marginBottom: 6 }}>
+                  {g.content}
+                </div>
+                {g.sources && g.sources.length > 0 && (
+                  <div style={{ fontSize: 10, color: '#64748b' }}>
+                    <strong>Sources:</strong>
+                    {g.sources.map((s, i) => (
+                      <div key={i} style={{ marginTop: 2 }}>
+                        {s.url !== '#' ? (
+                          <a href={s.url} target="_blank" rel="noopener noreferrer" style={{ color: '#4338ca' }}>{s.name}</a>
+                        ) : (
+                          <span style={{ fontStyle: 'italic', color: '#94a3b8' }}>{s.name} (URL to be added)</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
