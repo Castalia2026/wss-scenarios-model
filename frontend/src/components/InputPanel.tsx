@@ -190,7 +190,7 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
         {isBAU && (
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 500, lineHeight: 1.5 }}>
             <span style={{ fontSize: 14, lineHeight: 1.3 }}>🔗</span>
-            <span><strong>BAU data entry</strong> — these same fields also appear on the <strong>Data Inputs</strong> tab. They're repeated here so you can adjust the BAU scenario directly from this tab whenever you need to. Edits made here and on Data Inputs stay in sync.</span>
+            <span><strong>BAU data entry</strong> — Data fields below are synced with corresponding entries on the <strong>Data Inputs</strong> tab. They can be used to edit the BAU scenario directly from this tab.</span>
           </div>
         )}
       </div>
