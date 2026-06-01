@@ -39,6 +39,10 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
   const displayMin = min !== undefined ? (isPercent ? Math.round(min * 1e10) / 1e8 : min) : undefined;
   const displayMax = max !== undefined ? (isPercent ? Math.round(max * 1e10) / 1e8 : max) : undefined;
   const outOfRange = (displayMin !== undefined && displayVal < displayMin) || (displayMax !== undefined && displayVal > displayMax);
+  // Show thousands separators for large amounts, but never for years or percentages
+  const looksLikeYear = !unit && !isPercent && Number.isInteger(value) && value >= 1900 && value <= 2100;
+  const useCommas = !isPercent && !looksLikeYear && Math.abs(displayVal) >= 1000;
+  const commaStr = useCommas ? displayVal.toLocaleString('en-US') : '';
 
   let tooltip = tip || '';
   if (displayMin !== undefined || displayMax !== undefined) {
@@ -65,10 +69,11 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
           fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
         }} title={tooltip}>i</span>}
       </label>
-      <input type="number" value={displayVal}
-        onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
+      <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
+        value={useCommas ? commaStr : displayVal}
+        onChange={e => { const v = parseFloat(e.target.value.replace(/,/g, '')); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
         step={isPercent ? 1 : (step || 1)}
-        min={displayMin} max={displayMax}
+        min={useCommas ? undefined : displayMin} max={useCommas ? undefined : displayMax}
         style={{
           width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
           border: outOfRange ? '1.5px solid #E74C3C' : isDerived ? '1px solid #DDE3EA' : '1px solid #F0D070',
