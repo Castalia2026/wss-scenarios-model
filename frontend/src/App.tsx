@@ -311,7 +311,15 @@ export default function App() {
             <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0 }}>
-            <BAUForecastChart sector={sectorTab} geoScope={chartScope} />
+            {chartScope === 'urban_rural' ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                <BAUForecastChart sector={sectorTab} geoScope="urban" />
+                <BAUForecastChart sector={sectorTab} geoScope="rural" />
+                <BAUForecastChart sector={sectorTab} geoScope="urban_rural" />
+              </div>
+            ) : (
+              <BAUForecastChart sector={sectorTab} geoScope={chartScope} />
+            )}
           </div>
         </>)}
         {activeTab === 2 && inputs && (
