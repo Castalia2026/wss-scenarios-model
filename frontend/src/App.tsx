@@ -225,39 +225,62 @@ export default function App() {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Geo scope bar — shown on tabs 0, 1, 2 */}
+        {/* Scope bar. Full controls (mode + include) only on Data Inputs; other tabs get just the Editing switch. */}
         {activeTab <= 3 && (
           <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Data entry mode:</span>
-              {([
-                { key: 'urban_rural', label: 'Urban / Rural', tip: 'Enter urban and rural data separately. Include both to produce a national total, or just one to analyse that area on its own.' },
-                { key: 'national', label: 'National', tip: 'This option should only be used if you do not have and cannot estimate urban/rural breakdowns for WSS data and access.' },
-              ] as const).map(m => (
-                <button key={m.key} onClick={() => setScopeMode(m.key)} title={m.tip} style={{
-                  padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                  background: scopeMode === m.key ? '#2563eb' : '#fff',
-                  color: scopeMode === m.key ? '#fff' : '#374151',
-                  fontWeight: scopeMode === m.key ? 700 : 500, fontSize: 13,
-                  boxShadow: scopeMode === m.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
-                  transition: 'all 0.15s',
-                }}>{m.label}</button>
-              ))}
-            </div>
-            {scopeMode === 'urban_rural' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Include:</span>
-                {([{ key: 'urban', on: areaUrban }, { key: 'rural', on: areaRural }] as const).map(a => (
-                  <button key={a.key} onClick={() => toggleArea(a.key)} style={{
-                    padding: '5px 14px', border: a.on ? '1px solid #2563eb' : '1px solid #cbd5e1', borderRadius: 14, cursor: 'pointer',
-                    background: a.on ? '#2563eb' : '#fff',
-                    color: a.on ? '#fff' : '#94a3b8',
-                    fontWeight: a.on ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
-                  }}>{a.on ? '✓ ' : ''}{a.key}</button>
-                ))}
+            {activeTab === 0 ? (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Data entry mode:</span>
+                  {([
+                    { key: 'urban_rural', label: 'Urban / Rural', tip: 'Enter urban and rural data separately. Include both to produce a national total, or just one to analyse that area on its own.' },
+                    { key: 'national', label: 'National', tip: 'This option should only be used if you do not have and cannot estimate urban/rural breakdowns for WSS data and access.' },
+                  ] as const).map(m => (
+                    <button key={m.key} onClick={() => setScopeMode(m.key)} title={m.tip} style={{
+                      padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
+                      background: scopeMode === m.key ? '#2563eb' : '#fff',
+                      color: scopeMode === m.key ? '#fff' : '#374151',
+                      fontWeight: scopeMode === m.key ? 700 : 500, fontSize: 13,
+                      boxShadow: scopeMode === m.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
+                      transition: 'all 0.15s',
+                    }}>{m.label}</button>
+                  ))}
+                </div>
+                {scopeMode === 'urban_rural' && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Include:</span>
+                    {([{ key: 'urban', on: areaUrban }, { key: 'rural', on: areaRural }] as const).map(a => (
+                      <button key={a.key} onClick={() => toggleArea(a.key)} style={{
+                        padding: '5px 14px', border: a.on ? '1px solid #2563eb' : '1px solid #cbd5e1', borderRadius: 14, cursor: 'pointer',
+                        background: a.on ? '#2563eb' : '#fff',
+                        color: a.on ? '#fff' : '#94a3b8',
+                        fontWeight: a.on ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
+                      }}>{a.on ? '✓ ' : ''}{a.key}</button>
+                    ))}
+                    {both ? (
+                      <>
+                        <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginLeft: 8 }}>Editing:</span>
+                        {(['urban', 'rural'] as const).map(a => (
+                          <button key={a} onClick={() => setSubArea(a)} style={{
+                            padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
+                            background: subArea === a ? '#312e81' : '#fff',
+                            color: subArea === a ? '#fff' : '#475569',
+                            fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
+                          }}>{a}</button>
+                        ))}
+                        <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Graphs &amp; outputs show National (Urban + Rural).</span>
+                      </>
+                    ) : (
+                      <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginLeft: 4 }}>Graphs &amp; outputs show {onlyRural ? 'Rural' : 'Urban'} only.</span>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {both ? (
                   <>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginLeft: 8 }}>Editing:</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
                     {(['urban', 'rural'] as const).map(a => (
                       <button key={a} onClick={() => setSubArea(a)} style={{
                         padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
@@ -266,10 +289,13 @@ export default function App() {
                         fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
                       }}>{a}</button>
                     ))}
-                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Graphs &amp; outputs show National (Urban + Rural).</span>
+                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Graphs &amp; outputs show National (Urban + Rural). Change the scope on the Data Inputs tab.</span>
                   </>
                 ) : (
-                  <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginLeft: 4 }}>Graphs &amp; outputs show {onlyRural ? 'Rural' : 'Urban'} only.</span>
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    Scope: <strong style={{ color: '#312e81' }}>{scopeMode === 'national' ? 'National' : onlyRural ? 'Rural' : 'Urban'}</strong>
+                    <span style={{ fontStyle: 'italic', marginLeft: 6 }}>(set on the Data Inputs tab)</span>
+                  </span>
                 )}
               </div>
             )}

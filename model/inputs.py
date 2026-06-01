@@ -540,18 +540,19 @@ class CustomIntervention(BaseModel):
 
 
 class InterventionToggles(BaseModel):
+    # All interventions start switched off; the user enables the ones they want to model.
     # Water supply
-    ws_collection_nrw_enabled: bool = True
-    ws_capital_efficiency_enabled: bool = True
-    ws_tariff_enabled: bool = True
-    ws_borrowing_enabled: bool = True
+    ws_collection_nrw_enabled: bool = False
+    ws_capital_efficiency_enabled: bool = False
+    ws_tariff_enabled: bool = False
+    ws_borrowing_enabled: bool = False
 
     # Sanitation
-    san_collection_enabled: bool = True
-    san_capital_efficiency_enabled: bool = True
-    san_tariff_enabled: bool = True
-    san_borrowing_enabled: bool = True
-    san_microfinance_enabled: bool = True
+    san_collection_enabled: bool = False
+    san_capital_efficiency_enabled: bool = False
+    san_tariff_enabled: bool = False
+    san_borrowing_enabled: bool = False
+    san_microfinance_enabled: bool = False
 
 
 class ModelInputs(BaseModel):

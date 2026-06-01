@@ -362,11 +362,14 @@ export default function InputPanel({ inputs, onChange, onCalculate, loading, sho
 
           const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
             sectionRow('Economic'),
-            { label: 'Nominal GDP ($B)', tip: 'Gross domestic product in current US dollars (billions)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
-            { label: 'GDP growth %', tip: 'Year-on-year GDP growth rate, auto-calculated from nominal GDP', computed: true, cells: years.map((_: number, i: number) => {
-              const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
-            }) },
+            // GDP is only needed when the budget is entered as a % of GDP; in 'direct' mode we don't ask for it.
+            ...(budgetMode === 'direct' ? [] : [
+              { label: 'Nominal GDP ($B)', tip: 'Gross domestic product in current US dollars (billions)', cells: years.map((_: number, i: number) => mInput('gdp_nominal_usd', i, gdpArr[i]||0, false)) },
+              { label: 'GDP growth %', tip: 'Year-on-year GDP growth rate, auto-calculated from nominal GDP', computed: true, cells: years.map((_: number, i: number) => {
+                const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
+                return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 ? g.toFixed(1)+'%' : '—'}</span>;
+              }) },
+            ]),
             { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual consumer price inflation rate for the domestic economy', cells: years.map((_: number, i: number) => mInput('inflation_nepal', i, (inputs.macro.inflation_nepal||[])[i]||0, true)) },
             { label: 'Infl US %', tip: 'Annual US consumer price inflation rate', cells: years.map((_: number, i: number) => mInput('inflation_us', i, (inputs.macro.inflation_us||[])[i]||0, true)) },
             { label: `USD/${CUR}`, tip: 'Exchange rate: US dollars per unit of local currency', cells: years.map((_: number, i: number) => mInput('exchange_rate', i, (inputs.macro.exchange_rate||[])[i]||0, false)) },
