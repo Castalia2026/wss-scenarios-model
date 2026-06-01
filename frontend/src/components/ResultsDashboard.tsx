@@ -115,78 +115,36 @@ interface Props {
 export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props) {
   const [activeSector, setActiveSector] = useState<'water' | 'sanitation'>('water');
   return (
-    <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
+      {/* Main scrollable charts area */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
       {/* Prototype banner */}
       <div style={{ background: '#fef3c7', padding: '8px 14px', borderRadius: 6, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
         <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
       </div>
 
-      {/* Intervention toggles */}
-      <div style={{ background: '#f0f4ff', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #c7d2fe' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 6 }}>Toggle interventions</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
-            <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 11, cursor: 'pointer', padding: '4px 10px', background: '#fff', borderRadius: 5, border: '1px solid #e0e7ff' }}>
-              <input type="checkbox" defaultChecked style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
-              <span>{name}</span>
-            </label>
-          ))}
-        </div>
-        <div style={{ fontSize: 10, color: '#64748b', marginTop: 6, fontStyle: 'italic' }}>
-          In the full tool, toggling these will update the charts in real time.
-        </div>
-      </div>
-
-      {/* Target adjustment */}
-      <div style={{ background: '#fefce8', padding: '10px 14px', borderRadius: 8, marginBottom: 16, border: '1px solid #fde68a' }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 6 }}>Adjust targets</div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
-          <div style={{ fontSize: 11, color: '#78350f' }}>
-            <label>Target 1 year: </label>
-            <input type="number" defaultValue={inputs?.period?.target1_year || 2030}
-              style={{ width: 60, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
-          </div>
-          <div style={{ fontSize: 11, color: '#78350f' }}>
-            <label>Target 2 year: </label>
-            <input type="number" defaultValue={inputs?.period?.target2_year || 2040}
-              style={{ width: 60, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
-          </div>
-          <div style={{ fontSize: 10, color: '#92400e', fontStyle: 'italic' }}>
-            In the full tool, changing targets here will update projections in real time.
-          </div>
-        </div>
-      </div>
-
-      {/* Sector tabs */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {(['water', 'sanitation'] as const).map(s => (
-          <button key={s} onClick={() => setActiveSector(s)} style={{
-            padding: '7px 18px', border: 'none', borderRadius: 5, cursor: 'pointer',
-            background: activeSector === s ? '#2563eb' : '#e5e7eb',
-            color: activeSector === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
-          }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
-        ))}
-      </div>
-
-      {/* Three charts per the spec: rural, urban, national */}
-      {(geoScope === 'national' || geoScope === 'urban_rural') ? (
+      {/* Coverage charts vary with the selected scope */}
+      {geoScope === 'urban_rural' ? (
+        // Both Urban and Rural included → show each area plus the national aggregate
         <>
           <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <MockChart data={nationalWater} title={`National ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress (Urban + Rural)`} />
         </>
+      ) : geoScope === 'national' ? (
+        <MockChart data={nationalWater} title={`National ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
       ) : geoScope === 'rural' ? (
         <>
           <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Switch to <strong>National</strong> scope to see how rural feeds into national targets
+            Include <strong>Urban</strong> as well to see the national total.
           </div>
         </>
       ) : (
         <>
           <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
           <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Switch to <strong>National</strong> scope to see how urban feeds into national targets
+            Include <strong>Rural</strong> as well to see the national total.
           </div>
         </>
       )}
@@ -260,6 +218,61 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
           </div>
         </div>
       )}
+      </div>
+
+      {/* Right-hand control panel — stays visible while you scroll the charts */}
+      <div style={{ width: 250, flexShrink: 0, borderLeft: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#312e81', marginBottom: 4 }}>Controls</div>
+        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 14, fontStyle: 'italic' }}>Adjust these while viewing any graph.</div>
+
+        {/* Sector */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Sector</div>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+          {(['water', 'sanitation'] as const).map(s => (
+            <button key={s} onClick={() => setActiveSector(s)} style={{
+              flex: 1, padding: '7px 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
+              background: activeSector === s ? '#2563eb' : '#e5e7eb',
+              color: activeSector === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
+            }}>{s === 'water' ? 'Water' : 'Sanitation'}</button>
+          ))}
+        </div>
+
+        {/* Intervention toggles */}
+        <div style={{ background: '#f0f4ff', padding: '10px 12px', borderRadius: 8, marginBottom: 14, border: '1px solid #c7d2fe' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 8 }}>Toggle interventions</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
+              <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', padding: '5px 8px', background: '#fff', borderRadius: 5, border: '1px solid #e0e7ff' }}>
+                <input type="checkbox" defaultChecked style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
+                <span>{name}</span>
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 10, color: '#64748b', marginTop: 8, fontStyle: 'italic' }}>
+            In the full tool, toggling these updates the charts in real time.
+          </div>
+        </div>
+
+        {/* Target adjustment */}
+        <div style={{ background: '#fefce8', padding: '10px 12px', borderRadius: 8, border: '1px solid #fde68a' }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>Adjust targets</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 11, color: '#78350f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Target 1 year</span>
+              <input type="number" defaultValue={inputs?.period?.target1_year || 2030}
+                style={{ width: 64, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
+            </label>
+            <label style={{ fontSize: 11, color: '#78350f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span>Target 2 year</span>
+              <input type="number" defaultValue={inputs?.period?.target2_year || 2040}
+                style={{ width: 64, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
+            </label>
+          </div>
+          <div style={{ fontSize: 10, color: '#92400e', marginTop: 8, fontStyle: 'italic' }}>
+            In the full tool, changing targets updates projections in real time.
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
