@@ -49,7 +49,8 @@ const COLORS = {
   tariff: '#8b5cf6', loan: '#ec4899', inv_need: '#ef4444', bau_inv: '#64748b',
 };
 
-function MockChart({ data, title }: { data: any[]; title: string }) {
+interface LayerActive { ceNrw: boolean; capeff: boolean; tariff: boolean; borrowing: boolean }
+function MockChart({ data, title, active }: { data: any[]; title: string; active: LayerActive }) {
   return (
     <div style={{ marginBottom: 28 }}>
       <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>{title}</h3>
@@ -61,10 +62,10 @@ function MockChart({ data, title }: { data: any[]; title: string }) {
           <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} legendType="rect" />
-          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />
-          <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />
-          <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} legendType="rect" />
-          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={COLORS.loan} stroke={COLORS.loan} fillOpacity={0.6} legendType="rect" />
+          {active.ceNrw && <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />}
+          {active.capeff && <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />}
+          {active.tariff && <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} legendType="rect" />}
+          {active.borrowing && <Area type="monotone" dataKey="Borrowing" stackId="1" fill={COLORS.loan} stroke={COLORS.loan} fillOpacity={0.6} legendType="rect" />}
           <Line type="monotone" dataKey="Target" stroke={COLORS.target} strokeWidth={2.5} dot={false} strokeDasharray="6 3" legendType="plainline" />
         </ComposedChart>
       </ResponsiveContainer>
@@ -114,40 +115,36 @@ interface Props {
 
 export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props) {
   const [activeSector, setActiveSector] = useState<'water' | 'sanitation'>('water');
+  // Local view scope for the dashboard charts (chosen from the dropdown in the side panel)
+  const [viewScope, setViewScope] = useState<'urban' | 'rural' | 'national'>(
+    geoScope === 'urban' ? 'urban' : geoScope === 'rural' ? 'rural' : 'national'
+  );
+  const [activeIntv, setActiveIntv] = useState<Record<string, boolean>>({
+    'Collection Efficiency': true, 'NRW Reduction': true, 'Capital Efficiency': true,
+    'Tariff Reform': true, 'Borrowing': true, 'Budget Execution': true,
+  });
+  const layerActive = {
+    ceNrw: !!(activeIntv['Collection Efficiency'] || activeIntv['NRW Reduction']),
+    capeff: !!activeIntv['Capital Efficiency'],
+    tariff: !!activeIntv['Tariff Reform'],
+    borrowing: !!activeIntv['Borrowing'],
+  };
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
       {/* Main scrollable charts area */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '20px 28px' }}>
+      <div style={{ flex: 3, minWidth: 0, overflowY: 'auto', padding: '20px 28px' }}>
       {/* Prototype banner */}
       <div style={{ background: '#fef3c7', padding: '8px 14px', borderRadius: 6, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
         <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
       </div>
 
-      {/* Coverage charts vary with the selected scope */}
-      {geoScope === 'urban_rural' ? (
-        // Both Urban and Rural included → show each area plus the national aggregate
-        <>
-          <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
-          <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
-          <MockChart data={nationalWater} title={`National ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress (Urban + Rural)`} />
-        </>
-      ) : geoScope === 'national' ? (
-        <MockChart data={nationalWater} title={`National ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
-      ) : geoScope === 'rural' ? (
-        <>
-          <MockChart data={ruralWater} title={`Rural ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
-          <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Include <strong>Urban</strong> as well to see the national total.
-          </div>
-        </>
-      ) : (
-        <>
-          <MockChart data={urbanWater} title={`Urban ${activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Coverage Progress`} />
-          <div style={{ fontSize: 11, color: '#94a3b8', textAlign: 'center', padding: 16, background: '#f8fafc', borderRadius: 6, marginBottom: 20 }}>
-            Include <strong>Rural</strong> as well to see the national total.
-          </div>
-        </>
-      )}
+      {/* Coverage chart for the scope chosen in the side panel */}
+      {(() => {
+        const sectorName = activeSector === 'water' ? 'Water Supply' : 'Sanitation';
+        const data = viewScope === 'rural' ? ruralWater : viewScope === 'urban' ? urbanWater : nationalWater;
+        const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
+        return <MockChart data={data} title={`${scopeName} ${sectorName} — Coverage Progress`} active={layerActive} />;
+      })()}
 
       {/* Financing gap chart */}
       <div style={{ marginBottom: 28 }}>
@@ -192,7 +189,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
             ].map(([label, ...vals]) => (
               <tr key={label}>
                 <td style={tdStyle}>{label}</td>
-                {vals.map((v, i) => <td key={i} style={{ ...tdStyle, textAlign: 'right', fontFamily: 'monospace' }}>{v}</td>)}
+                {vals.map((v, i) => <td key={i} style={{ ...tdStyle, textAlign: 'left', fontFamily: 'monospace' }}>{v}</td>)}
               </tr>
             ))}
           </tbody>
@@ -221,9 +218,21 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
       </div>
 
       {/* Left-hand control panel — stays visible while you scroll the charts */}
-      <div style={{ order: -1, width: 250, flexShrink: 0, borderRight: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
+      <div style={{ order: -1, flex: 2, minWidth: 220, borderRight: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#312e81', marginBottom: 4 }}>Controls</div>
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 14, fontStyle: 'italic' }}>Adjust these while viewing any graph.</div>
+
+        {/* Geographic scope */}
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Geographic scope</div>
+        <div style={{ position: 'relative', marginBottom: 16 }}>
+          <select value={viewScope} onChange={e => setViewScope(e.target.value as 'urban' | 'rural' | 'national')}
+            style={{ width: '100%', padding: '7px 28px 7px 8px', borderRadius: 5, border: '1px solid #94a3b8', fontSize: 12, background: '#fff', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}>
+            <option value="urban">Urban</option>
+            <option value="rural">Rural</option>
+            <option value="national">National</option>
+          </select>
+          <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 10, color: '#475569' }}>▼</span>
+        </div>
 
         {/* Sector */}
         <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Sector</div>
@@ -243,13 +252,13 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
               <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', padding: '5px 8px', background: '#fff', borderRadius: 5, border: '1px solid #e0e7ff' }}>
-                <input type="checkbox" defaultChecked style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
+                <input type="checkbox" checked={!!activeIntv[name]} onChange={e => setActiveIntv(p => ({ ...p, [name]: e.target.checked }))} style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
                 <span>{name}</span>
               </label>
             ))}
           </div>
           <div style={{ fontSize: 10, color: '#64748b', marginTop: 8, fontStyle: 'italic' }}>
-            In the full tool, toggling these updates the charts in real time.
+            Toggle these to add or remove each layer from the coverage charts.
           </div>
         </div>
 
