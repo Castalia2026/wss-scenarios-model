@@ -16,7 +16,7 @@ function Section({ title, children, defaultOpen = false, cols = 3, sectionKey, o
       }}>
         {title}<span>{open ? '▴' : '▾'}</span>
       </button>
-      {open && <div style={{ padding: '10px 14px 12px', display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '12px 16px', alignItems: 'start' }}>{children}</div>}
+      {open && <div onFocusCapture={() => { if (sectionKey && onFocus) onFocus(sectionKey); }} onClickCapture={() => { if (sectionKey && onFocus) onFocus(sectionKey); }} style={{ padding: '10px 14px 12px', display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: '12px 16px', alignItems: 'start' }}>{children}</div>}
     </div>
   );
 }

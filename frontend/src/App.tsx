@@ -225,8 +225,8 @@ export default function App() {
 
       {/* Main Content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        {/* Scope bar. Full controls (mode + include) only on Data Inputs; other tabs get just the Editing switch. */}
-        {activeTab <= 3 && (
+        {/* Scope bar. Full controls (mode + include) only on Data Inputs; BAU & Intervention get just the Editing switch. The dashboard has its own scope dropdown. */}
+        {activeTab <= 2 && (
           <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px' }}>
             {activeTab === 0 ? (
               <>
@@ -307,8 +307,10 @@ export default function App() {
           <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {activeTab === 1 && inputs && (<>
-          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
+          <div style={{ flex: '0 1 460px', display: 'flex', minWidth: 0 }}>
+            <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          </div>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0 }}>
             <BAUForecastChart sector={sectorTab} geoScope={chartScope} />
           </div>
         </>)}
@@ -387,6 +389,7 @@ export default function App() {
 function OnboardingModal({ onClose }: { onClose: () => void }) {
   const [closing, setClosing] = React.useState(false);
   const [showArrow, setShowArrow] = React.useState(false);
+  const [ovTab, setOvTab] = React.useState<'start' | 'saving'>('start');
 
   const handleGetStarted = () => {
     // Show arrow animation pointing to the Tool Overview button — only the first time
@@ -420,7 +423,20 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
       {!closing && (
         <div style={{ background: '#fff', borderRadius: 12, maxWidth: 1040, width: '96%', maxHeight: '96vh', overflowY: 'auto', padding: '22px 40px' }} onClick={e => e.stopPropagation()}>
-          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 6px' }}>How to use this tool</h2>
+          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 10px' }}>Tool Overview</h2>
+
+          {/* Tab bar */}
+          <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid #e2e8f0', marginBottom: 14 }}>
+            {([{ k: 'start', l: 'How to use this tool' }, { k: 'saving', l: 'Saving your work' }] as const).map(t => (
+              <button key={t.k} onClick={() => setOvTab(t.k)} style={{
+                padding: '8px 16px', border: 'none', borderBottom: ovTab === t.k ? '2px solid #2563eb' : '2px solid transparent',
+                background: 'none', cursor: 'pointer', fontSize: 13, marginBottom: -1,
+                color: ovTab === t.k ? '#2563eb' : '#64748b', fontWeight: ovTab === t.k ? 700 : 500,
+              }}>{t.l}</button>
+            ))}
+          </div>
+
+          {ovTab === 'start' && <>
           <p style={{ fontSize: 13, color: '#475569', margin: '0 0 8px', lineHeight: 1.5 }}>
             This tool helps you build water supply and sanitation (WSS) financing scenarios for a country or region. You enter recent historical data and policy targets, the tool projects a business-as-usual (BAU) outlook, and you test how interventions close the gap to those targets and what they cost.
           </p>
@@ -451,12 +467,31 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
           <div style={{ display: 'flex', gap: 10, marginTop: 12 }}>
             <div style={{ flex: 1, padding: '8px 14px', background: '#f0f4ff', borderRadius: 8, fontSize: 12, color: '#312e81', border: '1px solid #c7d2fe', lineHeight: 1.45 }}>
-              <strong>Tip:</strong> Reopen this guide anytime via <strong>"📖 Tool Overview"</strong> in the top-right of the header.
+              <strong>Tip:</strong> Reopen this anytime via <strong>"📖 Tool Overview"</strong> in the top-right, and see <strong>Saving your work</strong> above for how to save and load.
             </div>
             <div style={{ flex: 1, padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e', lineHeight: 1.45 }}>
               <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
             </div>
           </div>
+          </>}
+
+          {ovTab === 'saving' && <>
+          <p style={{ fontSize: 13, color: '#475569', margin: '0 0 10px', lineHeight: 1.5 }}>
+            Two save options sit in the top-right of the header. A <strong>Profile</strong> is a complete, reloadable dataset for a place; a <strong>Scenario</strong> is a lightweight snapshot you compare against others.
+          </p>
+          <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 12, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>💾 Save Profile</div>
+            <div style={{ fontSize: 13, color: '#475569' }}>
+              Stores everything you have entered — country settings, the year-by-year data, BAU inputs and interventions — under a name. Saved profiles reappear in the <strong>Load Profile…</strong> dropdown (top-left) so you can return later or keep several places side by side. Loading a profile replaces what is on screen, so save first if needed.
+            </div>
+          </div>
+          <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', lineHeight: 1.5 }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>📋 Save Scenario</div>
+            <div style={{ fontSize: 13, color: '#475569' }}>
+              Captures a snapshot of the current inputs for comparison — e.g. save "Ambitious 2040", change assumptions, save "Conservative 2040". Saved scenarios appear on the Results Dashboard and Export tab, where each can be downloaded as its own PowerPoint slide.
+            </div>
+          </div>
+          </>}
 
           <button onClick={handleGetStarted}
             style={{ marginTop: 12, width: '100%', padding: '11px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>
@@ -699,15 +734,43 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_interventions: {
     title: 'Water Supply Interventions',
-    content: 'Define intervention parameters for water supply: collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement. Each intervention can be toggled on/off. The NRW target cannot go below 3%, as even the best utilities globally achieve only 3-5%.',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The available water supply interventions are collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement.</p>
+        <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on (this adds it to the graph). Click <strong>▾ Show</strong> on the right of its row to open the parameter dropdown, fill in the fields, then click <strong>▴ Hide</strong> to collapse it again. Ticking and the dropdown are independent — you can review parameters without enabling the intervention, and switching it off does not collapse the panel.</p>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+          <li><strong>Collection efficiency:</strong> set the start/target years and the current and target collection ratios (revenue collected ÷ revenue billed).</li>
+          <li><strong>NRW reduction:</strong> set current and target non-revenue water. The target cannot go below 3%, as even the best utilities globally achieve only 3–5%. Allow a few years' lag before benefits appear.</li>
+          <li><strong>Capital efficiency:</strong> the % reduction in unit capital costs from better procurement and project management (typically 10–30%).</li>
+          <li><strong>Tariff reform:</strong> set the affordability ceiling and the O&amp;M cost-recovery target to reach.</li>
+          <li><strong>Borrowing:</strong> set the loan terms (DSCR, grace period, tenor, interest rate) used to raise upfront finance against future cashflow.</li>
+        </ul>
+      </div>
+    ),
   },
   san_interventions: {
     title: 'Sanitation Interventions',
-    content: 'Define sanitation intervention parameters. Collection efficiency uses the same ratios as water supply (enter sewer tariff as % of water tariff). Includes capital efficiency, tariff reform, borrowing, budget execution, and microfinance for on-site sanitation.',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The available sanitation interventions are collection efficiency, capital efficiency, tariff reform, borrowing, budget execution improvement, and microfinance for on-site sanitation.</p>
+        <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on, then click <strong>▾ Show</strong> to open its parameter dropdown, fill in the fields, and click <strong>▴ Hide</strong> to collapse. The checkbox (which drives the graph) and the Show/Hide dropdown work independently.</p>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+          <li><strong>Collection efficiency:</strong> uses the same ratios as water supply — enter the sewer tariff as a % of the water tariff.</li>
+          <li><strong>Capital efficiency, tariff reform, borrowing:</strong> entered the same way as on the water supply side.</li>
+          <li><strong>Microfinance:</strong> for households investing in their own on-site sanitation.</li>
+        </ul>
+      </div>
+    ),
   },
   custom_interventions: {
     title: 'Custom Interventions',
-    content: 'Add custom interventions for scenarios not covered by the standard set — for example, donor grants, climate finance, or PPP contributions. Choose from fixed annual amount, growing revenue stream, or per-household subsidy.',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>Add interventions not covered by the standard set — for example donor grants, climate finance, or PPP contributions.</p>
+        <p style={{ margin: '0 0 6px' }}>Click <strong>+ Add Custom Intervention</strong>, name it, then choose its <strong>Sector</strong> and <strong>Type</strong> from the two dropdowns (▾). A new intervention defaults to the sector currently selected by the Water Supply / Sanitation toggle above; change it to Sanitation or Both if needed.</p>
+        <p style={{ margin: 0 }}>The <strong>Type</strong> dropdown sets which fields appear: <em>Fixed annual amount</em> (a constant yearly sum), <em>Revenue stream</em> (a starting amount that grows each year), or <em>Per-household subsidy</em> (an amount per household connected).</p>
+      </div>
+    ),
   },
 };
 

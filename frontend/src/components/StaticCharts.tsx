@@ -82,7 +82,10 @@ export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sec
 }
 
 // ─── Intervention Impact Charts ───
-function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
+export interface IntvActive { collectionNrw: boolean; capital: boolean; tariff: boolean; borrowing: boolean }
+const ALL_ACTIVE: IntvActive = { collectionNrw: true, capital: true, tariff: true, borrowing: true };
+
+function makeIntvData(sector: 'water' | 'sanitation', geoScope: string, active: IntvActive) {
   const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
   const baseBau = sector === 'water' ? 0.4 : 0.25;
   const bauSlope = sector === 'water' ? 0.5 : 0.4;
@@ -97,16 +100,21 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string) {
     const intv = y <= 2027 ? 0 : (y - 2027);
     const totalHH = (0.8 + t * 0.7) * f.total;
     const bauHH = (baseBau + t * 0.4 * bauSlope) * f.bau;
+    // Only count the contribution of interventions that are switched on
+    const ce  = active.collectionNrw ? intv * ceSlope  * f.tgt : 0;
+    const cap = active.capital       ? intv * capSlope * f.tgt : 0;
+    const tar = active.tariff        ? intv * tarSlope * f.tgt : 0;
+    const bor = active.borrowing     ? intv * borSlope * f.tgt : 0;
     // Target ramps from the BAU line at tgtStart up to the Total-households line (100%) at tgtEnd
     const tFrac = y <= tgtStart ? 0 : Math.min(1, (y - tgtStart) / (tgtEnd - tgtStart));
     return {
       year: y,
       'Total households': +totalHH.toFixed(2),
       'BAU': +bauHH.toFixed(2),
-      'Collection & NRW': +(intv * ceSlope * f.tgt).toFixed(3),
-      'Capital efficiency': +(intv * capSlope * f.tgt).toFixed(3),
-      'Tariff increase': +(intv * tarSlope * f.tgt).toFixed(3),
-      'Borrowing': +(intv * borSlope * f.tgt).toFixed(3),
+      'Collection & NRW': +ce.toFixed(3),
+      'Capital efficiency': +cap.toFixed(3),
+      'Tariff increase': +tar.toFixed(3),
+      'Borrowing': +bor.toFixed(3),
       'Target': +(bauHH + tFrac * (totalHH - bauHH)).toFixed(2),
     };
   });
@@ -120,8 +128,8 @@ const INTV_COLORS = {
   'Borrowing': '#ec4899',         // pink
 };
 
-export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }: { sector?: 'water' | 'sanitation'; geoScope?: string }) {
-  const data = makeIntvData(sector, geoScope);
+export function InterventionImpactChart({ sector = 'water', geoScope = 'urban', active = ALL_ACTIVE }: { sector?: 'water' | 'sanitation'; geoScope?: string; active?: IntvActive }) {
+  const data = makeIntvData(sector, geoScope, active);
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
   const scopeLabel = scopeLabelFor(geoScope);
   const serviceLabel = sector === 'water' ? 'treated, piped water' : 'safely managed sanitation';
@@ -133,6 +141,9 @@ export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }
       <div style={{ fontSize: 10, color: '#92400e', background: '#fef3c7', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Static example data — {scopeLabel} scope
       </div>
+      <div style={{ fontSize: 11, color: '#475569', background: '#f1f5f9', padding: '6px 10px', borderRadius: 4, marginBottom: 10, lineHeight: 1.5 }}>
+        Each band is one intervention, measured in <strong>households (millions)</strong>. It shows the <strong>additional households you could extend service to</strong> using the funds that intervention frees up or mobilises (e.g. revenue recovered, costs saved, or financing raised), stacked on top of the BAU coverage.
+      </div>
       <ResponsiveContainer width="100%" height={380}>
         <ComposedChart data={data} margin={{ top: 10, right: 20, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -142,17 +153,17 @@ export function InterventionImpactChart({ sector = 'water', geoScope = 'urban' }
           </YAxis>
           <Tooltip formatter={(value: number) => value.toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          {/* Stacked intervention areas — box legend */}
+          {/* Stacked intervention areas — only the switched-on ones are drawn */}
           <Area type="monotone" dataKey="BAU" stackId="1" fill={INTV_COLORS['BAU']} stroke="#94a3b8" fillOpacity={0.75} legendType="rect"
             name={`Households with ${serviceLabel} under BAU`} />
-          <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={INTV_COLORS['Collection & NRW']} stroke={INTV_COLORS['Collection & NRW']} fillOpacity={0.75} legendType="rect"
-            name="Increased collection efficiency & NRW reduction" />
-          <Area type="monotone" dataKey="Capital efficiency" stackId="1" fill={INTV_COLORS['Capital efficiency']} stroke={INTV_COLORS['Capital efficiency']} fillOpacity={0.75} legendType="rect"
-            name="Increased efficiency in capital expenditure" />
-          <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.75} legendType="rect"
-            name="Tariff increase" />
-          <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.75} legendType="rect"
-            name="Borrow against future cashflow" />
+          {active.collectionNrw && <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={INTV_COLORS['Collection & NRW']} stroke={INTV_COLORS['Collection & NRW']} fillOpacity={0.75} legendType="rect"
+            name="Increased collection efficiency & NRW reduction" />}
+          {active.capital && <Area type="monotone" dataKey="Capital efficiency" stackId="1" fill={INTV_COLORS['Capital efficiency']} stroke={INTV_COLORS['Capital efficiency']} fillOpacity={0.75} legendType="rect"
+            name="Increased efficiency in capital expenditure" />}
+          {active.tariff && <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.75} legendType="rect"
+            name="Tariff increase" />}
+          {active.borrowing && <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.75} legendType="rect"
+            name="Borrow against future cashflow" />}
           {/* Total HHs dashed line — line legend */}
           <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={false} legendType="plainline"
             strokeDasharray="8 4" name="Total households" />

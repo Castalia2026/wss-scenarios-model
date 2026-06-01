@@ -58,46 +58,29 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
   );
 }
 
-// Toggle with an independently collapsible parameter panel.
-// The panel auto-opens the first time the intervention is switched on; after that the user
-// expands/collapses it manually with the Configure/Hide control.
+// Toggle with a parameter panel that is opened/closed only by its own Show/Hide button.
+// The checkbox just enables/disables the intervention (drives the graph) and never opens or closes the panel.
 function InterventionToggle({ label, checked, onChange, children, onFocus }: {
   label: string; checked: boolean; onChange: (v: boolean) => void; children: React.ReactNode; onFocus?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
-  const prevChecked = React.useRef(checked);
-  const autoExpanded = React.useRef(false);
-
-  React.useEffect(() => {
-    if (checked && !prevChecked.current && !autoExpanded.current) {
-      // first time this intervention is turned on → reveal its parameters
-      setExpanded(true);
-      autoExpanded.current = true;
-    }
-    if (!checked) setExpanded(false); // turning it off collapses the panel
-    prevChecked.current = checked;
-  }, [checked]);
-
-  const showParams = checked && expanded;
   return (
     <div style={{ marginBottom: 8, border: '1px solid #e5e7eb', borderRadius: 8, overflow: 'hidden' }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px',
-        background: checked ? '#eef2ff' : '#fafbfc', borderBottom: showParams ? '1px solid #c7d2fe' : 'none',
+        background: checked ? '#eef2ff' : '#fafbfc', borderBottom: expanded ? '1px solid #c7d2fe' : 'none',
       }}>
         <label style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1, cursor: 'pointer' }}>
-          <input type="checkbox" checked={checked} onChange={e => { onChange(e.target.checked); if (e.target.checked && onFocus) onFocus(); }}
+          <input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)}
             style={{ width: 18, height: 18, accentColor: '#2563eb' }} />
-          <span style={{ fontSize: 13, color: checked ? '#1e3a5f' : '#94a3b8', fontWeight: checked ? 600 : 400 }}>{label}</span>
+          <span style={{ fontSize: 13, color: checked ? '#1e3a5f' : '#475569', fontWeight: checked ? 600 : 400 }}>{label}</span>
         </label>
-        {checked && (
-          <button onClick={() => { const e = !expanded; setExpanded(e); if (e && onFocus) onFocus(); }}
-            style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: 11, color: '#2563eb', fontWeight: 600, padding: '2px 4px' }}>
-            {expanded ? '▴ Hide' : '▾ Configure'}
-          </button>
-        )}
+        <button onClick={() => { const e = !expanded; setExpanded(e); if (e && onFocus) onFocus(); }}
+          style={{ border: '1px solid #c7d2fe', background: '#fff', cursor: 'pointer', fontSize: 11, color: '#2563eb', fontWeight: 600, padding: '3px 10px', borderRadius: 12 }}>
+          {expanded ? '▴ Hide' : '▾ Show'}
+        </button>
       </div>
-      {showParams && (
+      {expanded && (
         <div style={{ padding: '10px 14px', background: '#fff', display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start' }}>
           {children}
         </div>
@@ -119,10 +102,37 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
   const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const scopeLower = scopeLabel.toLowerCase();
 
+  // Which intervention layers are switched on for the active sector — drives the impact graph
+  const t = inputs.toggles || {};
+  const chartActive = sectorTab === 'water'
+    ? {
+        collectionNrw: !!(t.ws_collection_efficiency_enabled || t.ws_nrw_enabled),
+        capital: !!t.ws_capital_efficiency_enabled,
+        tariff: !!t.ws_tariff_enabled,
+        borrowing: !!t.ws_borrowing_enabled,
+      }
+    : {
+        collectionNrw: !!t.san_collection_enabled,
+        capital: !!t.san_capital_efficiency_enabled,
+        tariff: !!t.san_tariff_enabled,
+        borrowing: !!t.san_borrowing_enabled,
+      };
+
+  // Keep custom interventions on the sector selected by the top toggle (leave any set to "Both" alone)
+  const prevSector = React.useRef(sectorTab);
+  React.useEffect(() => {
+    if (prevSector.current === sectorTab) return;
+    prevSector.current = sectorTab;
+    const ci = inputs.custom_interventions || [];
+    if (ci.some((c: any) => c.sector !== 'both' && c.sector !== sectorTab)) {
+      onChange({ ...inputs, custom_interventions: ci.map((c: any) => c.sector === 'both' ? c : { ...c, sector: sectorTab }) });
+    }
+  }, [sectorTab]);
+
   return (
-    <div style={{ display: 'flex', width: '100%', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', flex: 1, minWidth: 0, overflow: 'hidden' }}>
       {/* Left: intervention controls */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 12 }}>
+      <div style={{ flex: '0 1 460px', minWidth: 0, overflowY: 'auto', padding: '16px 24px', background: '#fafbfc', borderRight: '1px solid #e0e0e0', fontSize: 12 }}>
 
         {/* Area-scope banner */}
         <div style={{
@@ -172,7 +182,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             <F label="Commercial losses % of NRW" value={inputs.water_interventions.nrw_commercial_loss_pct || 0} onChange={v => u('water_interventions','nrw_commercial_loss_pct',v)} isPercent unit="%" tip="Share of NRW from commercial losses (metering errors, theft, unbilled use). Commercial + physical must sum to 100%." />
             <F label="Physical losses % of NRW" value={inputs.water_interventions.nrw_physical_loss_pct || 0} onChange={v => u('water_interventions','nrw_physical_loss_pct',v)} isPercent unit="%" tip="Share of NRW from physical leaks in the network. Commercial + physical must sum to 100%." />
             <F label="Capex unit cost NRW reduction" value={inputs.water_interventions.nrw_capex_unit_cost_usd || 0} onChange={v => u('water_interventions','nrw_capex_unit_cost_usd',v)} step={10} unit="USD/m3/day" tip="Capital cost to recover one cubic metre per day of lost water through NRW reduction" />
-            <F label="Lag to benefits" value={inputs.water_interventions.nrw_lag_years} onChange={v => u('water_interventions','nrw_lag_years',v)} unit="yrs" tip="Years between NRW investment and the resulting reduction taking effect" />
+            <F label="Lag to benefits" value={inputs.water_interventions.nrw_lag_years} onChange={v => u('water_interventions','nrw_lag_years',v)} unit="yrs" tip="NRW reduction does not pay off immediately: leak detection surveys, pipe and meter replacement, and pressure management must be planned, procured, and rolled out across the network before non-revenue water actually falls. Enter the number of years between the investment and when the reduction takes effect (typically 2–4)." />
             <F label="Year of maintenance capex" value={inputs.water_interventions.nrw_maintenance_capex_year || 0} onChange={v => u('water_interventions','nrw_maintenance_capex_year',v)} tip="Year in which periodic maintenance capital expenditure on NRW is incurred" />
             <F label="Maintenance capex" value={inputs.water_interventions.nrw_maintenance_capex || 0} onChange={v => u('water_interventions','nrw_maintenance_capex',v)} step={10} unit={`${CUR} M`} tip="Maintenance capital expenditure to sustain the NRW reduction" />
           </InterventionToggle>
@@ -292,38 +302,40 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
                       onChange({ ...inputs, custom_interventions: arr });
                     }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 6px', cursor: 'pointer', fontSize: 10 }}>✕</button>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 10, color: '#64748b' }}>Sector</label>
+                      <label style={{ fontSize: 10, color: '#64748b' }}>Sector ▾</label>
                       <select value={ci.sector} onChange={e => updateCI('sector', e.target.value)}
-                        style={{ width: '100%', padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 10, background: '#fff' }}>
+                        style={{ width: '100%', padding: '4px 6px', border: '1px solid #94a3b8', borderRadius: 3, fontSize: 11, background: '#fff', cursor: 'pointer' }}>
                         <option value="water">Water Supply</option>
                         <option value="sanitation">Sanitation</option>
                         <option value="both">Both</option>
                       </select>
                     </div>
                     <div style={{ flex: 1 }}>
-                      <label style={{ fontSize: 10, color: '#64748b' }}>Type</label>
+                      <label style={{ fontSize: 10, color: '#64748b' }}>Type ▾</label>
                       <select value={ci.intervention_type} onChange={e => updateCI('intervention_type', e.target.value)}
-                        style={{ width: '100%', padding: '3px 5px', border: '1px solid #ccc', borderRadius: 3, fontSize: 10, background: '#fff' }}>
+                        style={{ width: '100%', padding: '4px 6px', border: '1px solid #94a3b8', borderRadius: 3, fontSize: 11, background: '#fff', cursor: 'pointer' }}>
                         <option value="fixed_annual">Fixed Annual Amount</option>
                         <option value="revenue_stream">Revenue Stream</option>
                         <option value="per_hh_subsidy">Per-HH Subsidy</option>
                       </select>
                     </div>
                   </div>
-                  <F label="Start year" value={ci.start_year} onChange={v => updateCI('start_year', v)} tip="Year this custom intervention begins" />
-                  <F label="End year" value={ci.end_year} onChange={v => updateCI('end_year', v)} tip="Year this custom intervention ends" />
-                  {ci.intervention_type === 'fixed_annual' && (
-                    <F label="Annual amount (mill)" value={ci.annual_amount} onChange={v => updateCI('annual_amount', v)} step={100} tip="Fixed amount of funding provided each year" />
-                  )}
-                  {ci.intervention_type === 'revenue_stream' && (<>
-                    <F label="Starting amount (mill)" value={ci.starting_amount} onChange={v => updateCI('starting_amount', v)} step={100} tip="Funding amount in the first year of the revenue stream" />
-                    <F label="Growth rate" value={ci.growth_rate} onChange={v => updateCI('growth_rate', v)} isPercent unit="%" tip="Annual growth rate of the revenue stream" />
-                  </>)}
-                  {ci.intervention_type === 'per_hh_subsidy' && (
-                    <F label="Subsidy per HH" value={ci.subsidy_per_hh} onChange={v => updateCI('subsidy_per_hh', v)} step={1000} tip="Subsidy amount provided per household connected" />
-                  )}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '12px 16px', alignItems: 'start' }}>
+                    <F label="Start year" value={ci.start_year} onChange={v => updateCI('start_year', v)} tip="Year this custom intervention begins" />
+                    <F label="End year" value={ci.end_year} onChange={v => updateCI('end_year', v)} tip="Year this custom intervention ends" />
+                    {ci.intervention_type === 'fixed_annual' && (
+                      <F label="Annual amount (mill)" value={ci.annual_amount} onChange={v => updateCI('annual_amount', v)} step={100} tip="Fixed amount of funding provided each year" />
+                    )}
+                    {ci.intervention_type === 'revenue_stream' && (<>
+                      <F label="Starting amount (mill)" value={ci.starting_amount} onChange={v => updateCI('starting_amount', v)} step={100} tip="Funding amount in the first year of the revenue stream" />
+                      <F label="Growth rate" value={ci.growth_rate} onChange={v => updateCI('growth_rate', v)} isPercent unit="%" tip="Annual growth rate of the revenue stream" />
+                    </>)}
+                    {ci.intervention_type === 'per_hh_subsidy' && (
+                      <F label="Subsidy per HH" value={ci.subsidy_per_hh} onChange={v => updateCI('subsidy_per_hh', v)} step={1000} tip="Subsidy amount provided per household connected" />
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -331,7 +343,7 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
               const existing = inputs.custom_interventions || [];
               const colors = ['#9333ea','#f97316','#06b6d4','#84cc16','#f43f5e'];
               onChange({ ...inputs, custom_interventions: [...existing, {
-                name: 'New Intervention', enabled: true, sector: 'water', intervention_type: 'fixed_annual',
+                name: 'New Intervention', enabled: true, sector: sectorTab, intervention_type: 'fixed_annual',
                 start_year: 2028, end_year: 2035, annual_amount: 1000, starting_amount: 500,
                 growth_rate: 0.05, subsidy_per_hh: 10000, color: colors[existing.length % colors.length],
               }] });
@@ -343,8 +355,8 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
       </div>
 
       {/* Right: intervention impact chart */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px' }}>
-        <InterventionImpactChart sector={sectorTab} geoScope={chartScope || geoScope} />
+      <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
+        <InterventionImpactChart sector={sectorTab} geoScope={chartScope || geoScope} active={chartActive} />
       </div>
     </div>
   );
