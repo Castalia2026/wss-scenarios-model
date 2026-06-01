@@ -366,7 +366,15 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
 
       {/* Right: intervention impact chart */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px' }}>
-        <InterventionImpactChart sector={sectorTab} geoScope={chartScope || geoScope} active={chartActive} />
+        {(chartScope || geoScope) === 'urban_rural' ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            <InterventionImpactChart sector={sectorTab} geoScope="urban" active={chartActive} />
+            <InterventionImpactChart sector={sectorTab} geoScope="rural" active={chartActive} />
+            <InterventionImpactChart sector={sectorTab} geoScope="urban_rural" active={chartActive} />
+          </div>
+        ) : (
+          <InterventionImpactChart sector={sectorTab} geoScope={chartScope || geoScope} active={chartActive} />
+        )}
       </div>
     </div>
   );
