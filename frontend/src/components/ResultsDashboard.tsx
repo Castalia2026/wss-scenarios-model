@@ -220,8 +220,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
       )}
       </div>
 
-      {/* Right-hand control panel — stays visible while you scroll the charts */}
-      <div style={{ width: 250, flexShrink: 0, borderLeft: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
+      {/* Left-hand control panel — stays visible while you scroll the charts */}
+      <div style={{ order: -1, width: 250, flexShrink: 0, borderRight: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#312e81', marginBottom: 4 }}>Controls</div>
         <div style={{ fontSize: 10, color: '#64748b', marginBottom: 14, fontStyle: 'italic' }}>Adjust these while viewing any graph.</div>
 
