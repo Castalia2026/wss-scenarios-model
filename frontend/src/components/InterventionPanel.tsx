@@ -28,6 +28,10 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
   const rawPct = Math.round(value * 1e4) / 1e2;
   const displayVal = isPercent ? (fieldType === 'computed' ? Math.round(rawPct * 100) / 100 : rawPct) : Math.round(value * 100) / 100;
   const isDerived = fieldType === 'computed' || fieldType === 'linked';
+  // Show thousands separators for large amounts, but never for years or percentages
+  const looksLikeYear = !unit && !isPercent && Number.isInteger(value) && value >= 1900 && value <= 2100;
+  const useCommas = !isPercent && !looksLikeYear && Math.abs(displayVal) >= 1000;
+  const commaStr = useCommas ? displayVal.toLocaleString('en-US') : '';
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0,
@@ -41,8 +45,9 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType }: {
           fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
         }} title={tip}>i</span>}
       </label>
-      <input type="number" value={displayVal}
-        onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
+      <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
+        value={useCommas ? commaStr : displayVal}
+        onChange={e => { const v = parseFloat(e.target.value.replace(/,/g, '')); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
         step={isPercent ? 1 : (step || 1)}
         readOnly={isDerived}
         style={{
@@ -181,6 +186,11 @@ export default function InterventionPanel({ inputs, onChange, sectorTab = 'water
             })()}
             <F label="Commercial losses % of NRW" value={inputs.water_interventions.nrw_commercial_loss_pct || 0} onChange={v => u('water_interventions','nrw_commercial_loss_pct',v)} isPercent unit="%" tip="Share of NRW from commercial losses (metering errors, theft, unbilled use). Commercial + physical must sum to 100%." />
             <F label="Physical losses % of NRW" value={inputs.water_interventions.nrw_physical_loss_pct || 0} onChange={v => u('water_interventions','nrw_physical_loss_pct',v)} isPercent unit="%" tip="Share of NRW from physical leaks in the network. Commercial + physical must sum to 100%." />
+            {(() => {
+              const s = (inputs.water_interventions.nrw_commercial_loss_pct || 0) + (inputs.water_interventions.nrw_physical_loss_pct || 0);
+              const bad = Math.abs(s - 1) > 0.005;
+              return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad ? '#dc2626' : '#16a34a', padding: '3px 8px', background: bad ? '#fef2f2' : '#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `Commercial and physical losses add up to ${Math.round(s * 10000) / 100}% — they should total 100%.` : 'Commercial and physical losses add up to 100%. ✓'}</div>;
+            })()}
             <F label="Capex unit cost NRW reduction" value={inputs.water_interventions.nrw_capex_unit_cost_usd || 0} onChange={v => u('water_interventions','nrw_capex_unit_cost_usd',v)} step={10} unit="USD/m3/day" tip="Capital cost to recover one cubic metre per day of lost water through NRW reduction" />
             <F label="Lag to benefits" value={inputs.water_interventions.nrw_lag_years} onChange={v => u('water_interventions','nrw_lag_years',v)} unit="yrs" tip="NRW reduction does not pay off immediately: leak detection surveys, pipe and meter replacement, and pressure management must be planned, procured, and rolled out across the network before non-revenue water actually falls. Enter the number of years between the investment and when the reduction takes effect (typically 2–4)." />
             <F label="Year of maintenance capex" value={inputs.water_interventions.nrw_maintenance_capex_year || 0} onChange={v => u('water_interventions','nrw_maintenance_capex_year',v)} tip="Year in which periodic maintenance capital expenditure on NRW is incurred" />
