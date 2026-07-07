@@ -106,6 +106,34 @@ function Toggle({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
+// A year input that commits only on blur / Enter (not per keystroke), so a half-typed year like "19"
+// can't momentarily re-anchor every data series or spawn thousands of table columns mid-edit.
+function YearField({ label, value, onCommit, min, max, tip }: {
+  label: string; value: number; onCommit: (v: number) => void; min?: number; max?: number; tip?: string;
+}) {
+  const [txt, setTxt] = useState(String(value ?? ''));
+  React.useEffect(() => { setTxt(String(value ?? '')); }, [value]);
+  const commit = () => {
+    const v = parseInt(txt, 10);
+    if (!isNaN(v) && v !== value) onCommit(v); else setTxt(String(value ?? ''));
+  };
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 6, fontSize: 12, color: '#3A4452', lineHeight: 1.3, fontWeight: 500, minHeight: 32 }} title={tip || undefined}>
+        {label}
+        {tip && <span style={{ width: 14, height: 14, borderRadius: '50%', flexShrink: 0, background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }} title={tip}>i</span>}
+      </label>
+      <input type="number" value={txt}
+        onChange={e => setTxt(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }}
+        min={min} max={max}
+        style={{ width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left', border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none' }}
+      />
+    </div>
+  );
+}
+
 interface Props { inputs: any; onChange: (i: any) => void; results?: any; onCalculate?: () => void; loading?: boolean; showSection?: string; geoScope?: string; bauSector?: 'water' | 'sanitation'; onBauSectorChange?: (v: 'water' | 'sanitation') => void; onSectionFocus?: (sectionKey: string) => void; }
 
 export default function InputPanel({ inputs, onChange, results, onCalculate, loading, showSection = 'inputs', geoScope = 'urban', bauSector: bauSectorProp, onBauSectorChange, onSectionFocus }: Props) {
@@ -121,6 +149,35 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   if (!inputs) return null;
   const u = (section: string, field: string, value: number) => {
     onChange({ ...inputs, [section]: { ...inputs[section], [field]: value } });
+  };
+
+  // Every macro / population / service / budget series is stored POSITIONALLY (index 0 = model start
+  // year). So moving the start year must shift these arrays, otherwise the old values just slide onto
+  // the new years (e.g. changing the start to 1999 would show the 2011 numbers under 1999). We re-anchor
+  // so each value stays attached to its YEAR: extend the start earlier → the newly-exposed years come in
+  // blank; move it later → the dropped leading years fall off.
+  const shiftYearSeries = (arr: any, delta: number) =>
+    (!Array.isArray(arr) || !delta) ? arr
+      : delta > 0 ? arr.slice(delta)                       // start later: drop leading years
+      : [...Array(-delta).fill(0), ...arr];                // start earlier: prepend blank years
+  const setModelStartYear = (newYr: number) => {
+    const oldYr = inputs.period?.model_start_year;
+    const delta = (Number.isFinite(newYr) && Number.isFinite(oldYr)) ? (newYr - oldYr) : 0;
+    const next: any = { ...inputs, period: { ...inputs.period, model_start_year: newYr } };
+    if (delta) {
+      const shiftGroup = (obj: any, fields: string[]) => {
+        if (!obj) return obj;
+        const o = { ...obj };
+        fields.forEach(f => { if (Array.isArray(o[f])) o[f] = shiftYearSeries(o[f], delta); });
+        return o;
+      };
+      next.macro = shiftGroup(next.macro, ['gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate', 'gdp_growth']);
+      next.population = shiftGroup(next.population, ['pop_ts', 'hh_ts']);
+      next.water_service = shiftGroup(next.water_service, ['serv1_ts', 'serv2_ts', 'serv3_ts', 'serv4_ts', 'serv5_ts']);
+      next.sanitation_service = shiftGroup(next.sanitation_service, ['sserv1_ts', 'sserv2_ts', 'sserv3_ts', 'sserv4_ts', 'sserv5_ts']);
+      next.bau = shiftGroup(next.bau, ['ws_budget_ts', 'san_budget_ts', 'ws_expend_ts', 'san_expend_ts']);
+    }
+    onChange(next);
   };
   const toggleIntv = (field: string, value: boolean) => {
     onChange({ ...inputs, toggles: { ...inputs.toggles, [field]: value } });
@@ -297,7 +354,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       {/* ===== TIME SCALES & MACROECONOMICS ===== */}
       <Section title="2. Time Scales & Macroeconomics" sectionKey="macro" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
-        <F label="Model start year" value={inputs.period.model_start_year} onChange={v => u('period','model_start_year',v)} min={1990} tip="First year of historical data; must be at least 3 years before baseline year" />
+        <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the baseline year. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
         <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} tip="Last year of projection" />
         <F label="As-is forecast start" value={inputs.period.as_is_forecast_start || (inputs.period.baseline_year + 1)} onChange={v => u('period','as_is_forecast_start',v)} min={inputs.period.baseline_year + 1} tip="First year of the as-is forecast (workbook G18); usually baseline + 1" />
@@ -395,20 +452,31 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           // hard values render editable; the tail shows grey markers for the engine's fills.
           const startYr2 = inputs.period.model_start_year || 2011;
           const endYr2 = inputs.period.forecast_end_year || 2040;
-          const years = Array.from({ length: Math.max(1, endYr2 - startYr2 + 1) }, (_: unknown, i: number) => startYr2 + i);
+          // Clamp the rendered span so a half-typed year (e.g. "20" mid-entry) can't spawn thousands of columns.
+          const span = Math.max(1, endYr2 - startYr2 + 1);
+          const years = Array.from({ length: Math.min(span, 120) }, (_: unknown, i: number) => startYr2 + i);
           const baseYr2 = inputs.period.baseline_year || 2025;
+          // Hard-value window for GDP & inflation: historical through the baseline + 5 forecast years.
+          const hardFcstEnd = Math.min(baseYr2 + 5, endYr2);
           const gdpArr = inputs.macro.gdp_nominal_usd || [];
-          const tsInput = (section: string, field: string, idx: number, val: number, isPct: boolean) => (
+          const tsInput = (section: string, field: string, idx: number, val: number, isPct: boolean, padFill: number = 0) => (
             <input type="number" value={isPct ? Math.round(val*10000)/100 : Math.round(val*100)/100}
               onChange={e => { const v=parseFloat(e.target.value); if(!isNaN(v)){
-                const a=[...(inputs[section]?.[field] || inputs.macro?.[field] || [])]; a[idx]=isPct?v/100:v;
+                const a=[...(inputs[section]?.[field] || inputs.macro?.[field] || [])];
+                while (a.length <= idx) a.push(padFill);   // grow to reach idx; gap cells take a neutral fill
+                a[idx]=isPct?v/100:v;
                 if (section === 'macro') onChange({...inputs, macro:{...inputs.macro, [field]:a}});
                 else onChange({...inputs, [section]:{...inputs[section], [field]:a}});
               }}}
               style={{ width: 58, padding: '3px 4px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, textAlign: 'left', color: '#3A4452', outline: 'none' }}
             />
           );
-          const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct);
+          // Neutral fill for gap cells created when the window grows: inflation rows hold their ongoing
+          // rate (so an unedited forecast cell still behaves like the projection); everything else uses 0
+          // (0 = "no data, project this year" for GDP; a missing actual for FX / population / households).
+          const macroFill = (field: string) => field === 'inflation_nepal' ? (inputs.macro?.inflation_local_ongoing ?? 0.05)
+            : field === 'inflation_us' ? (inputs.macro?.inflation_us_ongoing ?? 0.022) : 0;
+          const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct, macroFill(field));
           const grey = (txt: string, note: string) => <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title={note}>{txt}</span>;
           // Engine-computed series lookups (from the live /api/calculate results), used to show the
           // ACTUAL projected numbers in forecast years instead of a "→" placeholder.
@@ -427,9 +495,14 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             val == null ? grey('→', note) : grey(isPct ? (val * 100).toFixed(1) : fmtNum(val), note);
           // A macro series cell: editable while inside the HARD values; beyond that show the engine's
           // projected value for the year (ongoing rate / projection).
-          const hardCell = (field: string, idx: number, isPct: boolean, note: string, resKey?: string) => {
+          // Editable while inside the field's HARD range, decided by YEAR (not by the current array
+          // length) — so extending or shifting the year window always exposes editable cells for the
+          // new years instead of freezing at the preset (Nepal) array length. Beyond the hard range,
+          // show the engine's projected value (grey).
+          const hardCell = (field: string, idx: number, isPct: boolean, note: string, resKey?: string, editThroughYr?: number) => {
             const a = inputs.macro?.[field] || [];
-            if (idx < a.length) return mInput(field, idx, a[idx] || 0, isPct);
+            const editable = editThroughYr != null ? (years[idx] <= editThroughYr) : (idx < a.length);
+            if (editable) return mInput(field, idx, a[idx] ?? 0, isPct);
             return projCell(resKey ? resAt(resKey, idx) : null, isPct, note);
           };
 
@@ -548,17 +621,17 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
             sectionRow('Economic'),
             ...(budgetMode === 'direct' ? [] : [
-              { label: 'Nominal GDP ($B)', tip: 'GDP in current US dollars (billions). Enter historical + 5 hard forecast years; later years are the engine’s projection at the ongoing real growth rate.', cells: years.map((_: number, i: number) => hardCell('gdp_nominal_usd', i, false, 'Engine-projected (nominal USD $B) at the ongoing real GDP growth rate', 'gdp_nominal_usd')) },
+              { label: 'Nominal GDP ($B)', tip: 'GDP in current US dollars (billions). Enter historical + 5 hard forecast years; later years are the engine’s projection at the ongoing real growth rate.', cells: years.map((_: number, i: number) => hardCell('gdp_nominal_usd', i, false, 'Engine-projected (nominal USD $B) at the ongoing real GDP growth rate', 'gdp_nominal_usd', hardFcstEnd)) },
               { label: 'Nominal USD growth % (info)', tip: 'Year-on-year growth of the NOMINAL USD series (display only — the engine projects forecast years at the ongoing REAL growth rate)', computed: true, cells: years.map((_: number, i: number) => {
                 const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
                 return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && gdpArr[i] ? g.toFixed(1)+'%' : '—'}</span>;
               }) },
             ]),
-            { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual local inflation. Hard values are editable; later years show the ongoing local inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_nepal', i, true, 'Ongoing local inflation rate (engine)', 'inflation_local')) },
-            { label: 'Infl US %', tip: 'Annual US inflation. Hard values are editable; later years show the ongoing US inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_us', i, true, 'Ongoing US inflation rate (engine)', 'inflation_us')) },
+            { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual local inflation. Hard values are editable; later years show the ongoing local inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_nepal', i, true, 'Ongoing local inflation rate (engine)', 'inflation_local', hardFcstEnd)) },
+            { label: 'Infl US %', tip: 'Annual US inflation. Hard values are editable; later years show the ongoing US inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_us', i, true, 'Ongoing US inflation rate (engine)', 'inflation_us', hardFcstEnd)) },
             { label: `${CUR} per USD`, tip: 'Exchange rate: units of local currency per 1 US dollar. Enter ACTUALS through the year before baseline; the baseline year onward is the engine’s projection: FX[t] = FX[t−1] × (1+local infl)/(1+US infl).', cells: years.map((_: number, i: number) => {
               if (years[i] >= baseYr2) return projCell(resAt('exchange_rate', i), false, 'Engine-projected from the baseline year on: FX[t] = FX[t−1] × (1+local inflation)/(1+US inflation)');
-              return hardCell('exchange_rate', i, false, 'Missing actual — supply values through baseline−1');
+              return hardCell('exchange_rate', i, false, 'Missing actual — supply values through baseline−1', undefined, baseYr2 - 1);
             }) },
             sectionRow('Demographic'),
             { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in MILLIONS — actuals through the year before baseline; the baseline year onward is the engine’s projection at mean historical growth`, cells: years.map((_: number, i: number) => {
@@ -753,12 +826,8 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label={ss[3]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv4} onChange={v => u('sanitation_costs','sewer_cost_per_hh_sserv4',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection. Costs are for the baseline year." />
         {renderCostMix('sanitation_costs', 'sm', 'sewer_cost_per_hh_sserv1', ss[0])}
         {renderCostMix('sanitation_costs', 'basic', 'sewer_cost_per_hh_sserv2', ss[1])}
-        <SubHead text="Wastewater treatment" />
-        <F label="Cost per MLD wastewater treatment" value={inputs.sanitation_costs.san_cost_per_mld_treatment || 0} onChange={v => u('sanitation_costs','san_cost_per_mld_treatment',v)} step={100} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of wastewater treatment capacity. Costs are for the baseline year." />
         <SubHead text="On-site sanitation" />
         <F label="On-site facility Capex" value={inputs.sanitation_costs.onsite_facility_capex || 0} onChange={v => u('sanitation_costs','onsite_facility_capex',v)} step={1000} unit={CUR} min={0} max={10000000} tip="Average capital cost per on-site sanitation facility (weighted across facility types). Costs are for the baseline year." />
-        <SubHead text="Treatment" />
-        <F label="Cost per MLD fecal sludge treatment" value={inputs.sanitation_costs.cost_per_mld_fst} onChange={v => u('sanitation_costs','cost_per_mld_fst',v)} step={10} unit={`${CUR} M`} min={0} max={100000} tip="Capital cost to build 1 MLD of fecal sludge treatment capacity. Costs are for the baseline year." />
       </Section>
       )}
 
@@ -906,15 +975,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="Useful life of assets" value={inputs.technical.san_asset_life} onChange={v => u('technical','san_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets" />
         <F label="% wastewater from non-household" value={inputs.technical.san_non_hh_pct || 0} onChange={v => u('technical','san_non_hh_pct',v)} isPercent unit="%" tip="Share of wastewater from non-household sources (commercial, industrial, institutional)" />
         <F label="Factor wastewater of water supply" value={inputs.technical.san_wastewater_factor} onChange={v => u('technical','san_wastewater_factor',v)} isPercent unit="%" tip="Wastewater volume as share of water supply volume" />
-        <SubHead text="Wastewater treatment" />
-        <F label="Existing WWT capacity" value={inputs.technical.san_existing_wwt_mld || 0} onChange={v => u('technical','san_existing_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Existing wastewater treatment capacity" />
-        <F label="Planned WWT capacity" value={inputs.technical.san_planned_wwt_mld || 0} onChange={v => u('technical','san_planned_wwt_mld',v)} unit="MLD" min={0} max={10000} tip="Total planned wastewater treatment capacity" />
-        <F label="Avg capex per MLD for WWT" value={inputs.technical.san_avg_capex_per_mld_wwt || 0} onChange={v => u('technical','san_avg_capex_per_mld_wwt',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a wastewater treatment plant" />
-        <SubHead text="Fecal sludge" />
-        <F label="Avg capex per MLD for FSTP" value={inputs.technical.san_avg_capex_per_mld_fstp || 395} onChange={v => u('technical','san_avg_capex_per_mld_fstp',v)} unit={`${CUR} M/MLD`} min={0} max={100000} tip="Average capital cost per MLD for a fecal sludge treatment plant (e.g. Birendranagar FSTP)" />
-        <F label="Existing FST capacity" value={inputs.technical.san_existing_fst_mld} onChange={v => u('technical','san_existing_fst_mld',v)} step={0.0001} unit="MLD" min={0} max={10000} tip="Existing fecal sludge treatment capacity" />
-        <F label="Planned FST capacity" value={inputs.technical.san_planned_fst_mld || 0} onChange={v => u('technical','san_planned_fst_mld',v)} step={0.001} unit="MLD" min={0} max={10000} tip="Total planned fecal sludge treatment capacity" />
-        <F label="FS per person per day" value={inputs.technical.san_fs_per_person_per_day} onChange={v => u('technical','san_fs_per_person_per_day',v)} step={0.1} unit="liters" min={0} max={10} tip="Volume of fecal sludge generated per person per day in liters" />
       </Section>
       </>}
 
