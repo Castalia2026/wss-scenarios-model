@@ -59,7 +59,7 @@ function MockChart({ data, title, active }: { data: any[]; title: string; active
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-          <Tooltip formatter={(value: number) => value.toFixed(3)} contentStyle={{ fontSize: 11 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(3)} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} legendType="rect" />
           {active.ceNrw && <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />}
@@ -156,7 +156,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="year" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} label={{ value: 'Billions', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-            <Tooltip formatter={(value: number) => value.toFixed(2)} contentStyle={{ fontSize: 11 }} />
+            <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(2)} contentStyle={{ fontSize: 11 }} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
             <Bar dataKey="Investment Need" fill={COLORS.inv_need} opacity={0.7} />
             <Bar dataKey="BAU Investment" stackId="funding" fill={COLORS.bau_inv} opacity={0.7} />

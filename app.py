@@ -1,13 +1,14 @@
 import io
 import csv
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
 import json
 from model.inputs import ModelInputs, CountryConfig
 from model.engine import calculate
+from demo_adapter import frontend_defaults, to_engine, coerce_to_engine
 
 app = FastAPI(title="WSS Scenarios Model API")
 
@@ -27,47 +28,27 @@ def get_countries():
 
 @app.get("/api/defaults")
 def get_defaults():
-    return ModelInputs().model_dump()
+    # Frontend-shaped defaults (validated Kathmandu-Valley values). The demo UI reads this shape;
+    # /api/calculate translates it to the engine via demo_adapter.to_engine.
+    return frontend_defaults()
 
 
 @app.get("/api/defaults/blank")
 def get_blank():
-    """Returns a blank template with zero values for a new country."""
-    blank = ModelInputs(
-        country_config=CountryConfig(country="", area="", currency="USD",
-            provider1_name="Provider 1", provider2_name="Provider 2"),
-    ).model_dump()
-    # Zero out all data-specific fields but keep structure
+    """Blank template (frontend-shaped): zero the numeric data but keep structure and labels."""
+    import copy
+    blank = copy.deepcopy(frontend_defaults())
+    blank['country_config'].update(country='', area='', currency='USD')
     for section in ['macro', 'population', 'water_service', 'sanitation_service',
-                    'water_costs', 'sanitation_costs', 'bau', 'technical',
-                    'water_targets', 'sanitation_targets',
-                    'water_interventions', 'sanitation_interventions']:
-        if section in blank:
-            for key, val in blank[section].items():
-                if isinstance(val, (int, float)):
-                    blank[section][key] = 0
-                elif isinstance(val, list):
-                    # Zero out provider arrays but keep one empty provider shell
-                    if key == 'providers':
-                        blank[section][key] = [{'name': 'Provider 1', 'share_pct': 0,
-                            **{k: 0 for k, v in val[0].items() if k != 'name' and isinstance(v, (int, float))}}] if val else []
-                    else:
-                        blank[section][key] = [0] * len(val)
-    # Keep period as structural defaults (not country data)
-    blank['period'] = {'model_start_year': 0, 'forecast_end_year': 0,
-        'baseline_year': 0, 'as_is_forecast_start': 0,
-        'as_is_forecast_length': 0, 'target1_year': 0, 'target2_year': 0}
-    # Clear toggles
-    if 'toggles' in blank:
-        for key in blank['toggles']:
-            blank['toggles'][key] = False
-    # Clear custom interventions
+                    'water_costs', 'sanitation_costs', 'water_targets', 'sanitation_targets', 'technical']:
+        for key, val in list(blank.get(section, {}).items()):
+            if isinstance(val, (int, float)):
+                blank[section][key] = 0
+            elif isinstance(val, list):
+                blank[section][key] = [0] * len(val)
+    blank['bau'] = {'ws_budget_ts': [], 'san_budget_ts': [], 'ws_expend_ts': [], 'san_expend_ts': [],
+                    'period_mode': 'automatic', 'period_unit_years': 5, 'investment_periods': []}
     blank['custom_interventions'] = []
-    # Clear country config labels
-    for k in ['ws_serv1_name', 'ws_serv2_name', 'ws_serv3_name', 'ws_serv4_name', 'ws_serv5_name',
-              'san_serv1_name', 'san_serv2_name', 'san_serv3_name', 'san_serv4_name', 'san_serv5_name']:
-        if k in blank.get('country_config', {}):
-            blank['country_config'][k] = ''
     return blank
 
 
@@ -91,13 +72,13 @@ def get_profile(name: str):
 
 
 @app.post("/api/profiles/{name}")
-def save_profile(name: str, inputs: ModelInputs):
-    """Save current inputs as a country profile."""
+def save_profile(name: str, inputs: dict = Body(...)):
+    """Save current (frontend-shaped) inputs as a country profile."""
     profiles_dir = os.path.join(os.path.dirname(__file__), "profiles")
     os.makedirs(profiles_dir, exist_ok=True)
     filepath = os.path.join(profiles_dir, f"{name}.json")
     with open(filepath, 'w') as f:
-        json.dump(inputs.model_dump(), f, indent=2)
+        json.dump(inputs, f, indent=2)
     return {"status": "saved", "name": name}
 
 
@@ -112,13 +93,13 @@ def delete_profile(name: str):
 
 
 @app.post("/api/calculate")
-def run_calculation(inputs: ModelInputs):
-    return calculate(inputs)
+def run_calculation(inputs: dict = Body(...)):
+    return calculate(coerce_to_engine(inputs))
 
 
 @app.post("/api/export/csv")
-def export_csv(inputs: ModelInputs):
-    result = calculate(inputs)
+def export_csv(inputs: dict = Body(...)):
+    result = calculate(coerce_to_engine(inputs))
 
     years = result['years']
     total_hh = result['total_hh']
@@ -164,10 +145,10 @@ def export_csv(inputs: ModelInputs):
 
 
 @app.post("/api/export/pptx")
-def export_pptx(inputs: ModelInputs):
+def export_pptx(inputs: dict = Body(...)):
     from export_pptx import create_pptx
-    result = calculate(inputs)
-    output = create_pptx(result, inputs.model_dump())
+    result = calculate(coerce_to_engine(inputs))
+    output = create_pptx(result, inputs)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation',
@@ -176,9 +157,9 @@ def export_pptx(inputs: ModelInputs):
 
 
 @app.post("/api/export/xlsx")
-def export_xlsx(inputs: ModelInputs):
+def export_xlsx(inputs: dict = Body(...)):
     from openpyxl import Workbook
-    result = calculate(inputs)
+    result = calculate(coerce_to_engine(inputs))
     wb = Workbook()
 
     for sector_key, sector_name in [('water_supply', 'Water Supply'), ('sanitation', 'Sanitation')]:
@@ -210,6 +191,19 @@ def export_xlsx(inputs: ModelInputs):
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/bau-test")
+def bau_test():
+    """Minimal input-column → BAU-output test harness for the calculation engine.
+    Served with no-cache headers so every refresh loads the fresh file with default inputs
+    (the harness keeps no localStorage, so a reload always resets to the built-in defaults)."""
+    path = os.path.join(os.path.dirname(__file__), "bau_test.html")
+    return FileResponse(path, media_type="text/html", headers={
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    })
 
 
 # Serve frontend static files
