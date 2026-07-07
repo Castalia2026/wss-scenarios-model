@@ -119,8 +119,7 @@ def frontend_defaults() -> dict:
                             {'name': 'Borehole + handpump', 'share': 0.10, 'cost': 96877.9308914323}]},
         'sanitation_costs': {'sewer_cost_per_hh_sserv1': _SAN_COST_SM, 'sewer_cost_per_hh_sserv2': _SAN_COST_SM,
                              'sewer_cost_per_hh_sserv3': 14600.0, 'sewer_cost_per_hh_sserv4': 16500.0,
-                             'san_cost_per_mld_treatment': 0.0, 'onsite_facility_capex': 83000.0,
-                             'cost_per_mld_fst': 395.0,
+                             'onsite_facility_capex': 83000.0,
                              'sm_tech_mix': [
                                  {'name': 'Piped / network', 'share': 0.6570, 'cost': 117290.76671794064},
                                  {'name': 'Septic tank', 'share': 0.3360, 'cost': 83000.0},
@@ -153,8 +152,7 @@ def frontend_defaults() -> dict:
                 ]},
         'technical': {'ws_asset_life': 30, 'ws_non_hh_pct': 0.10, 'ws_existing_treatment_mld': 117.0,
                       'ws_water_req_who_lpcd': 135, 'san_asset_life': 30, 'san_non_hh_pct': 0.10,
-                      'san_wastewater_factor': 0.8, 'san_existing_fst_mld': 0.0, 'san_fs_per_person_per_day': 1.0,
-                      'san_avg_capex_per_mld_fstp': 395},
+                      'san_wastewater_factor': 0.8},
         'water_interventions': _default_ws_intervention(),
         'sanitation_interventions': _default_san_intervention(),
         'toggles': {k: False for k in [

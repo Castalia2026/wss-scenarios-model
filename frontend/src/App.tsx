@@ -119,6 +119,12 @@ export default function App() {
   const warnings: string[] = [];
   if (inputs) {
     const p = inputs.period;
+    // Year sequencing: model start < baseline < forecast end, with the target window inside it.
+    if (p.model_start_year >= p.baseline_year) warnings.push('Model start year must be before the baseline year');
+    else if (p.baseline_year - p.model_start_year < 3) warnings.push('Model start year should be at least 3 years before the baseline year');
+    if (p.forecast_end_year <= p.baseline_year) warnings.push('Forecast end year must be after the baseline year');
+    if (p.target1_year && (p.target1_year <= p.baseline_year || p.target1_year > p.forecast_end_year)) warnings.push('Target 1 year must be between the baseline year and the forecast end year');
+    if (p.target2_year > p.forecast_end_year) warnings.push('Target 2 year cannot be after the forecast end year');
     if (p.baseline_year >= p.as_is_forecast_start) warnings.push('Baseline year must be before as-is forecast start');
     if (p.target2_year < p.target1_year) warnings.push('Target 2 year must be >= Target 1 year');
     const wt = inputs.water_targets;
@@ -331,8 +337,17 @@ export default function App() {
             <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0 }}>
-            <LiveBAUChart inputs={activeInputs} sector={sectorTab}
-              scopeLabel={inputScope === 'national' ? 'National' : inputScope === 'rural' ? 'Rural' : 'Urban'} />
+            {chartScope === 'urban_rural' ? (
+              // Both areas entered: show Urban, Rural, and the National (Urban + Rural) aggregate.
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+                <LiveBAUChart inputsList={[inputs]} sector={sectorTab} scopeLabel="Urban" />
+                <LiveBAUChart inputsList={[altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="Rural" />
+                <LiveBAUChart inputsList={[inputs, altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="National" />
+              </div>
+            ) : (
+              <LiveBAUChart inputsList={[activeInputs]} sector={sectorTab}
+                scopeLabel={inputScope === 'national' ? 'National' : inputScope === 'rural' ? 'Rural' : 'Urban'} />
+            )}
           </div>
         </>)}
         {activeTab === 2 && inputs && (
@@ -740,7 +755,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   san_unit_costs: {
     title: 'Sanitation Supply Unit Costs',
-    content: "Enter sewerage cost per household at each service level, cost per MLD of wastewater treatment, on-site facility capex, and fecal sludge treatment costs. All costs should be in real terms at the base year price level. You can use costs for each distribution network and water treatment from the utility's data, and average costs for on-site solutions from a web search.",
+    content: "Enter sewerage cost per household at each service level and the on-site facility capex. All costs should be in real terms at the base year price level. You can use costs for each distribution network from the utility's data, and average costs for on-site solutions from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   planned_investments: {
@@ -750,7 +765,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   technical: {
     title: 'Technical Parameters',
-    content: 'Enter infrastructure parameters: asset useful life, non-household water share, treatment capacity (existing and planned), WHO water requirements, wastewater factors, and fecal sludge data. Treatment capacity figures should come from utility records or feasibility studies.',
+    content: 'Enter infrastructure parameters: asset useful life, non-household water share, treatment capacity (existing and planned), WHO water requirements, and the wastewater factor. Treatment capacity figures should come from utility records or feasibility studies.',
     sources: [
       { name: 'WHO water requirements guideline', url: 'https://www.who.int/publications/i/item/9789241548151' },
       { name: 'IBNET', url: 'https://www.ib-net.org/' },
