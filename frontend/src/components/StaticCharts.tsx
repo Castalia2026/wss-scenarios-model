@@ -64,7 +64,7 @@ export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sec
           <YAxis tick={{ fontSize: 10 }} domain={[0, (geoScope === 'national' || geoScope === 'urban_rural') ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
-          <Tooltip formatter={(value: number) => value.toFixed(2) + 'M'} contentStyle={{ fontSize: 11 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(2) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           {/* BAU shaded area — box legend */}
           <Area type="monotone" dataKey="Households under BAU" fill="#7dd3fc" stroke="#0ea5e9" fillOpacity={0.55} legendType="rect"
@@ -151,7 +151,7 @@ export function InterventionImpactChart({ sector = 'water', geoScope = 'urban', 
           <YAxis tick={{ fontSize: 10 }} domain={[0, (geoScope === 'national' || geoScope === 'urban_rural') ? 3 : 1.6]}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
-          <Tooltip formatter={(value: number) => value.toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(3) + 'M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           {/* Stacked intervention areas — only the switched-on ones are drawn */}
           <Area type="monotone" dataKey="BAU" stackId="1" fill={INTV_COLORS['BAU']} stroke="#94a3b8" fillOpacity={0.75} legendType="rect"

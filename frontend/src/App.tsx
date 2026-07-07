@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
-import { BAUForecastChart, InterventionImpactChart } from './components/StaticCharts';
-import { fetchDefaults } from './api';
+import LiveBAUChart from './components/LiveBAUChart';
+import TestHarness from './components/TestHarness';
+import { fetchDefaults, runCalculation } from './api';
 
 export default function App() {
   const [inputs, setInputs] = useState<any>(null);
@@ -33,6 +34,10 @@ export default function App() {
   }, []);
 
   const resizeMacroArrays = useCallback((inp: any) => {
+    // Macro series are HARD VALUES ONLY (historical + any forecast years with data): the engine
+    // fills the tail itself (ongoing inflation rates, GDP real-growth projection, FX from the
+    // inflation differential). So arrays are only TRUNCATED if the model window shrinks — never
+    // padded, or the ongoing/projection logic would be silently disabled.
     if (!inp?.period?.model_start_year || !inp?.period?.forecast_end_year || !inp?.macro) return inp;
     const needed = inp.period.forecast_end_year - inp.period.model_start_year + 1;
     const macroFields = ['gdp_growth', 'gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate'];
@@ -40,11 +45,9 @@ export default function App() {
     const newMacro = { ...inp.macro };
     for (const field of macroFields) {
       const arr = newMacro[field];
-      if (!arr || arr.length === needed) continue;
+      if (!arr || arr.length <= needed) continue;
       changed = true;
-      newMacro[field] = arr.length < needed
-        ? [...arr, ...Array(needed - arr.length).fill(field === 'gdp_nominal_usd' ? 0 : (arr[arr.length - 1] || 0))]
-        : arr.slice(0, needed);
+      newMacro[field] = arr.slice(0, needed);
     }
     return changed ? { ...inp, macro: newMacro } : inp;
   }, []);
@@ -69,6 +72,14 @@ export default function App() {
     : 'urban';
   // 'urban' is the primary dataset (held in `inputs`); other areas keep their own dataset in altInputs.
   const activeInputs = inputScope === 'urban' ? inputs : (altInputs[inputScope] ?? inputs);
+  // Live engine results for the ACTIVE dataset (debounced), so the input table can show the engine's
+  // computed forecast-year values (population, GDP, budget, allocated/actual capex, …).
+  const [results, setResults] = useState<any>(null);
+  useEffect(() => {
+    if (!activeInputs) return;
+    const h = setTimeout(() => { runCalculation(activeInputs).then(setResults).catch(() => {}); }, 350);
+    return () => clearTimeout(h);
+  }, [activeInputs]);
   const handleSetActiveInputs = useCallback((newInputs: any) => {
     const resized = resizeMacroArrays(newInputs);
     if (inputScope === 'urban') setInputs(resized);
@@ -115,20 +126,23 @@ export default function App() {
     if (wsSum !== 100) warnings.push(`Water Target 1 service levels sum to ${wsSum}%, must be 100%`);
     const wsSum2 = Math.round((wt.target2_serv1 + wt.target2_serv2 + wt.target2_serv3 + wt.target2_serv4 + wt.target2_serv5) * 100);
     if (wsSum2 !== 100) warnings.push(`Water Target 2 service levels sum to ${wsSum2}%, must be 100%`);
-    if (wt.providers) {
+    if (wt.providers && wt.providers.length) {
       const provSum = Math.round(wt.providers.reduce((s: number, p: any) => s + p.share_pct, 0) * 100);
       if (provSum !== 100) warnings.push(`Water provider shares sum to ${provSum}%, must be 100%`);
     }
     const st = inputs.sanitation_targets;
     const ssSum = Math.round((st.target1_sserv1 + st.target1_sserv2 + st.target1_sserv3 + st.target1_sserv4 + st.target1_sserv5) * 100);
     if (ssSum !== 100) warnings.push(`Sanitation Target 1 service levels sum to ${ssSum}%, must be 100%`);
-    if (st.providers) {
+    if (st.providers && st.providers.length) {
       const sanProvSum = Math.round((st.providers.reduce((s: number, p: any) => s + p.share_pct, 0) + (st.onsite_collection_treatment_pct || 0)) * 100);
       if (sanProvSum !== 100) warnings.push(`Sanitation provider shares + on-site sum to ${sanProvSum}%, must be 100%`);
     }
   }
 
-  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
+  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export', 'Test Harness'];
+  // Only Data Inputs, BAU and the Test Harness are active in this build; the rest are greyed out
+  // until the intervention engine is ported and validated.
+  const disabledTabs = new Set([2, 3, 4]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -189,14 +203,20 @@ export default function App() {
 
       {/* Tab Navigation */}
       <nav style={{ background: '#eef2f7', borderBottom: '2px solid #cbd5e1', display: 'flex', padding: '6px 20px 0', gap: 4 }}>
-        {tabs.map((tab, i) => (
-          <button key={tab} onClick={() => setActiveTab(i)} style={{
+        {tabs.map((tab, i) => {
+          const disabled = disabledTabs.has(i);
+          return (
+          <button key={tab} onClick={disabled ? undefined : () => setActiveTab(i)}
+            disabled={disabled}
+            title={disabled ? 'Not available in this build — the intervention engine is not yet ported/validated' : undefined}
+            style={{
             padding: '10px 28px', border: 'none',
             borderRadius: '8px 8px 0 0',
             background: activeTab === i ? '#fff' : 'transparent',
             boxShadow: activeTab === i ? '0 -2px 6px rgba(0,0,0,0.08)' : 'none',
-            cursor: 'pointer', fontSize: 13, fontWeight: activeTab === i ? 700 : 500,
-            color: activeTab === i ? '#1e3a5f' : '#64748b',
+            cursor: disabled ? 'not-allowed' : 'pointer', fontSize: 13, fontWeight: activeTab === i ? 700 : 500,
+            color: disabled ? '#c3cbd6' : activeTab === i ? '#1e3a5f' : '#64748b',
+            opacity: disabled ? 0.55 : 1,
             borderBottom: activeTab === i ? '2px solid #fff' : '2px solid transparent',
             marginBottom: -2,
             transition: 'all 0.15s',
@@ -208,13 +228,13 @@ export default function App() {
               <span style={{
                 display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                 width: 20, height: 20, borderRadius: '50%', fontSize: 10, fontWeight: 700,
-                background: activeTab === i ? '#2563eb' : '#94a3b8',
+                background: disabled ? '#d7dde6' : activeTab === i ? '#2563eb' : '#94a3b8',
                 color: '#fff', flexShrink: 0,
               }}>{i + 1}</span>
-              {tab}
+              {tab}{disabled ? ' 🔒' : ''}
             </span>
           </button>
-        ))}
+        );})}
       </nav>
 
       {warnings.length > 0 && (
@@ -304,22 +324,15 @@ export default function App() {
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} geoScope={inputScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {activeTab === 1 && inputs && (<>
           <div style={{ flex: '0 1 460px', display: 'flex', minWidth: 0 }}>
             <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0 }}>
-            {chartScope === 'urban_rural' ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-                <BAUForecastChart sector={sectorTab} geoScope="urban" />
-                <BAUForecastChart sector={sectorTab} geoScope="rural" />
-                <BAUForecastChart sector={sectorTab} geoScope="urban_rural" />
-              </div>
-            ) : (
-              <BAUForecastChart sector={sectorTab} geoScope={chartScope} />
-            )}
+            <LiveBAUChart inputs={activeInputs} sector={sectorTab}
+              scopeLabel={inputScope === 'national' ? 'National' : inputScope === 'rural' ? 'Rural' : 'Urban'} />
           </div>
         </>)}
         {activeTab === 2 && inputs && (
@@ -345,6 +358,9 @@ export default function App() {
 
         {activeTab === 3 && (
           <ResultsDashboard geoScope={chartScope} scenarios={scenarios} inputs={inputs} />
+        )}
+        {activeTab === 5 && inputs && (
+          <TestHarness inputs={activeInputs} onChange={handleSetActiveInputs} />
         )}
         {activeTab === 4 && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px' }}>

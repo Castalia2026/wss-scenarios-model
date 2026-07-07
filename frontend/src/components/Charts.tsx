@@ -51,7 +51,7 @@ export function ServiceGapChart({ years, targetHH, bauHH, interventions, title, 
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
-          <Tooltip formatter={(value: number) => value.toFixed(4)} contentStyle={{ fontSize: 12 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(4)} contentStyle={{ fontSize: 12 }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.6} />
           {interventions.map(interv => (
@@ -103,7 +103,7 @@ export function FinancingGapChart({ years, investmentNeed, bauInvestment, interv
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} label={{ value: 'Billions', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
-          <Tooltip formatter={(value: number) => value.toFixed(2)} contentStyle={{ fontSize: 12 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(2)} contentStyle={{ fontSize: 12 }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Bar dataKey="Investment Need" fill={COLORS.inv_need} opacity={0.7} />
           <Bar dataKey="BAU Investment" stackId="funding" fill={COLORS.bau_inv} opacity={0.7} />
@@ -143,7 +143,7 @@ export function CumulativeChart({ years, cumulativeNeed, cumulativeBau, title, s
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 11 }} />
           <YAxis tick={{ fontSize: 11 }} label={{ value: 'Billions', angle: -90, position: 'insideLeft', style: { fontSize: 11 } }} />
-          <Tooltip formatter={(value: number) => value.toFixed(2)} contentStyle={{ fontSize: 12 }} />
+          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(2)} contentStyle={{ fontSize: 12 }} />
           <Legend wrapperStyle={{ fontSize: 11 }} />
           <Area type="monotone" dataKey="Cumulative Need" fill={COLORS.inv_need} stroke={COLORS.inv_need} fillOpacity={0.3} />
           <Area type="monotone" dataKey="Cumulative BAU" fill={COLORS.bau_inv} stroke={COLORS.bau_inv} fillOpacity={0.3} />

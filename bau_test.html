@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>WSS — BAU test harness</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, sans-serif; color: #1e293b; background: #f8fafc; }
+  header { background: #0073A8; color: #fff; padding: 10px 18px; font-weight: 700; }
+  .wrap { display: flex; height: calc(100vh - 42px); }
+  .col-in { width: 430px; flex-shrink: 0; overflow-y: auto; padding: 14px 16px; border-right: 1px solid #cbd5e1; background: #fff; }
+  .col-out { flex: 1; overflow: auto; padding: 14px 16px; }
+  h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #0073A8; margin: 16px 0 6px; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+  .f { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; }
+  .f label { font-size: 12px; color: #334155; flex: 1; }
+  .f input { width: 110px; padding: 4px 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 12px; text-align: right; }
+  textarea { width: 100%; height: 44px; font-size: 11px; font-family: monospace; border: 1px solid #cbd5e1; border-radius: 4px; padding: 4px; }
+  .ta-label { font-size: 12px; color: #334155; margin-bottom: 2px; display:block; }
+  .seg { display: flex; gap: 0; margin: 0 0 6px; }
+  .seg button { flex: 1; padding: 8px; border: 1px solid #0073A8; background: #fff; color: #0073A8; font-weight: 700; font-size: 13px; cursor: pointer; }
+  .seg button.on { background: #0073A8; color: #fff; }
+  .seg button:first-child { border-radius: 6px 0 0 6px; }
+  .seg button:last-child { border-radius: 0 6px 6px 0; }
+  button.run { width: 100%; margin-top: 14px; padding: 10px; background: #0073A8; color: #fff; border: none; border-radius: 6px; font-weight: 700; font-size: 14px; cursor: pointer; }
+  table { border-collapse: collapse; font-size: 11px; white-space: nowrap; }
+  th, td { padding: 3px 7px; border-bottom: 1px solid #eef2f7; text-align: right; }
+  th { position: sticky; top: 0; background: #f1f5f9; color: #334155; }
+  td:first-child, th:first-child { text-align: left; position: sticky; left: 0; background: #fff; }
+  tr.fc td { background: #fffaf0; }
+  .err { color: #b91c1c; font-size: 12px; white-space: pre-wrap; }
+  .note { font-size: 11px; color: #64748b; margin: 4px 0 10px; }
+  .small { font-size: 10px; color: #94a3b8; }
+</style>
+</head>
+<body>
+<header>WSS — BAU test harness <span class="small">(inputs → live engine → BAU output, per sector)</span></header>
+<div class="wrap">
+  <div class="col-in" id="inputs">
+    <div class="seg">
+      <button id="btn-water" class="on" onclick="setSector('water')">Water Supply</button>
+      <button id="btn-san" onclick="setSector('sanitation')">Sanitation</button>
+    </div>
+
+    <!-- ───────── shared ───────── -->
+    <h3>Time scales</h3>
+    <div class="f"><label>Model start year</label><input id="msy" value="2011"></div>
+    <div class="f"><label>Baseline year</label><input id="by" value="2025"></div>
+    <div class="f"><label>Forecast end year</label><input id="fey" value="2040"></div>
+    <div class="f"><label>As-is start year</label><input id="ass" value="2026"></div>
+    <div class="f"><label>As-is length (yrs)</label><input id="asl" value="2"></div>
+    <div class="f"><label>Target 1 year</label><input id="t1y" value="2030"></div>
+    <div class="f"><label>Target 2 year</label><input id="t2y" value="2040"></div>
+
+    <h3 id="macroH">Macro (per year)</h3>
+    <div class="note">For GDP &amp; inflation: enter (1) historical and (2) any forecast years you have hard data for; the (3) <b>ongoing</b> rate auto-fills every remaining forecast year.</div>
+    <label class="ta-label">GDP nominal (USD bn) — historical</label>
+    <textarea id="gdpuH">21.685 21.703 22.162 22.722 24.361 24.524 28.972 33.112 34.186 33.434 36.927 41.183 40.907 43.419 46.08</textarea>
+    <label class="ta-label">GDP nominal (USD bn) — forecast (hard): enter <b>5 years</b> (baseline+1 … baseline+5)</label>
+    <textarea id="gdpuF">49.603 54.449 59.728 65.494 71.783</textarea>
+    <div id="gdpfChk" style="font-size:10px;margin:2px 0 4px"></div>
+    <div class="f"><label>GDP ongoing — real growth (fills remaining forecast yrs)</label><input id="gdpgf" value="0.05"></div>
+    <label class="ta-label">Inflation local — historical</label>
+    <textarea id="inflH">0.096 0.083 0.099 0.09 0.078 0.099 0.045 0.041 0.046 0.061 0.036 0.064 0.077 0.054 0.049</textarea>
+    <label class="ta-label">Inflation local — forecast (hard, years with data)</label>
+    <textarea id="inflF">0.05 0.051</textarea>
+    <div class="f"><label>Inflation local ongoing (fills rest)</label><input id="inflO" value="0.05"></div>
+    <label class="ta-label">Inflation US — historical</label>
+    <textarea id="uinflH">0.031 0.021 0.015 0.016 0.001 0.013 0.021 0.024 0.018 0.013 0.047 0.08 0.041 0.03 0.03</textarea>
+    <label class="ta-label">Inflation US — forecast (hard, years with data)</label>
+    <textarea id="uinflF">0.025 0.021</textarea>
+    <div class="f"><label>Inflation US ongoing (fills rest)</label><input id="uinflO" value="0.022"></div>
+    <label class="ta-label" id="fxLabel">Exchange rate (local per USD) — actuals through baseline−1</label>
+    <textarea id="fx">74.5973698630137 85.4278961748633 93.6310410958903 97.62424657534244 102.61506849315076 107.48286885245902 104.19501369863016 109.41323287671237 112.63893150684937 118.55868493150682 118.2669863013699 125.73810958904113 132.1363561643834 133.86980874316944</textarea>
+    <div style="font-size:10px;color:#64748b;margin:2px 0 6px">FX is derived from the inflation differential from the baseline year on: FX[t]=FX[t−1]×(1+local)/(1+US). Supply actuals only.</div>
+    <label class="ta-label" id="hhLabel">Total households (millions) — actuals through baseline−1</label>
+    <textarea id="hh">0.61 0.6292760000000001 0.6491611216000001 0.6696746130425602 0.6908363308147051 0.7126667588684498 0.7351870284486929 0.7584189385476716 0.7823849770057781 0.8071083422791607 0.8326129658951823 0.8589235356174701 0.8860655193429823 0.9140651897542206</textarea>
+    <label class="ta-label" id="popLabel">Total population (millions) — actuals through baseline−1</label>
+    <textarea id="pop">2.423388 2.477757119096809 2.533346018563647 2.5901820643791393 2.6482932364822645 2.707708142546658 2.768456032063945 2.830566810743036 2.8940710552324713 2.959000028173066 3.0253856935882634 3.0932607326197694 3.1626585596162253 3.233613338582828</textarea>
+    <div style="font-size:10px;color:#64748b;margin:2px 0 6px">Supply actuals only (through the year before baseline). The baseline year itself is projected: households/population at mean historical growth, and household size = population ÷ households is derived for display.</div>
+
+    <h3>WSS budget &amp; asset life (shared)</h3>
+    <div class="f"><label>Capex % of budget</label><input id="capex" value="21"></div>
+    <div class="f"><label>Water budget % of GDP</label><input id="wsgdp" value="0.16496186144332283"></div>
+    <div class="f"><label>Sanitation budget % of GDP</label><input id="sangdp" value="0.04178609445049989"></div>
+    <div class="f"><label>Useful life of assets (yrs)</label><input id="life" value="30"></div>
+
+    <!-- ───────── WATER block ───────── -->
+    <div class="sec sec-water">
+      <h3 id="wsServH">Water — service levels (% HHs)</h3>
+      <div class="f"><label>Start: Safely managed %</label><input id="s1s" value="56.560166762623"></div>
+      <div class="f"><label>Start: Basic %</label><input id="s2s" value="34.03983323737703"></div>
+      <div class="f"><label>Start: Limited %</label><input id="s3s" value="2.60"></div>
+      <div class="f"><label>Start: Unimproved %</label><input id="s4s" value="5.80"></div>
+      <div class="f"><label>Start: No Service %</label><input id="s5s" value="1.00"></div>
+      <div class="f"><label>Baseline: Safely managed %</label><input id="s1b" value="51.3729462650536"></div>
+      <div class="f"><label>Baseline: Basic %</label><input id="s2b" value="38.6270537349464"></div>
+      <div class="f"><label>Baseline: Limited %</label><input id="s3b" value="3.20"></div>
+      <div class="f"><label>Baseline: Unimproved %</label><input id="s4b" value="5.90"></div>
+      <div class="f"><label>Baseline: No Service %</label><input id="s5b" value="0.90"></div>
+
+      <h3 id="wsTgtH">Water — targets (% HHs)</h3>
+      <div class="f"><label>T1 Safely managed %</label><input id="t1_1" value="66"></div>
+      <div class="f"><label>T1 Basic %</label><input id="t1_2" value="34"></div>
+      <div class="f"><label>T1 Limited %</label><input id="t1_3" value="0"></div>
+      <div class="f"><label>T1 Unimproved %</label><input id="t1_4" value="0"></div>
+      <div class="f"><label>T1 No Service %</label><input id="t1_5" value="0"></div>
+      <div class="f"><label>T2 Safely managed %</label><input id="t2_1" value="100"></div>
+      <div class="f"><label>T2 Basic %</label><input id="t2_2" value="0"></div>
+      <div class="f"><label>T2 Limited %</label><input id="t2_3" value="0"></div>
+      <div class="f"><label>T2 Unimproved %</label><input id="t2_4" value="0"></div>
+      <div class="f"><label>T2 No Service %</label><input id="t2_5" value="0"></div>
+
+      <h3>Water — unit costs (Safely managed &amp; Basic mixes; capex = Σ share × cost)</h3>
+      <div id="waterTech"></div>
+
+      <h3>Water — planned investment (LCU mn) &amp; technical</h3>
+      <div class="note">2026-30, 31-35, 36-40, 41-45, 46-50</div>
+      <textarea id="wsplan">16223.765355365464 14005.46734156549 9306.350838959635 4817.250716358515 2717.0869163112056</textarea>
+      <div class="f" style="margin-top:6px"><label>% water sold to non-HH</label><input id="nonhh" value="10"></div>
+      <div class="f"><label>NRW: treatment % of capex</label><input id="ntc" value="40"></div>
+      <div class="f"><label>NRW: current NRW %</label><input id="ncur" value="40"></div>
+      <div class="f"><label>NRW: physical loss % of NRW</label><input id="nphys" value="50"></div>
+    </div>
+
+    <!-- ───────── SANITATION block ───────── -->
+    <div class="sec sec-san" style="display:none">
+      <h3 id="sanServH">Sanitation — service levels (% HHs)</h3>
+      <div class="f"><label>Start: Safely managed %</label><input id="ss1s" value="2.88"></div>
+      <div class="f"><label>Start: Basic %</label><input id="ss2s" value="97.00"></div>
+      <div class="f"><label>Start: Limited %</label><input id="ss3s" value="0.01"></div>
+      <div class="f"><label>Start: Unimproved %</label><input id="ss4s" value="0.10"></div>
+      <div class="f"><label>Start: No Service %</label><input id="ss5s" value="0.01"></div>
+      <div class="f"><label>Baseline: Safely managed %</label><input id="ss1b" value="7.774752344348565"></div>
+      <div class="f"><label>Baseline: Basic %</label><input id="ss2b" value="90.9252476556514"></div>
+      <div class="f"><label>Baseline: Limited %</label><input id="ss3b" value="0.80"></div>
+      <div class="f"><label>Baseline: Unimproved %</label><input id="ss4b" value="0.30"></div>
+      <div class="f"><label>Baseline: No Service %</label><input id="ss5b" value="0.20"></div>
+
+      <h3 id="sanTgtH">Sanitation — targets (% HHs)</h3>
+      <div class="f"><label>T1 Safely managed %</label><input id="st1_1" value="66"></div>
+      <div class="f"><label>T1 Basic %</label><input id="st1_2" value="34"></div>
+      <div class="f"><label>T1 Limited %</label><input id="st1_3" value="0"></div>
+      <div class="f"><label>T1 Unimproved %</label><input id="st1_4" value="0"></div>
+      <div class="f"><label>T1 No Service %</label><input id="st1_5" value="0"></div>
+      <div class="f"><label>T2 Safely managed %</label><input id="st2_1" value="100"></div>
+      <div class="f"><label>T2 Basic %</label><input id="st2_2" value="0"></div>
+      <div class="f"><label>T2 Limited %</label><input id="st2_3" value="0"></div>
+      <div class="f"><label>T2 Unimproved %</label><input id="st2_4" value="0"></div>
+      <div class="f"><label>T2 No Service %</label><input id="st2_5" value="0"></div>
+
+      <h3 id="sanMixH">Sanitation — unit costs (Safely managed &amp; Basic mixes; capex = Σ share × cost)</h3>
+      <div id="sanTech"></div>
+
+      <h3>Sanitation — planned investment &amp; technical</h3>
+      <textarea id="sanplan">17000 12000 11000 7000 5000</textarea>
+      <div class="f" style="margin-top:6px"><label>% sanitation sold to non-HH</label><input id="nonhh_san" value="10"></div>
+    </div>
+
+    <div id="validation" style="margin-top:14px;font-size:11px;line-height:1.6"></div>
+    <button class="run" onclick="run()">▶ Run BAU</button>
+  </div>
+
+  <div class="col-out" id="output">
+    <div class="note">Click <b>Run BAU</b>. Households in millions; money in LCU millions. Forecast years shaded.</div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const num = id => parseFloat($(id).value) || 0;
+const pct = id => (parseFloat($(id).value) || 0) / 100;
+const arr = id => $(id).value.trim().split(/[\s,]+/).filter(x => x !== '').map(Number);
+
+let sector = 'water';
+// ── dynamic technology mixes: SEPARATE lists for Safely managed and Basic (own techs & shares) ──
+const tech = {
+  water: {
+    sm: [
+      { name: 'Piped network', share: 65, cost: 105388.31832439502 },
+      { name: 'Protected well', share: 15, cost: 60000 },
+      { name: 'Water tanker', share: 10, cost: 96878 },
+      { name: 'Borehole + handpump', share: 10, cost: 96877.9308914323 },
+    ],
+    basic: [
+      { name: 'Piped network', share: 65, cost: 90000 },
+      { name: 'Protected well', share: 15, cost: 60000 },
+      { name: 'Water tanker', share: 10, cost: 96878 },
+      { name: 'Borehole + handpump', share: 10, cost: 96877.9308914323 },
+    ],
+  },
+  sanitation: {
+    sm: [
+      { name: 'Piped / network', share: 65.7, cost: 117290.76671794064 },
+      { name: 'Septic tank', share: 33.6, cost: 83000 },
+      { name: 'Pit latrine', share: 0.6, cost: 14600 },
+      { name: 'VIP latrine', share: 0, cost: 16500 },
+      { name: 'Pit + slab', share: 0.1, cost: 14600 },
+      { name: 'Composting', share: 0, cost: 22000 },
+    ],
+    basic: [
+      { name: 'Piped / network', share: 65.7, cost: 117290.76671794064 },
+      { name: 'Septic tank', share: 33.6, cost: 83000 },
+      { name: 'Pit latrine', share: 0.6, cost: 14600 },
+      { name: 'VIP latrine', share: 0, cost: 16500 },
+      { name: 'Pit + slab', share: 0.1, cost: 14600 },
+      { name: 'Composting', share: 0, cost: 22000 },
+    ],
+  },
+};
+const RUNGS = { sm: 'Safely managed', basic: 'Basic' };
+const techWeighted = (sec, rung) => tech[sec][rung].reduce((a, t) => a + (t.share / 100) * t.cost, 0);
+const techShareSum = (sec, rung) => tech[sec][rung].reduce((a, t) => a + (t.share || 0), 0);
+const rungRead = (sec, rung) => `Σ share ${techShareSum(sec, rung).toFixed(1)}% · weighted cost/HH ${Math.round(techWeighted(sec, rung)).toLocaleString()}`;
+const TI = 'padding:3px 4px;border:1px solid #cbd5e1;border-radius:3px;font-size:11px';
+function renderRung(sec, rung) {
+  let h = `<div style="font-size:11px;font-weight:600;color:#0073A8;margin:6px 0 2px">${RUNGS[rung]} — technology mix</div>`;
+  h += `<div style="display:flex;gap:3px;font-size:9px;color:#94a3b8"><span style="flex:1.6">technology</span><span style="width:44px;text-align:right">share%</span><span style="width:72px;text-align:right">cost/HH</span><span style="width:16px"></span></div>`;
+  tech[sec][rung].forEach((t, i) => {
+    h += `<div style="display:flex;gap:3px;margin-bottom:2px">
+      <input style="flex:1.6;min-width:0;${TI}" value="${t.name}" oninput="setTech('${sec}','${rung}',${i},'name',this.value)">
+      <input style="width:44px;text-align:right;${TI}" value="${t.share}" oninput="setTech('${sec}','${rung}',${i},'share',this.value)">
+      <input style="width:72px;text-align:right;${TI}" value="${t.cost}" oninput="setTech('${sec}','${rung}',${i},'cost',this.value)">
+      <button type="button" onclick="rmTech('${sec}','${rung}',${i})" style="width:16px;border:none;background:#fee2e2;color:#dc2626;border-radius:3px;cursor:pointer;font-size:10px">✕</button>
+    </div>`;
+  });
+  const ok = Math.abs(techShareSum(sec, rung) - 100) < 0.1;
+  h += `<div id="techRead_${sec}_${rung}" style="font-size:10px;color:${ok ? '#0073A8' : '#b91c1c'};margin:2px 0 3px">${rungRead(sec, rung)}</div>`;
+  h += `<button type="button" onclick="addTech('${sec}','${rung}')" style="margin:0 0 6px;padding:3px 9px;font-size:11px;border:1px dashed #0073A8;background:#fff;color:#0073A8;border-radius:5px;cursor:pointer">+ Add ${RUNGS[rung]} technology</button>`;
+  return h;
+}
+function renderTech(sec) {
+  $(sec === 'water' ? 'waterTech' : 'sanTech').innerHTML = renderRung(sec, 'sm') + renderRung(sec, 'basic');
+}
+function setTech(sec, rung, i, f, v) {
+  tech[sec][rung][i][f] = (f === 'name') ? v : (parseFloat(v) || 0);
+  const el = $(`techRead_${sec}_${rung}`);
+  if (el) { const ok = Math.abs(techShareSum(sec, rung) - 100) < 0.1; el.style.color = ok ? '#0073A8' : '#b91c1c'; el.textContent = rungRead(sec, rung); }
+  validate();
+}
+function rmTech(sec, rung, i) { if (tech[sec][rung].length > 1) { tech[sec][rung].splice(i, 1); renderTech(sec); validate(); } }
+function addTech(sec, rung) { tech[sec][rung].push({ name: 'New technology', share: 0, cost: 0 }); renderTech(sec); validate(); }
+const techMap = (sec, rung) => tech[sec][rung].map(t => ({ name: t.name, share: t.share / 100, cost: t.cost }));
+
+function setSector(s) {
+  sector = s;
+  document.querySelectorAll('.sec-water').forEach(e => e.style.display = s === 'water' ? '' : 'none');
+  document.querySelectorAll('.sec-san').forEach(e => e.style.display = s === 'sanitation' ? '' : 'none');
+  $('btn-water').classList.toggle('on', s === 'water');
+  $('btn-san').classList.toggle('on', s === 'sanitation');
+  validate();
+  run();
+}
+
+const WATER_GROUPS = [
+  ['Service — start', ['s1s','s2s','s3s','s4s','s5s']],
+  ['Service — baseline', ['s1b','s2b','s3b','s4b','s5b']],
+  ['Target 1', ['t1_1','t1_2','t1_3','t1_4','t1_5']],
+  ['Target 2', ['t2_1','t2_2','t2_3','t2_4','t2_5']],
+];
+const SAN_GROUPS = [
+  ['Service — start', ['ss1s','ss2s','ss3s','ss4s','ss5s']],
+  ['Service — baseline', ['ss1b','ss2b','ss3b','ss4b','ss5b']],
+  ['Target 1', ['st1_1','st1_2','st1_3','st1_4','st1_5']],
+  ['Target 2', ['st2_1','st2_2','st2_3','st2_4','st2_5']],
+];
+function validate() {
+  const groups = sector === 'water' ? WATER_GROUPS : SAN_GROUPS;
+  let ok = true;
+  let html = groups.map(([name, ids]) => {
+    const s = ids.reduce((a, id) => a + (parseFloat($(id).value) || 0), 0);
+    const g = Math.abs(s - 100) < 0.1;
+    if (!g) ok = false;
+    return `<div style="color:${g ? '#16a34a' : '#b91c1c'}">${g ? '✓' : '✗'} ${name}: ${s.toFixed(2)}%</div>`;
+  }).join('');
+  ['sm', 'basic'].forEach(rung => {
+    const ts = techShareSum(sector, rung);
+    const tg = Math.abs(ts - 100) < 0.1; if (!tg) ok = false;
+    html += `<div style="color:${tg ? '#16a34a' : '#b91c1c'}">${tg ? '✓' : '✗'} ${RUNGS[rung]} tech shares: ${ts.toFixed(2)}%</div>`;
+  });
+  $('validation').innerHTML = '<b>' + (sector === 'water' ? 'Water' : 'Sanitation') + ' checks (each must total 100%)</b>' + html;
+  const ng = arr('gdpuF').length, gc = $('gdpfChk');
+  if (gc) { const good = ng === 5; gc.style.color = good ? '#16a34a' : '#b45309';
+    gc.textContent = good ? '✓ 5 forecast years entered' : `⚠ ${ng} year(s) entered — enter 5; the ongoing growth rate fills years after`; }
+  return ok;
+}
+function refreshLabels() {
+  const msy = num('msy'), by = num('by'), fey = num('fey'), t1 = num('t1y'), t2 = num('t2y');
+  $('macroH').textContent = `Macro (per year, ${msy} → ${fey})`;
+  $('hhLabel').textContent = `Total households (millions, ${msy} → ${by} historical)`;
+  $('popLabel').textContent = `Total population (millions, ${msy} → ${by} historical)`;
+  $('wsServH').textContent = `Water — service levels (${msy} / ${by})`;
+  $('sanServH').textContent = `Sanitation — service levels (${msy} / ${by})`;
+  $('wsTgtH').textContent = `Water — targets (T1 ${t1} / T2 ${t2})`;
+  $('sanTgtH').textContent = `Sanitation — targets (T1 ${t1} / T2 ${t2})`;
+}
+document.getElementById('inputs').addEventListener('input', () => { validate(); refreshLabels(); });
+
+function payload() {
+  return {
+    period: { model_start_year: num('msy'), baseline_year: num('by'), forecast_end_year: num('fey'),
+      as_is_forecast_start: num('ass'), as_is_forecast_length: num('asl'), target1_year: num('t1y'), target2_year: num('t2y') },
+    macro: {
+      gdp_nominal_usd: [...arr('gdpuH'), ...arr('gdpuF')], gdp_growth_forecast: num('gdpgf'),
+      inflation_local: [...arr('inflH'), ...arr('inflF')], inflation_local_ongoing: num('inflO'),
+      inflation_us: [...arr('uinflH'), ...arr('uinflF')], inflation_us_ongoing: num('uinflO'),
+      exchange_rate: arr('fx') },
+    population: { hh_ts: arr('hh'), pop_ts: arr('pop') },
+    wss_budget: { capex_pct_budget: pct('capex'), ws_budget_pct_gdp: pct('wsgdp'), san_budget_pct_gdp: pct('sangdp') },
+    technical: { ws_non_hh_pct: pct('nonhh'), san_non_hh_pct: pct('nonhh_san'), ws_asset_life: num('life') },
+    planned_investments: { ws_planned: arr('wsplan'), san_planned: arr('sanplan') },
+    water_service: { pct_serv1_start: pct('s1s'), pct_serv2_start: pct('s2s'), pct_serv3_start: pct('s3s'),
+      pct_serv4_start: pct('s4s'), pct_serv5_start: pct('s5s'), pct_serv1_baseline: pct('s1b'), pct_serv2_baseline: pct('s2b'),
+      pct_serv3_baseline: pct('s3b'), pct_serv4_baseline: pct('s4b'), pct_serv5_baseline: pct('s5b') },
+    water_targets: { target1_serv1: pct('t1_1'), target1_serv2: pct('t1_2'), target1_serv3: pct('t1_3'),
+      target1_serv4: pct('t1_4'), target1_serv5: pct('t1_5'), target2_serv1: pct('t2_1'), target2_serv2: pct('t2_2'),
+      target2_serv3: pct('t2_3'), target2_serv4: pct('t2_4'), target2_serv5: pct('t2_5') },
+    water_costs: { sm_technologies: techMap('water', 'sm'), basic_technologies: techMap('water', 'basic') },
+    water_interventions: { nrw_treatment_cost_pct_capex: pct('ntc'), nrw_current_pct: pct('ncur'), nrw_physical_loss_pct: pct('nphys') },
+    sanitation_service: { pct_sserv1_start: pct('ss1s'), pct_sserv2_start: pct('ss2s'), pct_sserv3_start: pct('ss3s'),
+      pct_sserv4_start: pct('ss4s'), pct_sserv5_start: pct('ss5s'), pct_sserv1_baseline: pct('ss1b'), pct_sserv2_baseline: pct('ss2b'),
+      pct_sserv3_baseline: pct('ss3b'), pct_sserv4_baseline: pct('ss4b'), pct_sserv5_baseline: pct('ss5b') },
+    sanitation_targets: { target1_sserv1: pct('st1_1'), target1_sserv2: pct('st1_2'), target1_sserv3: pct('st1_3'),
+      target1_sserv4: pct('st1_4'), target1_sserv5: pct('st1_5'), target2_sserv1: pct('st2_1'), target2_sserv2: pct('st2_2'),
+      target2_sserv3: pct('st2_3'), target2_sserv4: pct('st2_4'), target2_sserv5: pct('st2_5') },
+    sanitation_costs: { sm_technologies: techMap('sanitation', 'sm'), basic_technologies: techMap('sanitation', 'basic') },
+  };
+}
+
+const M = x => x.toLocaleString(undefined, { maximumFractionDigits: 1 });
+const HH = x => x.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+
+async function run() {
+  const out = $('output');
+  if (!validate()) { out.innerHTML = '<div class="err">Fix the highlighted groups — each must total 100% before running.</div>'; return; }
+  out.innerHTML = '<div class="note">Running…</div>';
+  try {
+    const res = await fetch('/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload()) });
+    if (!res.ok) { out.innerHTML = '<div class="err">' + res.status + '\n' + (await res.text()) + '</div>'; return; }
+    render(await res.json());
+  } catch (e) { out.innerHTML = '<div class="err">' + e + '</div>'; }
+}
+
+function render(r) {
+  const ws = sector === 'water' ? r.water_supply : r.sanitation, yrs = r.years, bau = ws.bau_hh, tgt = ws.target_hh;
+  const title = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const cols = ['Year', 'Total HH', 'BAU SM', 'BAU Basic', 'BAU Limited', 'BAU Unimp', 'BAU NoServ',
+                'Σ rungs', 'Target SM', 'New capex', 'Replace', 'Total need', 'Fin. gap'];
+  let h = '<h3 style="margin-top:0">' + title + ' — BAU</h3>';
+  h += '<div class="note">cost/HH (SM) = <b>' + Math.round(ws.cost_per_hh).toLocaleString() +
+       '</b> · hist CAGR = ' + ws.hist_cagr.map(x => (x*100).toFixed(2) + '%').join(' / ') +
+       ' · opening stock = <b>' + M(ws.opening_stock) + '</b> mn · end-of-as-is = <b>' + r.end_asis_year + '</b></div>';
+  h += '<table><thead><tr>' + cols.map(c => '<th>' + c + '</th>').join('') + '</tr></thead><tbody>';
+  for (let i = 0; i < yrs.length; i++) {
+    const sum = [0,1,2,3,4].reduce((a, rn) => a + bau[rn][i], 0);
+    const fc = yrs[i] > num('by');
+    h += '<tr class="' + (fc ? 'fc' : '') + '"><td>' + yrs[i] + '</td><td>' + HH(r.total_hh[i]) + '</td>' +
+      [0,1,2,3,4].map(rn => '<td>' + HH(bau[rn][i]) + '</td>').join('') +
+      '<td>' + HH(sum) + '</td><td>' + HH(tgt[0][i]) + '</td>' +
+      '<td>' + M(ws.new_capex_total[i]) + '</td><td>' + M(ws.replacement_capex[i]) + '</td>' +
+      '<td>' + M(ws.total_investment_need[i]) + '</td><td>' + M(ws.financing_gap[i]) + '</td></tr>';
+  }
+  $('output').innerHTML = h + '</tbody></table>';
+}
+
+renderTech('water');
+renderTech('sanitation');
+refreshLabels();
+validate();
+run();
+</script>
+</body>
+</html>
