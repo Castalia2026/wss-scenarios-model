@@ -16,7 +16,7 @@ from model.inputs import (
     WaterServiceLevelInputs, SanitationServiceLevelInputs, WaterTargetInputs,
     SanitationTargetInputs, WaterUnitCosts, SanitationUnitCosts, Tech,
     PlannedInvestmentInputs, TechnicalInputs, WSSBudgetInputs,
-    WaterInterventionInputs, SanitationInterventionInputs, CountryConfig,
+    WaterInterventionInputs, SanitationInterventionInputs, CountryConfig, TargetPoint,
 )
 
 # ── validated Kathmandu-Valley values (from the reference workbook) ──────────
@@ -44,26 +44,44 @@ _WS_BUDGET_DIRECT = [6499.543652769706, 6878.455752682857, 7004.910275298227, 68
 # Sanitation direct-entry default = real GDP × sanitation %GDP, DERIVED from the water series (real GDP =
 # _WS_BUDGET_DIRECT ÷ _WS_BUDGET_PCT) so it stays consistent with %GDP mode when _SAN_BUDGET_PCT changes.
 _SAN_BUDGET_DIRECT = [g * (_SAN_BUDGET_PCT / _WS_BUDGET_PCT) for g in _WS_BUDGET_DIRECT]
+# test2: REAL GDP in local currency (millions) — the primary macro input. Derived from the water
+# budget series (real GDP = budget ÷ %GDP) so it stays consistent with the historical budget.
+_GDP_REAL_LOCAL = [round(g / _WS_BUDGET_PCT, 3) for g in _WS_BUDGET_DIRECT]
 _START_YR, _BASE_YR, _END_YR = 2011, 2025, 2040
 _NYEARS = _END_YR - _START_YR + 1                       # 30
 _BASE_IDX = _BASE_YR - _START_YR                        # 14
 
 
 def _svc_series(start, base):
-    """A per-year service-share series the UI can show: linear start→baseline over history,
-    held flat over the forecast. The engine only reads index 0 (start) and the baseline index —
-    those two are kept at FULL precision (rounding them breaks Excel parity); only the
-    display-only interpolated years in between are rounded."""
+    """A per-year service-share series the UI can show: linear start→baseline over history, then BLANK
+    (0) over the forecast — test2: forecast service cells are user-entered TARGETS, so they must start
+    empty (a filled forecast column is what defines a target year). The engine still reads index 0
+    (start) and the baseline index at FULL precision; only the display-only interpolated years between
+    them are rounded."""
     out = []
     for i in range(_NYEARS):
         if i == 0:
             out.append(start)
-        elif i >= _BASE_IDX:
+        elif i == _BASE_IDX:
             out.append(base)
-        else:
+        elif i < _BASE_IDX:
             f = i / _BASE_IDX
             out.append(round(start * (1 - f) + base * f, 6))
+        else:
+            out.append(0.0)          # forecast year: blank until the user sets a target here
     return out
+
+
+def _svc_with_targets(starts, bases, tgt_years_shares):
+    """Build the 5 per-rung service series and stamp the default example TARGETS into their forecast
+    columns. `tgt_years_shares` = list of (year, [5 shares]); each rung r gets series[year-idx]=share[r]."""
+    series = [_svc_series(starts[r], bases[r]) for r in range(5)]
+    for yr, shares in tgt_years_shares:
+        idx = yr - _START_YR
+        if 0 <= idx < _NYEARS:
+            for r in range(5):
+                series[r][idx] = shares[r]
+    return series
 
 
 def frontend_defaults() -> dict:
@@ -89,8 +107,12 @@ def frontend_defaults() -> dict:
             # (excel2 I|General Urban: water G321 = 21%, sanitation G328 = 15%).
             'ws_capex_pct': 0.21, 'san_capex_pct': 0.15,
             'execution_rate': 1.0,
-            'budget_input_mode': 'pct_gdp',
-            'gdp_nominal_usd': _GDP_USD,                      # hard values only; tail projected at growth
+            # test2: budget is derived from the cost of new connections (see 'bau' below); real GDP in
+            # local currency is entered directly (no nominal-USD / inflation / FX chain needed).
+            'budget_input_mode': 'from_cost', 'budget_source': 'from_cost',
+            'gdp_real_local': list(_GDP_REAL_LOCAL),         # real GDP, local M — hard values; tail auto-fills
+            # legacy nominal-USD chain kept for the Test Harness only (ignored once real GDP is present):
+            'gdp_nominal_usd': _GDP_USD,
             'inflation_nepal': _INFL_LOCAL, 'inflation_us': _INFL_US, 'exchange_rate': _FX,
             'inflation_local_ongoing': 0.05, 'inflation_us_ongoing': 0.022,
             'gdp_growth_forecast': 0.05, 'real_price_year': 2025,
@@ -98,14 +120,19 @@ def frontend_defaults() -> dict:
         'population': {'pop_ts': _POP, 'hh_ts': _HH,
                        'total_pop_start': _POP[0], 'total_hh_start': _HH[0],
                        'total_pop_baseline': None, 'total_hh_baseline': None},
-        'water_service': {f'serv{i+1}_ts': _svc_series(_WS_START[i], _WS_BASE[i]) for i in range(5)},
-        'sanitation_service': {f'sserv{i+1}_ts': _svc_series(_SAN_START[i], _SAN_BASE[i]) for i in range(5)},
+        'water_service': {f'serv{i+1}_ts': s for i, s in enumerate(
+            _svc_with_targets(_WS_START, _WS_BASE, [(2030, _WS_T1), (2040, _WS_T2)]))},
+        'sanitation_service': {f'sserv{i+1}_ts': s for i, s in enumerate(
+            _svc_with_targets(_SAN_START, _SAN_BASE, [(2030, _SAN_T1), (2040, _SAN_T2)]))},
         'water_targets': {**{f'target1_serv{i+1}': _WS_T1[i] for i in range(5)},
                           **{f'target2_serv{i+1}': _WS_T2[i] for i in range(5)},
                           'providers': []},
         'sanitation_targets': {**{f'target1_sserv{i+1}': _SAN_T1[i] for i in range(5)},
                                **{f'target2_sserv{i+1}': _SAN_T2[i] for i in range(5)}},
         'water_costs': {'network_cost_per_hh_serv1': _WS_COST_SM, 'network_cost_per_hh_serv2': _WS_COST_BASIC,
+                        # test2: technology costs are entered as NOMINAL prices for a given year; the
+                        # real price = nominal × price_index/100. Index defaults to 100 (real = nominal).
+                        'price_index_year': _BASE_YR, 'price_index': 100.0,
                         # technology-mix calculators (Test Harness tab): weighted Σ(share×cost) is
                         # written through to the serv1/serv2 cost fields the engine consumes.
                         'sm_tech_mix': [
@@ -119,6 +146,7 @@ def frontend_defaults() -> dict:
                             {'name': 'Water tanker', 'share': 0.10, 'cost': 96878.0},
                             {'name': 'Borehole + handpump', 'share': 0.10, 'cost': 96877.9308914323}]},
         'sanitation_costs': {'sewer_cost_per_hh_sserv1': _SAN_COST_SM, 'sewer_cost_per_hh_sserv2': _SAN_COST_SM,
+                             'price_index_year': _BASE_YR, 'price_index': 100.0,
                              'sm_tech_mix': [
                                  {'name': 'Piped / network', 'share': 0.6570, 'cost': 117290.76671794064},
                                  {'name': 'Septic tank', 'share': 0.3360, 'cost': 83000.0},
@@ -133,12 +161,11 @@ def frontend_defaults() -> dict:
                                  {'name': 'VIP latrine', 'share': 0.0, 'cost': 16500.0},
                                  {'name': 'Pit + slab', 'share': 0.0010, 'cost': 14600.0},
                                  {'name': 'Composting', 'share': 0.0, 'cost': 22000.0}]},
-        'bau': {'budget_input_mode': 'pct_gdp',
-                # actual-expenditure defaults = the GDP-derived real budget (2011-2030). With the 5%
-                # ongoing growth (= real GDP growth) these reproduce %GDP mode exactly, so flipping the
-                # switch is seamless; the user then edits the spent numbers.
-                'ws_budget_ts': list(_WS_BUDGET_DIRECT), 'san_budget_ts': list(_SAN_BUDGET_DIRECT),
-                'ws_expend_ts': list(_WS_BUDGET_DIRECT), 'san_expend_ts': list(_SAN_BUDGET_DIRECT),
+        'bau': {'budget_input_mode': 'from_cost', 'budget_source': 'from_cost',
+                # test2: budget is computed from the cost of new connections (historical) and the mean
+                # historical budget/GDP ratio × real GDP (forecast). These override series start EMPTY —
+                # the engine fills them; any value the user types here overrides that year.
+                'ws_budget_ts': [], 'san_budget_ts': [], 'ws_expend_ts': [], 'san_expend_ts': [],
                 'ws_budget_ongoing': 0.05, 'san_budget_ongoing': 0.05},
         'technical': {'ws_asset_life': 30, 'ws_non_hh_pct': 0.10,
                       'san_asset_life': 30, 'san_non_hh_pct': 0.10},
@@ -187,6 +214,32 @@ def _at(series, idx, default=0.0):
     return series[idx] if series and 0 <= idx < len(series) else default
 
 
+def _targets_from_service(svc: dict, prefix: str, msy: int, baseline: int, end: int):
+    """test2: derive the N-target list from the service-level table. A forecast year (baseline < year
+    ≤ end) whose 5 rung shares are all present and sum to ~100% is a TARGET at that year."""
+    arrs = [svc.get(f'{prefix}{i+1}_ts', []) or [] for i in range(5)]
+    maxlen = max((len(a) for a in arrs), default=0)
+    out = []
+    for idx in range(maxlen):
+        yr = msy + idx
+        if yr <= baseline or yr > end:
+            continue
+        shares = [(arrs[r][idx] if idx < len(arrs[r]) else 0) or 0 for r in range(5)]
+        s = sum(shares)
+        if s > 0 and abs(s - 1.0) < 0.02:                # a fully-entered column (Σ≈100%) = a target
+            out.append(TargetPoint(year=yr, shares=[float(x) for x in shares]))
+    return out
+
+
+def _real_cost(costs: dict, field: str, default: float) -> float:
+    """test2: real unit cost = entered NOMINAL cost × price_index/100 (index defaults to 100)."""
+    nominal = costs.get(field, default)
+    idx = costs.get('price_index', 100.0)
+    if idx in (None, 0):
+        idx = 100.0
+    return float(nominal) * float(idx) / 100.0
+
+
 def coerce_to_engine(inputs: dict) -> ModelInputs:
     """Accept EITHER shape and return a ModelInputs.
 
@@ -221,6 +274,7 @@ def to_engine(fe: dict) -> ModelInputs:
     )
 
     m = MacroInputs(
+        gdp_real_local=macro.get('gdp_real_local', []),      # test2: real GDP local — the primary input
         gdp_nominal_usd=macro.get('gdp_nominal_usd', []),
         gdp_growth_forecast=macro.get('gdp_growth_forecast', 0.05),
         inflation_local=macro.get('inflation_nepal', macro.get('inflation_local', [])),
@@ -244,21 +298,27 @@ def to_engine(fe: dict) -> ModelInputs:
         **{f'pct_sserv{i+1}_baseline': _at(ssv.get(f'sserv{i+1}_ts', []), bi) for i in range(5)},
     })
 
+    end_yr = per.get('forecast_end_year', _END_YR)
+    base_yr = per.get('baseline_year', _BASE_YR)
     wt = fe.get('water_targets', {})
-    ws_tgt = WaterTargetInputs(**{k: wt.get(k, 0.0) for k in
-        [f'target1_serv{i+1}' for i in range(5)] + [f'target2_serv{i+1}' for i in range(5)]})
+    ws_tgt = WaterTargetInputs(
+        targets=_targets_from_service(wsv, 'serv', msy, base_yr, end_yr),
+        **{k: wt.get(k, 0.0) for k in [f'target1_serv{i+1}' for i in range(5)] + [f'target2_serv{i+1}' for i in range(5)]})
     st = fe.get('sanitation_targets', {})
-    san_tgt = SanitationTargetInputs(**{k: st.get(k, 0.0) for k in
-        [f'target1_sserv{i+1}' for i in range(5)] + [f'target2_sserv{i+1}' for i in range(5)]})
+    san_tgt = SanitationTargetInputs(
+        targets=_targets_from_service(ssv, 'sserv', msy, base_yr, end_yr),
+        **{k: st.get(k, 0.0) for k in [f'target1_sserv{i+1}' for i in range(5)] + [f'target2_sserv{i+1}' for i in range(5)]})
 
+    # Unit costs: entered as NOMINAL prices; real = nominal × price_index/100 (test2). The weighted
+    # SM / Basic cost the engine consumes is deflated here.
     wc = fe.get('water_costs', {})
     ws_costs = WaterUnitCosts(
-        sm_technologies=[Tech(name='Weighted', share=1.0, cost=wc.get('network_cost_per_hh_serv1', _WS_COST_SM))],
-        basic_technologies=[Tech(name='Weighted', share=1.0, cost=wc.get('network_cost_per_hh_serv2', _WS_COST_BASIC))])
+        sm_technologies=[Tech(name='Weighted', share=1.0, cost=_real_cost(wc, 'network_cost_per_hh_serv1', _WS_COST_SM))],
+        basic_technologies=[Tech(name='Weighted', share=1.0, cost=_real_cost(wc, 'network_cost_per_hh_serv2', _WS_COST_BASIC))])
     sc = fe.get('sanitation_costs', {})
     san_costs = SanitationUnitCosts(
-        sm_technologies=[Tech(name='Weighted', share=1.0, cost=sc.get('sewer_cost_per_hh_sserv1', _SAN_COST_SM))],
-        basic_technologies=[Tech(name='Weighted', share=1.0, cost=sc.get('sewer_cost_per_hh_sserv2', _SAN_COST_SM))])
+        sm_technologies=[Tech(name='Weighted', share=1.0, cost=_real_cost(sc, 'sewer_cost_per_hh_sserv1', _SAN_COST_SM))],
+        basic_technologies=[Tech(name='Weighted', share=1.0, cost=_real_cost(sc, 'sewer_cost_per_hh_sserv2', _SAN_COST_SM))])
 
     # planned investments: sum the frontend's investment periods into a single bucket each sector
     periods = _g(fe, 'bau', 'investment_periods', default=[]) or []
@@ -283,6 +343,9 @@ def to_engine(fe: dict) -> ModelInputs:
         execution_rate=macro.get('execution_rate', 1.0),
         # direct-entry budget: 'actual expenditure' series drives the model (real terms, full budget)
         budget_input_mode=macro.get('budget_input_mode', bau.get('budget_input_mode', 'pct_gdp')),
+        # test2 budget source: 'pct_gdp' | 'direct' | 'from_cost' (historical from connection cost)
+        budget_source=macro.get('budget_source', bau.get('budget_source',
+                                 macro.get('budget_input_mode', bau.get('budget_input_mode', 'pct_gdp')))),
         ws_budget_direct=bau.get('ws_expend_ts', []) or [],
         san_budget_direct=bau.get('san_expend_ts', []) or [],
         ws_budget_direct_ongoing=bau.get('ws_budget_ongoing', 0.05),

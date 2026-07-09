@@ -28,38 +28,43 @@ HEADER_ROW = 5
 
 
 def _layout(fe):
-    """Return (rows, mode). Each row: (key, label, section, field, kind, number_format)."""
+    """Return (rows, mode). Each row: (key, label, section, field, kind, number_format).
+
+    test2 layout matches the InputPanel table: real GDP + demographics are editable across all years
+    (blank forecast years auto-fill at mean growth); service levels are editable at the start & baseline
+    years AND any forecast year (a full forecast column = a target); the budget is from connection cost
+    and any cell may be overridden."""
     cc = fe.get('country_config', {}) or {}
     ws_names = [cc.get(f'ws_serv{i+1}_name') or f'Level {i+1}' for i in range(5)]
     sn_names = [cc.get(f'san_serv{i+1}_name') or f'Level {i+1}' for i in range(5)]
-    mode = ((fe.get('macro', {}) or {}).get('budget_input_mode')
-            or (fe.get('bau', {}) or {}).get('budget_input_mode') or 'pct_gdp')
+    cur = cc.get('currency', 'LCU')
+    mode = 'from_cost'
     rows = [
-        ('macro.gdp_nominal_usd', 'Nominal GDP (US$ billion)', 'macro', 'gdp_nominal_usd', 'hard', '#,##0.000'),
-        ('macro.inflation_nepal', 'Local inflation', 'macro', 'inflation_nepal', 'hard', '0.00%'),
-        ('macro.inflation_us', 'US inflation', 'macro', 'inflation_us', 'hard', '0.00%'),
-        ('macro.exchange_rate', 'Exchange rate (local per US$)', 'macro', 'exchange_rate', 'hist', '#,##0.0000'),
-        ('population.pop_ts', 'Population (millions)', 'population', 'pop_ts', 'hist', '#,##0.000000'),
-        ('population.hh_ts', 'Households (millions)', 'population', 'hh_ts', 'hist', '#,##0.000000'),
+        ('macro.gdp_real_local', f'Real GDP ({cur} millions)', 'macro', 'gdp_real_local', 'proj', '#,##0'),
+        ('population.pop_ts', 'Population (millions)', 'population', 'pop_ts', 'proj', '#,##0.000000'),
+        ('population.hh_ts', 'Households (millions)', 'population', 'hh_ts', 'proj', '#,##0.000000'),
     ]
     for i in range(5):
-        rows.append((f'water_service.serv{i+1}_ts', f'Water — % {ws_names[i]}', 'water_service', f'serv{i+1}_ts', 'svc', '0.00%'))
+        rows.append((f'water_service.serv{i+1}_ts', f'Water — % {ws_names[i]}', 'water_service', f'serv{i+1}_ts', 'svc_tgt', '0.00%'))
     for i in range(5):
-        rows.append((f'sanitation_service.sserv{i+1}_ts', f'Sanitation — % {sn_names[i]}', 'sanitation_service', f'sserv{i+1}_ts', 'svc', '0.00%'))
-    if mode == 'direct':
-        rows.append(('bau.ws_expend_ts', 'Water actual expenditure (millions, real)', 'bau', 'ws_expend_ts', 'hard', '#,##0.00'))
-        rows.append(('bau.san_expend_ts', 'Sanitation actual expenditure (millions, real)', 'bau', 'san_expend_ts', 'hard', '#,##0.00'))
+        rows.append((f'sanitation_service.sserv{i+1}_ts', f'Sanitation — % {sn_names[i]}', 'sanitation_service', f'sserv{i+1}_ts', 'svc_tgt', '0.00%'))
+    rows.append(('bau.ws_expend_ts', f'Water budget ({cur} millions, real) — override', 'bau', 'ws_expend_ts', 'proj', '#,##0.00'))
+    rows.append(('bau.san_expend_ts', f'Sanitation budget ({cur} millions, real) — override', 'bau', 'san_expend_ts', 'proj', '#,##0.00'))
     return rows, mode
 
 
 def _editable(kind, i, bi, hard):
     """Is column index i (year offset from model start) an editable INPUT for this row kind?"""
+    if kind == 'proj':
+        return True               # all years — historical actuals + forecast projections / overrides
     if kind == 'hard':
         return i <= hard          # historical + baseline + 5 forecast years
     if kind == 'hist':
         return i < bi             # historical actuals only (through baseline − 1)
     if kind == 'svc':
         return i == 0 or i == bi  # start year + baseline year only
+    if kind == 'svc_tgt':
+        return i == 0 or i >= bi  # start, baseline, or any forecast year (a full forecast column = a target)
     return False
 
 
@@ -166,18 +171,21 @@ def parse_template(file_bytes: bytes, fe: dict):
         section, field, kind = keymap[key]
         arr = list((merged.get(section, {}) or {}).get(field, []) or [])
         for i in range(n):
-            if not _editable(kind, i, bi, hard) or i >= len(arr):
-                continue                       # keep array length; never zero-pad hard-value tails
+            if not _editable(kind, i, bi, hard):
+                continue
             col = year_col.get(start + i)
             if not col:
                 continue
             v = ws.cell(rr, col).value
             if v is None or v == '':
-                continue                       # blank = keep the existing value
+                continue                       # blank = keep the existing value (auto-fill at mean growth)
             try:
-                arr[i] = float(v)
+                fv = float(v)
             except (TypeError, ValueError):
                 continue
+            while len(arr) <= i:               # grow to reach forecast years the user filled in
+                arr.append(0)
+            arr[i] = fv
             changed += 1
         merged.setdefault(section, {})[field] = arr
 

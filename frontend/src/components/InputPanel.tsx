@@ -198,7 +198,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         fields.forEach(f => { if (Array.isArray(o[f])) o[f] = shiftYearSeries(o[f], delta); });
         return o;
       };
-      next.macro = shiftGroup(next.macro, ['gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate', 'gdp_growth']);
+      next.macro = shiftGroup(next.macro, ['gdp_real_local', 'gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate', 'gdp_growth']);
       next.population = shiftGroup(next.population, ['pop_ts', 'hh_ts']);
       next.water_service = shiftGroup(next.water_service, ['serv1_ts', 'serv2_ts', 'serv3_ts', 'serv4_ts', 'serv5_ts']);
       next.sanitation_service = shiftGroup(next.sanitation_service, ['sserv1_ts', 'sserv2_ts', 'sserv3_ts', 'sserv4_ts', 'sserv5_ts']);
@@ -292,10 +292,8 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   const baseYr = inputs.period.baseline_year;
   const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const scopeLower = scopeLabel.toLowerCase();
-  // How the WSS budget is entered: 'pct_gdp' (full budget = real GDP × %GDP) or 'direct' (enter the
-  // actual-expenditure series directly — real terms; it drives the model exactly like the derived budget).
-  const budgetMode: 'pct_gdp' | 'direct' = inputs.macro?.budget_input_mode === 'direct' ? 'direct' : 'pct_gdp';
-  const setBudgetMode = (m: 'pct_gdp' | 'direct') => onChange({ ...inputs, macro: { ...inputs.macro, budget_input_mode: m } });
+  // test2: the WSS budget is derived from the cost of new connections (historical) and the mean
+  // historical budget/GDP ratio × real GDP (forecast); any cell can be overridden in the table.
 
   // CAGR helper: (end/start)^(1/n) - 1
   const cagr = (start: number, end: number, years: number) => {
@@ -316,14 +314,18 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       {/* Content is capped to a consistent max width and centered, so section cards don't sprawl
           edge-to-edge on wide screens; the grey scroll container stays full-bleed behind it. */}
       <div style={{ maxWidth: 1200, margin: '0 auto' }}>
-      <div style={{ display: 'flex', gap: 18, fontSize: 12, marginBottom: 12, color: '#3A4452', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 18, fontSize: 12, marginBottom: 12, color: '#3A4452', alignItems: 'center', flexWrap: 'wrap' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #F0D070', background: '#FFF9E6', display: 'inline-block' }} />
-          Editable input
+          Historical input
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #93C5FD', background: '#EFF6FF', display: 'inline-block' }} />
+          Forecast / target input
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           <span style={{ width: 14, height: 14, borderRadius: 3, border: '1px solid #DDE3EA', background: '#F1F3F5', display: 'inline-block' }} />
-          Cannot edit (auto-calculated)
+          Auto-calculated
         </span>
       </div>
 
@@ -384,7 +386,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </div>
 
       {/* ===== COUNTRY CONFIG ===== */}
-      <Section title="1. Country, Region & Currency" sectionKey="country" onFocus={onSectionFocus}>
+      <Section title="1. Country, Area of Focus & Currency" sectionKey="country" onFocus={onSectionFocus}>
         {inputs.country_config && <>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
             <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Country</label>
@@ -398,7 +400,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             </datalist>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-            <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Region</label>
+            <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }}>Area of focus</label>
             <input type="text" value={inputs.country_config.area || ''}
               onChange={e => setCountryConfig('area', e.target.value)}
               style={{ width: '100%', padding: '7px 10px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 4, fontSize: 13, color: '#3A4452', boxSizing: 'border-box', outline: 'none' }}
@@ -422,95 +424,19 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="As-is forecast start" value={inputs.period.as_is_forecast_start || (inputs.period.baseline_year + 1)} onChange={v => u('period','as_is_forecast_start',v)} min={inputs.period.baseline_year + 1} tip="First year of the as-is forecast (workbook G18); usually baseline + 1" />
         <F label="As-is forecast length" value={inputs.period.as_is_forecast_length ?? 2} onChange={v => u('period','as_is_forecast_length',v)} unit="yrs" min={1} max={10} tip="Number of as-is years (workbook G19). End of as-is = start + length − 1; the target path branches from the end-of-as-is year" />
         <F label="Performance improvement start" value={(inputs.period.as_is_forecast_start || inputs.period.baseline_year + 1) + (inputs.period.as_is_forecast_length || 2)} onChange={() => {}} fieldType="computed" tip="Derived: end of as-is forecast + 1 (= as-is start + as-is length). Matches the workbook's G21." />
-        <F label="Target 1 year" value={inputs.period.target1_year} onChange={v => u('period','target1_year',v)} tip="First milestone year; must be greater than the performance improvement start year" />
-        <F label="Target 2 year" value={inputs.period.target2_year} onChange={v => u('period','target2_year',v)} min={inputs.period.target1_year} max={inputs.period.forecast_end_year} tip="Final milestone year; must be between Target 1 year and forecast end year" />
-        <SubHead text="Government budget for WSS" />
-        <div style={{ gridColumn: '1 / -1', marginBottom: 6 }}>
-          <div style={{ fontSize: 11, color: '#475569', marginBottom: 4 }}>How would you like to provide the WSS budget?</div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            {([
-              { k: 'pct_gdp', l: 'As % of GDP', d: 'Enter one share of GDP; the yearly budget = real GDP × %' },
-              { k: 'direct', l: 'Direct (budget actually spent)', d: 'Enter the actual expenditure series year-by-year (real terms); the % of GDP is then implied' },
-            ] as const).map(opt => (
-              <button key={opt.k} onClick={() => setBudgetMode(opt.k)} title={opt.d} style={{
-                padding: '6px 14px', borderRadius: 14, border: '1px solid #c7d2fe', cursor: 'pointer', fontSize: 11.5,
-                background: budgetMode === opt.k ? '#2563eb' : '#fff',
-                color: budgetMode === opt.k ? '#fff' : '#475569', fontWeight: budgetMode === opt.k ? 700 : 500,
-              }}>{opt.l}</button>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic', marginTop: 4 }}>
-            {budgetMode === 'pct_gdp'
-              ? 'Budget as % of GDP below; the engine derives each year’s budget from real GDP. The table’s “WS/SAN budget allocated” rows are indicative.'
-              : 'Enter the “WS/SAN actual expenditure” rows in the table (real / baseline prices) — historical + 5 hard forecast years; later years grow at the ongoing budget-growth rate below. This spent series drives the model; the % of GDP is implied.'}
-          </div>
+        <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#0369a1', background: '#EBF6FB', border: '1px solid #9fd3ec', borderRadius: 6, padding: '8px 12px' }}>
+          🎯 <b>Target years are set in the year-by-year table below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
         </div>
-        {(() => {
-          // Derive implied average % of GDP from the year-by-year budget (used in 'direct' mode)
-          const gdpArr = inputs.macro?.gdp_nominal_usd || [];
-          const rateArr = inputs.macro?.exchange_rate || [];
-          const yrs = gdpArr.map((_: number, i: number) => (inputs.period.model_start_year || 2011) + i);
-          const baseYr2 = inputs.period.baseline_year || 2025;
-          // Implied %GDP in direct mode = mean over forecast years of (real expenditure ÷ real GDP).
-          // GDP is nominal USD, so real-GDP (local) = USD × 1000 × FX ÷ deflator ≈ USD × 1000 × FX
-          // for the baseline year; we approximate with the ratio spent/(GDP_USD × 1000 × FX) which
-          // matches the engine's %GDP definition at baseline prices.
-          const impliedPct = (spendField: string) => {
-            let sum = 0, n = 0;
-            yrs.forEach((yr: number, i: number) => {
-              if (yr <= baseYr2) return;                                   // forecast years only (what drives the model)
-              const b = (inputs.bau?.[spendField] || [])[i] || 0;          // real budget (local M)
-              const gdpB = gdpArr[i] || 0; const rate = rateArr[i] || 0;   // USD B ; local per USD
-              if (b > 0 && gdpB > 0 && rate > 0) { sum += b / (gdpB * 1000 * rate); n++; }
-            });
-            return n > 0 ? sum / n : 0;
-          };
-          const isDirect = budgetMode === 'direct';
-          return <>
-            <F label="Water supply budget as % of GDP"
-              value={isDirect ? impliedPct('ws_expend_ts') : (inputs.macro.ws_budget_pct_gdp || 0)}
-              onChange={v => u('macro','ws_budget_pct_gdp',v)} isPercent unit="%"
-              fieldType={isDirect ? 'computed' : undefined}
-              tip={isDirect ? 'Implied share of GDP, averaged over forecast years from the water actual-expenditure row' : 'Water supply budget as share of GDP. The engine derives each year’s budget = real GDP × this %.'} />
-            <F label="Sanitation budget as % of GDP"
-              value={isDirect ? impliedPct('san_expend_ts') : (inputs.macro.san_budget_pct_gdp || 0)}
-              onChange={v => u('macro','san_budget_pct_gdp',v)} isPercent unit="%"
-              fieldType={isDirect ? 'computed' : undefined}
-              tip={isDirect ? 'Implied share of GDP, averaged over forecast years from the sanitation actual-expenditure row' : 'Sanitation budget as share of GDP. The engine derives each year’s budget = real GDP × this %.'} />
-          </>;
-        })()}
-        <F label="Water capex share of budget" value={inputs.macro.ws_capex_pct ?? inputs.macro.capex_pct_budget ?? 0.21}
-          onChange={v => u('macro','ws_capex_pct',v)} isPercent unit="%"
-          tip="Share of the WATER budget that is capital expenditure (workbook G321 = 21%); feeds the water BAU capex budget." />
-        <F label="Sanitation capex share of budget" value={inputs.macro.san_capex_pct ?? inputs.macro.capex_pct_budget ?? 0.15}
-          onChange={v => u('macro','san_capex_pct',v)} isPercent unit="%"
-          tip="Share of the SANITATION budget that is capital expenditure (workbook G328 = 15%, distinct from water); feeds the sanitation BAU capex budget." />
-        {budgetMode === 'pct_gdp' && (
-          <F label="Budget execution rate" value={inputs.macro.execution_rate ?? 1.0}
-            onChange={v => u('macro','execution_rate',v)} isPercent unit="%"
-            tip="Share of the ALLOCATED capex budget that is actually spent. Actual expenditure = %GDP × GDP × %capex × execution rate. One rate shared by water and sanitation; drives the BAU service-level growth." />
-        )}
-        <SubHead text="Ongoing rates — fill every forecast year beyond the hard values in the table" />
-        <F label="Real GDP growth — ongoing" value={inputs.macro.gdp_growth_forecast ?? 0.05}
+        <SubHead text="Government budget for WSS" />
+        <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
+          💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed households × Safely-managed unit cost) + (new Basic households × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. You can override any year directly in the <b>budget</b> rows of the table below.
+        </div>
+        <F label="Real GDP growth — fallback" value={inputs.macro.gdp_growth_forecast ?? 0.05}
           onChange={v => u('macro','gdp_growth_forecast',v)} isPercent unit="%"
-          tip="Applied to every forecast year after the hard GDP series ends (enter 5 hard forecast years of GDP in the table)" />
-        <F label="Local inflation — ongoing" value={inputs.macro.inflation_local_ongoing ?? 0.05}
-          onChange={v => u('macro','inflation_local_ongoing',v)} isPercent unit="%"
-          tip="Fills years beyond the hard local-inflation series" />
-        <F label="US inflation — ongoing" value={inputs.macro.inflation_us_ongoing ?? 0.022}
-          onChange={v => u('macro','inflation_us_ongoing',v)} isPercent unit="%"
-          tip="Fills years beyond the hard US-inflation series; drives the exchange-rate projection" />
-        {budgetMode === 'direct' && <>
-          <F label="Water budget growth — ongoing" value={inputs.bau?.ws_budget_ongoing ?? 0.05}
-            onChange={v => onChange({ ...inputs, bau: { ...inputs.bau, ws_budget_ongoing: v } })} isPercent unit="%"
-            tip="Water actual expenditure compounds at this rate for every forecast year beyond the 5 hard values" />
-          <F label="Sanitation budget growth — ongoing" value={inputs.bau?.san_budget_ongoing ?? 0.05}
-            onChange={v => onChange({ ...inputs, bau: { ...inputs.bau, san_budget_ongoing: v } })} isPercent unit="%"
-            tip="Sanitation actual expenditure compounds at this rate for every forecast year beyond the 5 hard values" />
-        </>}
+          tip="Used to grow real GDP only when there are fewer than two historical GDP values to average from. Otherwise blank GDP years fill at the mean historical growth." />
         <SubHead text="Year-by-year data" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Enter data for historical years. Forecast years are projected. GDP growth, population growth, avg household size, and execution rates are auto-calculated.
+          Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — leave them blank to auto-fill at the mean historical growth (shown in the grey “→ … used” row below each), or type your own projection. For service levels, fill a full forecast column (Σ 100%) to set a <b style={{ color: '#16a34a' }}>🎯 target</b> year. GDP/pop growth and avg household size are auto-calculated.
         </div>
         {(() => {
           // Table spans the FULL model window (start -> forecast end), independent of series length:
@@ -521,30 +447,11 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           const span = Math.max(1, endYr2 - startYr2 + 1);
           const years = Array.from({ length: Math.min(span, 120) }, (_: unknown, i: number) => startYr2 + i);
           const baseYr2 = inputs.period.baseline_year || 2025;
-          // Hard-value window for GDP & inflation: historical through the baseline + 5 forecast years.
-          const hardFcstEnd = Math.min(baseYr2 + 5, endYr2);
-          const gdpArr = inputs.macro.gdp_nominal_usd || [];
-          const tsInput = (section: string, field: string, idx: number, val: number, isPct: boolean, padFill: number = 0) => (
-            <input type="number" value={isPct ? Math.round(val*10000)/100 : Math.round(val*100)/100}
-              onChange={e => { const v=parseFloat(e.target.value); if(!isNaN(v)){
-                const a=[...(inputs[section]?.[field] || inputs.macro?.[field] || [])];
-                while (a.length <= idx) a.push(padFill);   // grow to reach idx; gap cells take a neutral fill
-                a[idx]=isPct?v/100:v;
-                if (section === 'macro') onChange({...inputs, macro:{...inputs.macro, [field]:a}});
-                else onChange({...inputs, [section]:{...inputs[section], [field]:a}});
-              }}}
-              style={{ width: 58, padding: '3px 4px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, textAlign: 'left', color: '#3A4452', outline: 'none' }}
-            />
-          );
-          // Neutral fill for gap cells created when the window grows: inflation rows hold their ongoing
-          // rate (so an unedited forecast cell still behaves like the projection); everything else uses 0
-          // (0 = "no data, project this year" for GDP; a missing actual for FX / population / households).
-          const macroFill = (field: string) => field === 'inflation_nepal' ? (inputs.macro?.inflation_local_ongoing ?? 0.05)
-            : field === 'inflation_us' ? (inputs.macro?.inflation_us_ongoing ?? 0.022) : 0;
-          const mInput = (field: string, idx: number, val: number, isPct: boolean) => tsInput('macro', field, idx, val, isPct, macroFill(field));
+          // ── Cell styling: cream = historical input, blue = forecast/projection input, grey = computed.
+          const inputBase: React.CSSProperties = { width: 58, padding: '3px 4px', borderRadius: 3, fontSize: 11, textAlign: 'left', outline: 'none' };
+          const CREAM: React.CSSProperties = { border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452' };  // historical input
+          const BLUE: React.CSSProperties = { border: '1px solid #93C5FD', background: '#EFF6FF', color: '#1E3A5F' };    // forecast / projection input
           const grey = (txt: string, note: string) => <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title={note}>{txt}</span>;
-          // Engine-computed series lookups (from the live /api/calculate results), used to show the
-          // ACTUAL projected numbers in forecast years instead of a "→" placeholder.
           const fmtNum = (v: number) => Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : String(Math.round(v * 100) / 100);
           const resAt = (key: string, idx: number): number | null => {
             const a = results?.[key];
@@ -554,60 +461,42 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             const a = results?.[sector]?.[key];
             return Array.isArray(a) && idx < a.length && a[idx] != null ? a[idx] : null;
           };
-          // A forecast/projection cell: shows the engine's computed value (grey, non-editable); falls
-          // back to "→" until the first calculation returns.
-          const projCell = (val: number | null, isPct: boolean, note: string) =>
-            val == null ? grey('→', note) : grey(isPct ? (val * 100).toFixed(1) : fmtNum(val), note);
-          // A macro series cell: editable while inside the HARD values; beyond that show the engine's
-          // projected value for the year (ongoing rate / projection).
-          // Editable while inside the field's HARD range, decided by YEAR (not by the current array
-          // length) — so extending or shifting the year window always exposes editable cells for the
-          // new years instead of freezing at the preset (Nepal) array length. Beyond the hard range,
-          // show the engine's projected value (grey).
-          const hardCell = (field: string, idx: number, isPct: boolean, note: string, resKey?: string, editThroughYr?: number) => {
-            const a = inputs.macro?.[field] || [];
-            const editable = editThroughYr != null ? (years[idx] <= editThroughYr) : (idx < a.length);
-            if (editable) return mInput(field, idx, a[idx] ?? 0, isPct);
-            return projCell(resKey ? resAt(resKey, idx) : null, isPct, note);
+          // Write a value into inputs[section][field][idx] (macro / a named section / bau), growing the array.
+          const writeCell = (section: string, field: string, idx: number, raw: string, isPct: boolean) => {
+            const v = parseFloat(raw);
+            const src = section === 'macro' ? inputs.macro : inputs[section];
+            const a = [...((src?.[field]) || [])];
+            while (a.length <= idx) a.push(0);
+            a[idx] = isNaN(v) ? 0 : (isPct ? v / 100 : v);
+            onChange(section === 'macro' ? { ...inputs, macro: { ...inputs.macro, [field]: a } }
+                                         : { ...inputs, [section]: { ...inputs[section], [field]: a } });
           };
-
-          // Direct-mode budget series computed EXACTLY like the engine (sector_full_budget): the entered
-          // hard values as-is, then every later year FORECAST — compounded at the ongoing budget-growth
-          // rate from the last hard value. Used to SHOW the projected number in the forecast cells.
-          const directSeries = (field: string, ongoing: number) => {
-            const a = inputs.bau?.[field] || [];
-            const g = ongoing || 0;
-            const out: number[] = [];
-            for (let t = 0; t < years.length; t++) out[t] = (t < a.length) ? (a[t] || 0) : ((out[t - 1] || 0) * (1 + g));
-            return out;
+          // An editable series cell. `forecast` colours it blue; `emptyZero` shows a blank (not 0) when unset,
+          // so the user can see which forecast cells are empty (and will auto-fill at mean growth).
+          const editCell = (section: string, field: string, idx: number, isPct: boolean, forecast: boolean, emptyZero = false) => {
+            const val = (((section === 'macro' ? inputs.macro : inputs[section])?.[field]) || [])[idx] ?? 0;
+            const disp = (emptyZero && !(val > 0)) ? '' : (isPct ? Math.round(val * 10000) / 100 : Math.round(val * 100) / 100);
+            return <input type="number" value={disp}
+              onChange={e => writeCell(section, field, idx, e.target.value, isPct)}
+              style={{ ...inputBase, ...(forecast ? BLUE : CREAM) }} />;
           };
-          // A direct-mode budget cell: editable through the baseline + 5 forecast years (by YEAR, so it
-          // tracks window changes), then FORECAST — the read-only projected value (grown at the ongoing
-          // rate), not just an arrow.
-          const directCell = (field: string, ongoing: number, idx: number) => {
-            if (years[idx] <= hardFcstEnd) return tsInput('bau', field, idx, (inputs.bau?.[field] || [])[idx] ?? 0, false);
-            const proj = directSeries(field, ongoing)[idx] || 0;
-            return grey(proj > 0 ? fmtNum(proj) : '—',
-              `Forecast — grown at the ongoing budget-growth rate (${(ongoing * 100).toFixed(1)}%) from the last hard value (through ${hardFcstEnd}).`);
-          };
-          // Allocated-capex cell. %GDP mode: PURELY CALCULATED (not editable). DIRECT mode: the user
-          // enters the allocated budget through baseline + 5 years; later years are forecast (read-only).
-          const budgetCell = (field: string, sector: 'water_supply' | 'sanitation', idx: number, ongoing: number) => {
-            if (budgetMode === 'direct') return directCell(field, ongoing, idx);
-            const rv = secRes(sector, 'allocated_capex', idx);
-            if (rv == null) return grey('…', 'Computing…');
-            return grey(rv > 0 ? Math.round(rv).toLocaleString() : '—',
-              'Allocated capex = %GDP × real GDP × %capex (engine, real / baseline prices). Calculated — not editable.');
-          };
-          // Actual-expenditure cell. DIRECT mode DRIVES the model: editable through baseline + 5 forecast
-          // years, then forecast (grown at the ongoing budget-growth rate — shown read-only). %GDP mode:
-          // PURELY CALCULATED: actual capex = allocated × execution rate.
-          const spendCell = (field: string, ongoing: number, idx: number, sector: 'water_supply' | 'sanitation') => {
-            if (budgetMode === 'direct') return directCell(field, ongoing, idx);
-            const rv = secRes(sector, 'actual_capex', idx);
-            if (rv == null) return grey('…', 'Computing…');
-            return grey(rv > 0 ? Math.round(rv).toLocaleString() : '—',
-              'Actual capex = allocated × execution rate (engine, real / baseline prices). Calculated — not editable.');
+          // A grey "auto-fill" row: the value the model actually uses each year (the user's own entries,
+          // with blank years filled at the mean historical growth). This is the separate projection row.
+          const projRow = (label: string, tip: string, get: (i: number) => number | null, isPct: boolean) => ({
+            label, tip, computed: true,
+            cells: years.map((_: number, i: number) => { const v = get(i); return v == null ? grey('…', 'computing…') : grey(isPct ? (v * 100).toFixed(1) : fmtNum(v), 'Value the model uses this year'); }),
+          });
+          // Budget cell (from_cost): the model-computed budget shows as a PLACEHOLDER; type to OVERRIDE that
+          // year (stored in the bau expenditure series). Historical = cream, forecast = blue.
+          const budgetCostCell = (ovField: string, sector: 'water_supply' | 'sanitation', idx: number) => {
+            const ov = (inputs.bau?.[ovField] || [])[idx] ?? 0;
+            const forecast = years[idx] > baseYr2;
+            const computed = secRes(sector, 'allocated_capex', idx);
+            return <input type="number" value={ov > 0 ? Math.round(ov * 100) / 100 : ''}
+              placeholder={computed != null ? String(Math.round(computed)) : ''}
+              title={ov > 0 ? 'Your override for this year' : 'Model-computed budget (connection cost history / GDP ratio forecast) — type to override'}
+              onChange={e => { const v = parseFloat(e.target.value); const a = [...(inputs.bau?.[ovField] || [])]; while (a.length <= idx) a.push(0); a[idx] = isNaN(v) ? 0 : v; onChange({ ...inputs, bau: { ...inputs.bau, [ovField]: a } }); }}
+              style={{ ...inputBase, width: 64, ...(forecast ? BLUE : CREAM) }} />;
           };
 
           // Service-level cell. The validated model consumes exactly TWO points per rung — the
@@ -672,91 +561,71 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
           const svcCell = (section: string, field: string, idx: number) => {
             const yr = years[idx];
-            const arr = inputs[section]?.[field] || [];
             if (yr === startYr2 || yr === baseYr2) {
-              return tsInput(section, field, idx, arr[idx] || 0, true);
+              return editCell(section, field, idx, true, false);          // cream: historical start / baseline input
             }
             if (yr < baseYr2) {
-              // Display only: recompute the engine's historical path LIVE from the current
-              // start-year and baseline-year splits (and, for sanitation, the households series),
-              // so it tracks edits to either endpoint and re-spans when the start/baseline YEARS
-              // change — and matches what the model actually uses instead of a linear guess.
+              // Display only: the engine's historical path (each rung's count grows at its historical
+              // CAGR, then rescaled to total households) — tracks edits to either endpoint.
               const rung0 = parseInt(field.replace(/\D/g, ''), 10) - 1;
               const pct = histSvcPct(section, rung0, yr - startYr2);
-              return grey((pct * 100).toFixed(1), 'Display only — follows the engine’s historical path (each rung’s count grows at its historical CAGR, then rescaled to total households), matching the model’s BAU block');
+              return grey((pct * 100).toFixed(1), 'Display only — follows the engine’s historical path, matching the model’s BAU block');
             }
-            return grey('—', 'Forecast years are computed by the engine (BAU / targets)');
+            // Forecast year: EDITABLE target cell (blue). Fill all 5 rungs (Σ 100%) to make this a target year.
+            return editCell(section, field, idx, true, true, true);
+          };
+          // A forecast column is a target year when its 5 rung shares sum to ~100% (zeros allowed).
+          const colIsTarget = (section: string, idx: number) => {
+            const fields = svcFields(section);
+            let s = 0;
+            for (const f of fields) { const v = (inputs[section]?.[f] || [])[idx]; if (v != null && v > 0) s += v; }
+            return Math.abs(s - 1) < 0.02;
           };
           const svcRow = (label: string, section: string, field: string) => ({
-            label, tip: 'Share of households at this service level. The model uses the START-year and BASELINE-year splits (editable); other years are display-only.',
+            label, tip: 'Share of households at this service level. Start & baseline years are historical inputs; fill a full forecast column (all 5 rungs, Σ 100%) to set a target year.',
             cells: years.map((_: number, i: number) => svcCell(section, field, i)),
           });
 
           // Section headers as row separators
           const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
 
+          const hhLbl = `${scopeLabel} households`;
           const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
             sectionRow('Economic'),
-            ...(budgetMode === 'direct' ? [] : [
-              { label: 'Nominal GDP ($B)', tip: 'GDP in current US dollars (billions). Enter historical + 5 hard forecast years; later years are the engine’s projection at the ongoing real growth rate.', cells: years.map((_: number, i: number) => hardCell('gdp_nominal_usd', i, false, 'Engine-projected (nominal USD $B) at the ongoing real GDP growth rate', 'gdp_nominal_usd', hardFcstEnd)) },
-              { label: 'Nominal USD growth % (info)', tip: 'Year-on-year growth of the NOMINAL USD series (display only — the engine projects forecast years at the ongoing REAL growth rate)', computed: true, cells: years.map((_: number, i: number) => {
-                const g = (i > 0 && gdpArr[i] && gdpArr[i-1] && gdpArr[i-1] !== 0) ? ((gdpArr[i]/gdpArr[i-1])-1)*100 : 0;
-                return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && gdpArr[i] ? g.toFixed(1)+'%' : '—'}</span>;
-              }) },
-            ]),
-            { label: `Infl ${cc.country || 'Domestic'} %`, tip: 'Annual local inflation. Hard values are editable; later years show the ongoing local inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_nepal', i, true, 'Ongoing local inflation rate (engine)', 'inflation_local', hardFcstEnd)) },
-            { label: 'Infl US %', tip: 'Annual US inflation. Hard values are editable; later years show the ongoing US inflation rate used by the engine.', cells: years.map((_: number, i: number) => hardCell('inflation_us', i, true, 'Ongoing US inflation rate (engine)', 'inflation_us', hardFcstEnd)) },
-            { label: `${CUR} per USD`, tip: 'Exchange rate: units of local currency per 1 US dollar. Enter ACTUALS through the year before baseline; the baseline year onward is the engine’s projection: FX[t] = FX[t−1] × (1+local infl)/(1+US infl).', cells: years.map((_: number, i: number) => {
-              if (years[i] >= baseYr2) return projCell(resAt('exchange_rate', i), false, 'Engine-projected from the baseline year on: FX[t] = FX[t−1] × (1+local inflation)/(1+US inflation)');
-              return hardCell('exchange_rate', i, false, 'Missing actual — supply values through baseline−1', undefined, baseYr2 - 1);
-            }) },
-            sectionRow('Demographic'),
-            { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in MILLIONS — actuals through the year before baseline; the baseline year onward is the engine’s projection at mean historical growth`, cells: years.map((_: number, i: number) => {
-              if (years[i] >= baseYr2) return projCell(resAt('population', i), false, 'Engine-projected at mean historical population growth from the baseline year on');
-              return tsInput('population', 'pop_ts', i, (inputs.population?.pop_ts||[])[i]||0, false);
-            }) },
-            { label: 'Pop growth %', tip: 'Year-on-year population growth, auto-calculated', computed: true, cells: years.map((_: number, i: number) => {
-              const at = (j: number) => (inputs.population?.pop_ts || [])[j] ?? resAt('population', j);
-              const cur = at(i), prev = at(i - 1);
+            { label: `Real GDP (${CUR} M)`, tip: `Real GDP in local currency (millions, base-year prices). Enter historical years; blank forecast years auto-fill at mean historical growth — or type your own. This drives the forecast budget.`, cells: years.map((_: number, i: number) => editCell('macro', 'gdp_real_local', i, false, years[i] > baseYr2, true)) },
+            projRow(`→ Real GDP used (${CUR} M)`, 'Auto-fill: real GDP the model uses each year (your entries; blank years filled at mean historical growth).', (i) => resAt('gdp_real_local', i), false),
+            { label: 'GDP growth %', tip: 'Year-on-year real GDP growth (auto-calculated from the values the model uses).', computed: true, cells: years.map((_: number, i: number) => {
+              const cur = resAt('gdp_real_local', i), prev = resAt('gdp_real_local', i - 1);
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: 'Households (mill)', tip: 'Total households in millions — actuals through the year before baseline; the baseline year onward is the engine’s projection at mean historical household growth (this series DRIVES the model)', cells: years.map((_: number, i: number) => {
-              if (years[i] >= baseYr2) return projCell(resAt('total_hh', i), false, 'Engine-projected at mean historical household growth from the baseline year on');
-              return tsInput('population', 'hh_ts', i, (inputs.population?.hh_ts||[])[i]||0, false);
+            sectionRow('Demographic'),
+            { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in millions. Historical years are inputs; blank forecast years auto-fill at mean historical growth — or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'pop_ts', i, false, years[i] > baseYr2, true)) },
+            projRow('→ Population used (mill)', 'Auto-fill: population the model uses each year.', (i) => resAt('population', i), false),
+            { label: 'Pop growth %', tip: 'Year-on-year population growth (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
+              const cur = resAt('population', i), prev = resAt('population', i - 1);
+              const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: 'Avg HH size', tip: 'Average household size, auto-calculated: population (millions) ÷ households (millions)', computed: true, cells: years.map((_: number, i: number) => {
-              const p = (inputs.population?.pop_ts||[])[i] ?? resAt('population', i) ?? 0;
-              const h = (inputs.population?.hh_ts||[])[i] ?? resAt('total_hh', i) ?? 0;
+            { label: `${hhLbl} (mill)`, tip: `Total ${scopeLower} households in millions — DRIVES the model. Historical years are inputs; blank forecast years auto-fill at mean historical growth — or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'hh_ts', i, false, years[i] > baseYr2, true)) },
+            projRow(`→ ${hhLbl} used (mill)`, 'Auto-fill: households the model uses each year.', (i) => resAt('total_hh', i), false),
+            { label: 'Avg HH size', tip: 'Average household size = population ÷ households (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
+              const p = resAt('population', i) ?? 0; const h = resAt('total_hh', i) ?? 0;
               const sz = (h > 0 && p > 0) ? p / h : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(2) : '—'}</span>;
             }) },
-            sectionRow(`Budget & Execution (${CUR} M, real / baseline prices)` + (budgetMode === 'pct_gdp' ? ' — capex allocated / actual are calculated (not editable)' : ' — “actual expenditure” drives the model')),
-            { label: budgetMode === 'pct_gdp' ? 'WS capex allocated' : 'WS budget allocated', tip: budgetMode === 'pct_gdp' ? 'Calculated: allocated capex = “Water supply budget as % of GDP” × real GDP × “Capex share of WSS budget”. Not editable.' : 'Water supply budget allocated by government (reference only — used for the execution-rate display)', computed: budgetMode === 'pct_gdp', cells: years.map((_: number, i: number) => budgetCell('ws_budget_ts', 'water_supply', i, inputs.bau?.ws_budget_ongoing ?? 0.05)) },
-            { label: budgetMode === 'pct_gdp' ? 'WS capex actual (drives model)' : '▶ WS actual expenditure (drives model)', tip: budgetMode === 'pct_gdp' ? 'Calculated: actual capex = allocated × budget execution rate. DRIVES the model. Not editable.' : 'The water budget actually spent (real terms) — DRIVES the model. Enter historical + 5 hard forecast years; grey → years grow at the ongoing water budget-growth rate.', computed: budgetMode === 'pct_gdp', cells: years.map((_: number, i: number) => spendCell('ws_expend_ts', inputs.bau?.ws_budget_ongoing ?? 0.05, i, 'water_supply')) },
-            { label: 'WS execution rate', tip: budgetMode === 'pct_gdp' ? 'Budget execution rate (input above) — the share of allocated capex actually spent' : 'Budget execution rate: actual expenditure ÷ allocated budget', computed: true, cells: years.map((_: number, i: number) => {
-              if (budgetMode === 'pct_gdp') return <span style={{ fontSize: 10, color: '#94a3b8' }}>{((inputs.macro?.execution_rate ?? 1) * 100).toFixed(0)+'%'}</span>;
-              const b = (inputs.bau?.ws_budget_ts||[])[i]||0;
-              const e = (inputs.bau?.ws_expend_ts||[])[i]||0;
-              const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
-            }) },
-            { label: budgetMode === 'pct_gdp' ? 'SAN capex allocated' : 'SAN budget allocated', tip: budgetMode === 'pct_gdp' ? 'Calculated: allocated capex = “Sanitation budget as % of GDP” × real GDP × “Capex share of WSS budget”. Not editable.' : 'Sanitation budget allocated by government (reference only — used for the execution-rate display)', computed: budgetMode === 'pct_gdp', cells: years.map((_: number, i: number) => budgetCell('san_budget_ts', 'sanitation', i, inputs.bau?.san_budget_ongoing ?? 0.05)) },
-            { label: budgetMode === 'pct_gdp' ? 'SAN capex actual (drives model)' : '▶ SAN actual expenditure (drives model)', tip: budgetMode === 'pct_gdp' ? 'Calculated: actual capex = allocated × budget execution rate. DRIVES the model. Not editable.' : 'The sanitation budget actually spent (real terms) — DRIVES the model. Enter historical + 5 hard forecast years; grey → years grow at the ongoing sanitation budget-growth rate.', computed: budgetMode === 'pct_gdp', cells: years.map((_: number, i: number) => spendCell('san_expend_ts', inputs.bau?.san_budget_ongoing ?? 0.05, i, 'sanitation')) },
-            { label: 'SAN execution rate', tip: budgetMode === 'pct_gdp' ? 'Budget execution rate (input above) — the share of allocated capex actually spent' : 'Budget execution rate: actual expenditure ÷ allocated budget', computed: true, cells: years.map((_: number, i: number) => {
-              if (budgetMode === 'pct_gdp') return <span style={{ fontSize: 10, color: '#94a3b8' }}>{((inputs.macro?.execution_rate ?? 1) * 100).toFixed(0)+'%'}</span>;
-              const b = (inputs.bau?.san_budget_ts||[])[i]||0;
-              const e = (inputs.bau?.san_expend_ts||[])[i]||0;
-              const r = (b > 0 && e > 0) ? (e/b)*100 : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{r > 0 ? r.toFixed(0)+'%' : '—'}</span>;
-            }) },
-            sectionRow(`${scopeLabel} water service levels (% HH)`),
+            sectionRow(`Budget (${CUR} M, real / baseline prices) — derived from connection cost; type any cell to override`),
+            { label: 'WS budget', tip: 'Water supply budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('ws_expend_ts', 'water_supply', i)) },
+            projRow('→ WS budget used', 'Auto-fill: the water budget the model uses each year.', (i) => secRes('water_supply', 'allocated_capex', i), false),
+            { label: 'SAN budget', tip: 'Sanitation budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('san_expend_ts', 'sanitation', i)) },
+            projRow('→ SAN budget used', 'Auto-fill: the sanitation budget the model uses each year.', (i) => secRes('sanitation', 'allocated_capex', i), false),
+            sectionRow(`${scopeLabel} water service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
             svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
             svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
             svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
             svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
             svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
-            sectionRow(`${scopeLabel} sanitation service levels (% HH)`),
+            sectionRow(`${scopeLabel} sanitation service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
             svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
             svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
             svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
@@ -769,11 +638,13 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
                 <thead>
                   <tr style={{ background: '#f1f5f9' }}>
                     <th style={{ padding: '4px 8px', textAlign: 'left', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 1, minWidth: 150 }}></th>
-                    {years.map((yr: number) => (
-                      <th key={yr} style={{ padding: '4px 4px', textAlign: 'center', fontSize: 10, fontWeight: yr > baseYr2 ? 600 : 500, color: yr > baseYr2 ? '#f59e0b' : '#334155', minWidth: 62 }}>
-                        {yr}{yr > baseYr2 && <span style={{ fontSize: 7, verticalAlign: 'super' }}>F</span>}
+                    {years.map((yr: number, i: number) => {
+                      const tgt = yr > baseYr2 && (colIsTarget('water_service', i) || colIsTarget('sanitation_service', i));
+                      return (
+                      <th key={yr} title={tgt ? 'Target year (a full service-level column is entered here)' : undefined} style={{ padding: '4px 4px', textAlign: 'center', fontSize: 10, fontWeight: yr > baseYr2 ? 600 : 500, color: tgt ? '#16a34a' : yr > baseYr2 ? '#f59e0b' : '#334155', minWidth: 62, background: tgt ? '#f0fdf4' : undefined }}>
+                        {yr}{tgt ? <span style={{ fontSize: 9 }}> 🎯</span> : yr > baseYr2 && <span style={{ fontSize: 7, verticalAlign: 'super' }}>F</span>}
                       </th>
-                    ))}
+                    );})}
                   </tr>
                 </thead>
                 <tbody>
@@ -820,94 +691,50 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         ))}
       </div>
 
-      {/* ===== TARGETS (sector-dependent) ===== */}
+      {/* ===== UNIT COSTS + TECHNICAL (merged, sector-dependent). Targets are now set in the §2 table. ===== */}
       {bauSector === 'water' && (
-      <Section title={`3. ${scopeLabel} Water Supply Targets`} cols={2} sectionKey="ws_targets" onFocus={onSectionFocus}>
-        <SubHead text="Service Targets" />
-        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Number of HHs per level calculated automatically from population
-        </div>
-        <SubHead text="Target 1 (2030)" />
-        {(() => { const s = (inputs.water_targets.target1_serv1||0)+(inputs.water_targets.target1_serv2||0)+(inputs.water_targets.target1_serv3||0)+(inputs.water_targets.target1_serv4||0)+(inputs.water_targets.target1_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ws[0]}`} value={inputs.water_targets.target1_serv1} onChange={v => u('water_targets','target1_serv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[1]}`} value={inputs.water_targets.target1_serv2} onChange={v => u('water_targets','target1_serv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[2]}`} value={inputs.water_targets.target1_serv3} onChange={v => u('water_targets','target1_serv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[3]}`} value={inputs.water_targets.target1_serv4} onChange={v => u('water_targets','target1_serv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[4]}`} value={inputs.water_targets.target1_serv5} onChange={v => u('water_targets','target1_serv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <SubHead text="Target 2 (2040)" />
-        {(() => { const s = (inputs.water_targets.target2_serv1||0)+(inputs.water_targets.target2_serv2||0)+(inputs.water_targets.target2_serv3||0)+(inputs.water_targets.target2_serv4||0)+(inputs.water_targets.target2_serv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ws[0]}`} value={inputs.water_targets.target2_serv1} onChange={v => u('water_targets','target2_serv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[1]}`} value={inputs.water_targets.target2_serv2} onChange={v => u('water_targets','target2_serv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[2]}`} value={inputs.water_targets.target2_serv3} onChange={v => u('water_targets','target2_serv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[3]}`} value={inputs.water_targets.target2_serv4} onChange={v => u('water_targets','target2_serv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ws[4]}`} value={inputs.water_targets.target2_serv5} onChange={v => u('water_targets','target2_serv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share of HHs at this service level; all 5 must sum to 100%" />
-      </Section>
-      )}
-
-      {bauSector === 'sanitation' && (
-      <Section title={`3. ${scopeLabel} Sanitation Targets`} cols={2} sectionKey="san_targets" onFocus={onSectionFocus}>
-        <SubHead text="Service Targets" />
-        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 6, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Number of HHs per level calculated automatically from population
-        </div>
-        <SubHead text="Target 1 (2030)" />
-        {(() => { const s = (inputs.sanitation_targets.target1_sserv1||0)+(inputs.sanitation_targets.target1_sserv2||0)+(inputs.sanitation_targets.target1_sserv3||0)+(inputs.sanitation_targets.target1_sserv4||0)+(inputs.sanitation_targets.target1_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_targets.target1_sserv1} onChange={v => u('sanitation_targets','target1_sserv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_targets.target1_sserv2} onChange={v => u('sanitation_targets','target1_sserv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_targets.target1_sserv3} onChange={v => u('sanitation_targets','target1_sserv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_targets.target1_sserv4} onChange={v => u('sanitation_targets','target1_sserv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_targets.target1_sserv5} onChange={v => u('sanitation_targets','target1_sserv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <SubHead text="Target 2 (2040)" />
-        {(() => { const s = (inputs.sanitation_targets.target2_sserv1||0)+(inputs.sanitation_targets.target2_sserv2||0)+(inputs.sanitation_targets.target2_sserv3||0)+(inputs.sanitation_targets.target2_sserv4||0)+(inputs.sanitation_targets.target2_sserv5||0); const bad = Math.abs(s-1)>0.005; return <div style={{ gridColumn: '1 / -1', fontSize: 10, fontWeight: 600, color: bad?'#dc2626':'#16a34a', padding: '2px 8px', background: bad?'#fef2f2':'#f0fdf4', borderRadius: 4, marginBottom: 4 }}>{bad ? `These shares add up to ${Math.round(s*10000)/100}% — they should total 100%.` : 'These shares add up to 100%. ✓'}</div>; })()}
-        <F label={`% ${ss[0]}`} value={inputs.sanitation_targets.target2_sserv1} onChange={v => u('sanitation_targets','target2_sserv1',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[1]}`} value={inputs.sanitation_targets.target2_sserv2} onChange={v => u('sanitation_targets','target2_sserv2',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[2]}`} value={inputs.sanitation_targets.target2_sserv3} onChange={v => u('sanitation_targets','target2_sserv3',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[3]}`} value={inputs.sanitation_targets.target2_sserv4} onChange={v => u('sanitation_targets','target2_sserv4',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-        <F label={`% ${ss[4]}`} value={inputs.sanitation_targets.target2_sserv5} onChange={v => u('sanitation_targets','target2_sserv5',v)} isPercent unit="%" min={0} max={1.0} tip="Target share at this service level; all 5 must sum to 100%" />
-      </Section>
-      )}
-
-      {/* ===== UNIT COSTS (sector-dependent) ===== */}
-      {bauSector === 'water' && (
-      <Section title={`4. ${scopeLabel} Water Supply Unit Costs`} cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
+      <Section title={`3. ${scopeLabel} Water Supply — Unit Costs & Technical Parameters`} cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
+        <SubHead text="Unit costs (nominal → real)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
-          The validated BAU engine uses the <b>{ws[0]}</b> and <b>{ws[1]}</b> weighted costs — build them from the technology mixes below (also editable on the <b>Test Harness</b> tab; both edit the same data).
+          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ws[0]}</b> and <b>{ws[1]}</b> weighted costs, built from the technology mixes.
         </div>
-        <SubHead text="Distribution network cost per HH" />
-        <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network. Costs are for the baseline year. Editing this rescales the technology mix below to match." />
-        <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to the distribution network. Costs are for the baseline year. Editing this rescales the technology mix below to match." />
+        <F label="Nominal price year" value={inputs.water_costs.price_index_year ?? inputs.period.baseline_year} onChange={v => u('water_costs','price_index_year',v)} tip="The year the nominal technology prices are quoted in." />
+        <F label="Price index (base = 100)" value={inputs.water_costs.price_index ?? 100} onChange={v => u('water_costs','price_index',v)} step={1} min={0} max={100000} tip="Real price = nominal × price index ÷ 100. Leave at 100 for no adjustment; change it and every technology price rescales accordingly." />
+        {(() => { const pi = (inputs.water_costs.price_index ?? 100) / 100; return (
+          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', background: '#f8fafc', borderRadius: 4, padding: '3px 8px' }}>Real (used by the model): {ws[0]} = <b>{Math.round((inputs.water_costs.network_cost_per_hh_serv1||0)*pi).toLocaleString()}</b> {CUR}/HH · {ws[1]} = <b>{Math.round((inputs.water_costs.network_cost_per_hh_serv2||0)*pi).toLocaleString()}</b> {CUR}/HH</div>
+        ); })()}
+        <SubHead text="Distribution network cost per HH (nominal)" />
+        <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to the distribution network. Editing this rescales the technology mix below to match." />
+        <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to the distribution network. Editing this rescales the technology mix below to match." />
         {renderCostMix('water_costs', 'sm', 'network_cost_per_hh_serv1', ws[0])}
         {renderCostMix('water_costs', 'basic', 'network_cost_per_hh_serv2', ws[1])}
-      </Section>
-      )}
-
-      {bauSector === 'sanitation' && (
-      <Section title={`4. ${scopeLabel} Sanitation Unit Costs`} cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
-        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
-          The validated BAU engine uses the <b>{ss[0]}</b> and <b>{ss[1]}</b> weighted costs — build them from the technology mixes below (also editable on the <b>Test Harness</b> tab; both edit the same data).
-        </div>
-        <SubHead text="Sewerage cost per HH" />
-        <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection. Costs are for the baseline year. Editing this rescales the technology mix below to match." />
-        <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Capital cost to connect one HH to sewer network + house connection. Costs are for the baseline year. Editing this rescales the technology mix below to match." />
-        {renderCostMix('sanitation_costs', 'sm', 'sewer_cost_per_hh_sserv1', ss[0])}
-        {renderCostMix('sanitation_costs', 'basic', 'sewer_cost_per_hh_sserv2', ss[1])}
-      </Section>
-      )}
-
-      {/* ===== TECHNICAL (sector-dependent) ===== */}
-      {bauSector === 'water' && (
-      <Section title={`5. ${scopeLabel} Water Supply Technical Parameters`} cols={2} sectionKey="ws_technical" onFocus={onSectionFocus}>
+        <SubHead text="Technical parameters" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets — drives the replacement (depreciation) capex." />
         <F label="% water sold to non-household" value={inputs.technical.ws_non_hh_pct || 0} onChange={v => u('technical','ws_non_hh_pct',v)} isPercent unit="%" tip="Share of water sold to non-household customers (commercial, industrial, institutional) — scales the total capex above the household capex." />
         <SubHead text="Non-revenue water — feeds the BAU new-capex adder" />
-        <F label="Treatment cost as % of capex" value={inputs.water_interventions?.nrw_treatment_cost_pct_capex ?? 0.4} onChange={v => u('water_interventions','nrw_treatment_cost_pct_capex',v)} isPercent unit="%" tip="Workbook G173 — part of the 4d new-capex adder: cost × (treat% × NRW% × physical%)" />
-        <F label="Current NRW" value={inputs.water_interventions?.nrw_current_pct ?? 0.4} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Workbook G174 — non-revenue water as share of water produced" />
-        <F label="Physical losses as % of NRW" value={inputs.water_interventions?.nrw_physical_loss_pct ?? 0.5} onChange={v => u('water_interventions','nrw_physical_loss_pct',v)} isPercent unit="%" tip="Workbook G175 — physical (leakage) share of total NRW" />
+        <F label="Treatment cost as % of capex" value={inputs.water_interventions?.nrw_treatment_cost_pct_capex ?? 0.4} onChange={v => u('water_interventions','nrw_treatment_cost_pct_capex',v)} isPercent unit="%" tip="Part of the new-capex adder: cost × (treat% × NRW% × physical%)" />
+        <F label="Current NRW" value={inputs.water_interventions?.nrw_current_pct ?? 0.4} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Non-revenue water as share of water produced" />
+        <F label="Physical losses as % of NRW" value={inputs.water_interventions?.nrw_physical_loss_pct ?? 0.5} onChange={v => u('water_interventions','nrw_physical_loss_pct',v)} isPercent unit="%" tip="Physical (leakage) share of total NRW" />
       </Section>
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title={`5. ${scopeLabel} Sanitation Technical Parameters`} cols={2} sectionKey="san_technical" onFocus={onSectionFocus}>
+      <Section title={`3. ${scopeLabel} Sanitation — Unit Costs & Technical Parameters`} cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
+        <SubHead text="Unit costs (nominal → real)" />
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
+          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ss[0]}</b> and <b>{ss[1]}</b> weighted costs, built from the technology mixes.
+        </div>
+        <F label="Nominal price year" value={inputs.sanitation_costs.price_index_year ?? inputs.period.baseline_year} onChange={v => u('sanitation_costs','price_index_year',v)} tip="The year the nominal technology prices are quoted in." />
+        <F label="Price index (base = 100)" value={inputs.sanitation_costs.price_index ?? 100} onChange={v => u('sanitation_costs','price_index',v)} step={1} min={0} max={100000} tip="Real price = nominal × price index ÷ 100. Leave at 100 for no adjustment; change it and every technology price rescales accordingly." />
+        {(() => { const pi = (inputs.sanitation_costs.price_index ?? 100) / 100; return (
+          <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', background: '#f8fafc', borderRadius: 4, padding: '3px 8px' }}>Real (used by the model): {ss[0]} = <b>{Math.round((inputs.sanitation_costs.sewer_cost_per_hh_sserv1||0)*pi).toLocaleString()}</b> {CUR}/HH · {ss[1]} = <b>{Math.round((inputs.sanitation_costs.sewer_cost_per_hh_sserv2||0)*pi).toLocaleString()}</b> {CUR}/HH</div>
+        ); })()}
+        <SubHead text="Sewerage cost per HH (nominal)" />
+        <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to sewer network + house connection. Editing this rescales the technology mix below to match." />
+        <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to sewer network + house connection. Editing this rescales the technology mix below to match." />
+        {renderCostMix('sanitation_costs', 'sm', 'sewer_cost_per_hh_sserv1', ss[0])}
+        {renderCostMix('sanitation_costs', 'basic', 'sewer_cost_per_hh_sserv2', ss[1])}
+        <SubHead text="Technical parameters" />
         <F label="Useful life of assets" value={inputs.technical.san_asset_life} onChange={v => u('technical','san_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets — drives the replacement (depreciation) capex." />
         <F label="% wastewater from non-household" value={inputs.technical.san_non_hh_pct || 0} onChange={v => u('technical','san_non_hh_pct',v)} isPercent unit="%" tip="Share of wastewater from non-household sources (commercial, industrial, institutional) — scales the total capex above the household capex." />
       </Section>

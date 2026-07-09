@@ -42,7 +42,7 @@ export default function App() {
     // padded, or the ongoing/projection logic would be silently disabled.
     if (!inp?.period?.model_start_year || !inp?.period?.forecast_end_year || !inp?.macro) return inp;
     const needed = inp.period.forecast_end_year - inp.period.model_start_year + 1;
-    const macroFields = ['gdp_growth', 'gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate'];
+    const macroFields = ['gdp_real_local', 'gdp_growth', 'gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate'];
     let changed = false;
     const newMacro = { ...inp.macro };
     for (const field of macroFields) {
@@ -121,30 +121,30 @@ export default function App() {
   const warnings: string[] = [];
   if (inputs) {
     const p = inputs.period;
-    // Year sequencing: model start < baseline < forecast end, with the target window inside it.
+    // Year sequencing: model start < baseline < forecast end, with the as-is window inside it.
     if (p.model_start_year >= p.baseline_year) warnings.push('Model start year must be before the baseline year');
     else if (p.baseline_year - p.model_start_year < 3) warnings.push('Model start year should be at least 3 years before the baseline year');
     if (p.forecast_end_year <= p.baseline_year) warnings.push('Forecast end year must be after the baseline year');
-    if (p.target1_year && (p.target1_year <= p.baseline_year || p.target1_year > p.forecast_end_year)) warnings.push('Target 1 year must be between the baseline year and the forecast end year');
-    if (p.target2_year > p.forecast_end_year) warnings.push('Target 2 year cannot be after the forecast end year');
     if (p.baseline_year >= p.as_is_forecast_start) warnings.push('Baseline year must be before as-is forecast start');
-    if (p.target2_year < p.target1_year) warnings.push('Target 2 year must be >= Target 1 year');
-    const wt = inputs.water_targets;
-    const wsSum = Math.round((wt.target1_serv1 + wt.target1_serv2 + wt.target1_serv3 + wt.target1_serv4 + wt.target1_serv5) * 100);
-    if (wsSum !== 100) warnings.push(`Water Target 1 service levels sum to ${wsSum}%, must be 100%`);
-    const wsSum2 = Math.round((wt.target2_serv1 + wt.target2_serv2 + wt.target2_serv3 + wt.target2_serv4 + wt.target2_serv5) * 100);
-    if (wsSum2 !== 100) warnings.push(`Water Target 2 service levels sum to ${wsSum2}%, must be 100%`);
-    if (wt.providers && wt.providers.length) {
-      const provSum = Math.round(wt.providers.reduce((s: number, p: any) => s + p.share_pct, 0) * 100);
-      if (provSum !== 100) warnings.push(`Water provider shares sum to ${provSum}%, must be 100%`);
-    }
-    const st = inputs.sanitation_targets;
-    const ssSum = Math.round((st.target1_sserv1 + st.target1_sserv2 + st.target1_sserv3 + st.target1_sserv4 + st.target1_sserv5) * 100);
-    if (ssSum !== 100) warnings.push(`Sanitation Target 1 service levels sum to ${ssSum}%, must be 100%`);
-    if (st.providers && st.providers.length) {
-      const sanProvSum = Math.round((st.providers.reduce((s: number, p: any) => s + p.share_pct, 0)) * 100);
-      if (sanProvSum !== 100) warnings.push(`Sanitation provider shares + on-site sum to ${sanProvSum}%, must be 100%`);
-    }
+    // Targets now live in the §2 table: any forecast year with a fully-entered service column (Σ 100%).
+    // Warn about partially-filled columns and about a sector with no target at all.
+    const checkTargets = (svc: any, prefix: string, label: string) => {
+      const fields = [1, 2, 3, 4, 5].map(i => `${prefix}${i}_ts`);
+      const maxLen = Math.max(0, ...fields.map(f => (svc?.[f] || []).length));
+      let count = 0;
+      for (let idx = 0; idx < maxLen; idx++) {
+        const yr = p.model_start_year + idx;
+        if (yr <= p.baseline_year || yr > p.forecast_end_year) continue;
+        let sum = 0, any = false;
+        for (const f of fields) { const v = (svc?.[f] || [])[idx]; if (v != null && v > 0) { sum += v; any = true; } }
+        if (!any) continue;                                               // empty column — fine (not a target)
+        if (Math.abs(sum - 1) < 0.02) { count++; continue; }              // valid target (zeros for some rungs OK)
+        warnings.push(`${label} target column for ${yr} sums to ${Math.round(sum * 100)}% — a target column must total 100%.`);
+      }
+      return count;
+    };
+    if (checkTargets(inputs.water_service, 'serv', 'Water') === 0) warnings.push('No water target year set — fill a full forecast service-level column (Σ 100%) in the table.');
+    if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
   }
 
   const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export', 'Test Harness'];
@@ -507,10 +507,10 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>Make your selections first.</strong> At the top of the screen, choose a <strong>data entry mode</strong>: <em>Urban / Rural</em> (enter urban and rural data separately — include both to produce a national total, or just one to analyse that area on its own) or <em>National</em> (a single national data set, for when you cannot break down by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>Country, Region &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates and choose how to provide the WSS budget (as % of GDP or directly year-by-year). Then complete the year-by-year table, which covers economic data (GDP, inflation, exchange rate), demographics (population, households), budget &amp; execution, and historical water and sanitation service levels. Growth rates, household size, and execution rates are calculated for you. Forecast-year service levels are derived from your BAU targets. The BAU data entry also appears further down this tab, where you select Water Supply or Sanitation to fill each sector.
+              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates, then complete the year-by-year table: <strong>real GDP</strong> (local currency), population and households, the WSS budget, and the water &amp; sanitation service levels. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections, which are <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
+              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation. Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
@@ -618,8 +618,8 @@ function GFind({ items }: { items: string[] }) {
 // Contextual guide content keyed by sectionKey
 const contextualGuide: Record<string, { title: string; content: React.ReactNode; sources?: { name: string; url: string }[] }> = {
   country: {
-    title: 'Country & Region',
-    content: 'Select the country and sub-national region for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed.',
+    title: 'Country & Area of focus',
+    content: 'Select the country and the area of focus for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed.',
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
   macro: {
@@ -649,52 +649,20 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Target year:</span> This is the first interim year for which targets will be set. For example, if national targets aim to reach 100% access by 2050, there would be interim targets such as 60% access by 2030 and 80% access by 2040. In this case, the first target year would be 2030, the target year 2 would be 2040, and the model end year would be 2050.
-          <span style={gNote}>Note: If there is only one interim target year, please set target year 2 to the same as the model end year.</span>
-        </div>
-
-        <div style={gSub}>Macroeconomic assumptions</div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Water supply budget as % of GDP:</span> Please enter an average % of total GDP that is spent on providing water supply services in the region.
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Sanitation supply budget as % of GDP:</span> Please enter an average % of total GDP that is spent on providing sanitation supply services in the region.
+          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the year-by-year table below — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
         </div>
 
         <div style={gSub}>Year-by-year data</div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Nominal GDP ($B):</span> The total monetary value of all goods and services produced in the selected country in a given year, expressed in billions of US dollars (current prices). This is used to contextualize investment needs and fiscal capacity over the analysis period.
+          <span style={gFieldLbl}>Real GDP (local currency, millions):</span> Real GDP in local currency at constant (base-year) prices. Enter the historical years; leave forecast years blank to auto-fill at the mean historical growth, or type your own projection (the grey “→ used” row shows the value the model applies). This drives the forecast WSS budget.
           <GFind items={[
-            'World Bank – data.worldbank.org/indicator/NY.GDP.MKTP.CD (GDP in current USD by country)',
+            'World Bank – data.worldbank.org/indicator/NY.GDP.MKTP.KN (GDP in constant local currency)',
             'IMF World Economic Outlook Database – imf.org/en/Publications/WEO',
-            "Your country's central bank or ministry of finance",
+            "Your country's central bank or national statistics office",
           ]} />
         </div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Inflation Local (%):</span> The annual inflation rate for the selected country, expressed as a percentage. Used to adjust local currency monetary values over time.
-          <GFind items={[
-            'World Bank – data.worldbank.org/indicator/FP.CPI.TOTL.ZG',
-            'IMF World Economic Outlook Database – imf.org/en/Publications/WEO',
-            'Your country\'s central bank or national statistics office (search "[country] central bank CPI inflation")',
-          ]} />
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Inflation US (%):</span> The annual US inflation rate, expressed as a percentage. Used to adjust USD-denominated values over time.
-          <GFind items={[
-            'US Bureau of Labor Statistics (BLS) – bls.gov/cpi',
-            'Federal Reserve Economic Data (FRED) – fred.stlouisfed.org/series/FPCPITOTLZGUSA',
-            'World Bank – data.worldbank.org/indicator/FP.CPI.TOTL.ZG?locations=US',
-          ]} />
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>USD to Local Currency Exchange Rate (USD/local currency):</span> The number of local currency units per 1 US Dollar for each year of the analysis. Used to convert between USD and local currency throughout the model.
-          <span style={gNote}>Note: Use annual average rates rather than spot rates for consistency across the analysis period.</span>
-          <GFind items={[
-            'OANDA – oanda.com/currency-converter (historical average exchange rates)',
-            'Federal Reserve Economic Data (FRED) – fred.stlouisfed.org (search your currency pair, e.g. "USD to NPR")',
-            'World Bank – data.worldbank.org/indicator/PA.NUS.FCRF (official exchange rates by country)',
-            "Your country's central bank (most publish official annual average exchange rates)",
-          ]} />
+          <span style={gFieldLbl}>WSS budget:</span> The budget is derived automatically — historically from the cost of the new connections added each year (Safely-managed + Basic households × their unit cost), and for forecast years from the average historical budget-to-GDP ratio × real GDP. You can type into any budget cell to override that year.
         </div>
         <div style={gFieldWrap}>
           <span style={gFieldLbl}>Urban Population:</span> The total number of people living in urban areas within the selected region for each year of the analysis. This forms the baseline from which the model calculates growth and infrastructure demand.
@@ -713,35 +681,10 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
           <span style={gNote}>Note: If household data is unavailable, it can be estimated by dividing the urban population by the average household size.</span>
         </div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Water Supply (WS) Budget Allocated (in millions):</span> The total budget allocated for water supply infrastructure and services in a given year, expressed in millions of local currency. Sourced from government budget documents.
+          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you — historically from the cost of new connections, and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type to override a given year. If you have actual government budget figures you would rather use, enter them directly to override.
           <GFind items={[
-            "Your country's Ministry of Finance (annual budget documents and Red Books)",
-            "Your country's Ministry of Water Supply or equivalent sector ministry",
-            'Municipal or utility budget reports (for sub-national analysis)',
-          ]} />
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Water Supply (WS) Actual Expenditure (in millions):</span> The amount actually spent on water supply in a given year, expressed in millions of local currency. May differ from the allocated budget due to implementation delays or capacity constraints.
-          <GFind items={[
-            "Your country's Ministry of Finance (budget execution reports or annual financial statements)",
-            "Your country's Ministry of Water Supply or equivalent sector ministry",
-            'National audit reports or public financial management systems',
-          ]} />
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Sanitation (SAN) Budget Allocated (in millions):</span> The total budget allocated for sanitation infrastructure and services in a given year, expressed in millions of local currency.
-          <GFind items={[
-            "Your country's Ministry of Finance (annual budget documents)",
-            "Your country's Ministry of Water Supply, Sanitation, or equivalent sector ministry",
-            'Municipal or utility budget reports (for sub-national analysis)',
-          ]} />
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Sanitation (SAN) Actual Expenditure (in Millions):</span> The amount actually spent on sanitation in a given year, expressed in millions of local currency.
-          <GFind items={[
-            "Your country's Ministry of Finance (budget execution reports or annual financial statements)",
-            "Your country's Ministry of Water Supply, Sanitation, or equivalent sector ministry",
-            'National audit reports or public financial management systems',
+            "Your country's Ministry of Finance (budget documents / execution reports), if overriding",
+            "Your country's Ministry of Water Supply / Sanitation or equivalent sector ministry",
           ]} />
         </div>
       </div>
@@ -842,10 +785,11 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 
 // Which guide sections belong to each tab (only these show in that tab's Guide panel)
 const guideKeysByTab: Record<number, string[]> = {
-  // Data Inputs — includes the BAU data entry duplicated onto this tab
-  0: ['country', 'macro', 'ws_service_levels', 'san_service_levels', 'ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'ws_technical', 'san_technical'],
+  // Data Inputs — includes the BAU data entry duplicated onto this tab. test2: targets & technical
+  // params are folded into the table / the merged unit-cost section.
+  0: ['country', 'macro', 'ws_unit_costs', 'san_unit_costs'],
   // BAU Scenario
-  1: ['ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'ws_technical', 'san_technical'],
+  1: ['ws_unit_costs', 'san_unit_costs'],
   // Intervention Design
   2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
 };

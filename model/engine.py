@@ -85,6 +85,32 @@ def _project_hh(arr, n):
     return out
 
 
+def _project_series(arr, n, fallback_growth=0.0):
+    """test2 projection rule: HONOUR user-entered values (historical AND forecast) and fill only the
+    blanks. A value ≤ 0 (or missing) is 'blank' → carried forward from the prior year at the MEAN
+    historical year-on-year growth (the average of the leading contiguous run of real values). This
+    lets the user override any forecast year while empty cells auto-fill at average growth.
+
+    Returns (series, mean_growth). The default Nepal payload supplies only historical values, so the
+    tail auto-fills exactly as `_project_hh` did — parity preserved."""
+    a = np.array(arr, dtype=float) if arr else np.array([], dtype=float)
+    out = np.zeros(n, dtype=float)
+    k = min(len(a), n)
+    out[:k] = a[:k]
+    known = []
+    for t in range(n):                       # leading contiguous run of real (>0) values = 'historical'
+        if out[t] > 0:
+            known.append(out[t])
+        else:
+            break
+    yoy = [known[i] / known[i - 1] - 1.0 for i in range(1, len(known)) if known[i - 1] > 0]
+    g = float(np.mean(yoy)) if yoy else float(fallback_growth)
+    for t in range(1, n):
+        if out[t] <= 0:                      # blank → project from the prior year at mean growth
+            out[t] = out[t - 1] * (1.0 + g)
+    return out, g
+
+
 def build_context(inputs: ModelInputs) -> dict:
     p = inputs.period
     c = inputs.constants
@@ -103,46 +129,50 @@ def build_context(inputs: ModelInputs) -> dict:
     # ACTUALS run only through baseline-1; the BASELINE YEAR ITSELF IS A PROJECTION in the sheet
     # (I!92 baseline = prior×(1+G93)), so households/population are projected from the actuals at mean
     # historical growth from the baseline year onward. Supplied baseline/forecast values are ignored.
-    total_hh = _project_hh(inputs.population.hh_ts[:bi], n)
+    # test2: households/population HONOUR any user-entered forecast values; blank forecast years fill
+    # at mean historical growth. With the default payload (historical only) this matches the previous
+    # `_project_hh(hh_ts[:bi])` behaviour exactly.
+    total_hh, _ = _project_series(inputs.population.hh_ts, n)
     # Population (I!89, millions) projected at mean historical pop growth (G90); household SIZE (I!95)
     # is DERIVED for display only = population / households (both millions -> people per HH). Not used in 4a-4d.
-    population = _project_hh(inputs.population.pop_ts[:bi], n)
+    population, _ = _project_series(inputs.population.pop_ts, n)
     with np.errstate(divide='ignore', invalid='ignore'):
         hh_size = np.where(total_hh > 0, population / total_hh, 0.0)
 
-    # Inflation index (base = real_price_year -> 100), used to deflate nominal GDP to real terms.
-    # Inflation = hard years (historical + forecast with data) then the fixed ONGOING rate for the tail.
     infl_local = _series_with_ongoing(inputs.macro.inflation_local, n, inputs.macro.inflation_local_ongoing)
-    rpy = int(np.clip(p.real_price_year - p.model_start_year, 0, n - 1))
-    idx = np.zeros(n)
-    idx[rpy] = 100.0
-    for t in range(rpy - 1, -1, -1):
-        idx[t] = idx[t + 1] / (1.0 + infl_local[t + 1])
-    for t in range(rpy + 1, n):
-        idx[t] = idx[t - 1] * (1.0 + infl_local[t])
-
-    # Nominal GDP in local currency (millions). GDP-USD = hard years (historical + forecast with data),
-    # ZERO-padded; a 0 marks a forecast year with no data, projected at the fixed real growth rate.
-    gdp_usd = _zero_pad(inputs.macro.gdp_nominal_usd, n)        # USD billion
-    g_fcst = inputs.macro.gdp_growth_forecast   # fixed real growth for forecast (post-USD-data) years
     us_infl = _series_with_ongoing(inputs.macro.inflation_us, n, inputs.macro.inflation_us_ongoing)
-    # FX: actuals through baseline-1; baseline year onward DERIVED from the inflation differential
-    # (I!81 = prior×(1+local)/(1+US)). Supplied baseline/forecast FX is ignored so that editing
-    # inflation flows into FX (and cancels in real GDP) exactly as the sheet does.
-    fx = _project_fx(inputs.macro.exchange_rate[:bi], infl_local, us_infl, n)  # local per 1 USD
-    gdp_nom = np.zeros(n)
-    for t in range(n):
-        if gdp_usd[t] > 0:
-            gdp_nom[t] = gdp_usd[t] * c.thousand * fx[t]        # USD bn*1000 = USD mn; *fx = local mn
-        elif t > 0:
-            # past the USD/GDP data: real GDP grows at the fixed forecast rate (row 60), so the
-            # nominal series compounds at (1+forecast growth)(1+inflation) — equivalently real[t]=real[t-1]*(1+g).
-            gdp_nom[t] = gdp_nom[t - 1] * (1.0 + g_fcst) * (1.0 + infl_local[t])
-    gdp_real = np.where(idx > 0, gdp_nom * 100.0 / idx, 0.0)    # real, base = real_price_year
-    # Projected nominal GDP in USD billions (back out from local nominal ÷ FX) so the forecast years
-    # of the "Nominal GDP ($B)" input row can show the engine's projection instead of a blank marker.
-    with np.errstate(divide='ignore', invalid='ignore'):
-        gdp_usd_proj = np.where((fx > 0), gdp_nom / (c.thousand * fx), 0.0)
+    g_fcst = inputs.macro.gdp_growth_forecast   # fallback real growth if <2 historical points to average
+
+    real_gdp_input = list(inputs.macro.gdp_real_local or [])
+    if any((v or 0) > 0 for v in real_gdp_input):
+        # ── test2 primary path: REAL GDP in local currency is entered directly. No nominal-USD / FX /
+        #    deflation needed — user forecast values are honoured, blanks fill at mean historical growth. ──
+        gdp_real, _ = _project_series(real_gdp_input, n, fallback_growth=g_fcst)
+        gdp_nom = gdp_real.copy()          # nominal ≡ real (base-year prices); no inflation chain
+        fx = np.ones(n)
+        idx = np.full(n, 100.0)
+        gdp_usd_proj = np.zeros(n)
+    else:
+        # ── Legacy path (no real-GDP series supplied, e.g. the Test Harness): derive real GDP from
+        #    nominal USD × FX ÷ inflation index, exactly as before. ──
+        rpy = int(np.clip(p.real_price_year - p.model_start_year, 0, n - 1))
+        idx = np.zeros(n)
+        idx[rpy] = 100.0
+        for t in range(rpy - 1, -1, -1):
+            idx[t] = idx[t + 1] / (1.0 + infl_local[t + 1])
+        for t in range(rpy + 1, n):
+            idx[t] = idx[t - 1] * (1.0 + infl_local[t])
+        gdp_usd = _zero_pad(inputs.macro.gdp_nominal_usd, n)        # USD billion
+        fx = _project_fx(inputs.macro.exchange_rate[:bi], infl_local, us_infl, n)  # local per 1 USD
+        gdp_nom = np.zeros(n)
+        for t in range(n):
+            if gdp_usd[t] > 0:
+                gdp_nom[t] = gdp_usd[t] * c.thousand * fx[t]        # USD bn*1000 = USD mn; *fx = local mn
+            elif t > 0:
+                gdp_nom[t] = gdp_nom[t - 1] * (1.0 + g_fcst) * (1.0 + infl_local[t])
+        gdp_real = np.where(idx > 0, gdp_nom * 100.0 / idx, 0.0)    # real, base = real_price_year
+        with np.errstate(divide='ignore', invalid='ignore'):
+            gdp_usd_proj = np.where((fx > 0), gdp_nom / (c.thousand * fx), 0.0)
 
     return {
         'years': years, 'n': n, 'bi': bi,
