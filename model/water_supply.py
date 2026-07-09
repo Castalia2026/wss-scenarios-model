@@ -70,12 +70,15 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                hist_all_proportional, target_adjusted, execution_rate=1.0):
     """Shared 4a-4d core. All HH and money values are in MILLIONS; costs in actual currency.
 
-    `full_budget` is the sector's FULL budget per year in real terms (I!312 water / I!317 san),
-    from EITHER %GDP mode (GDP_real × budget%) OR direct entry (actual expenditure series). Two
-    budgets flow from it, because the sheet treats the sectors asymmetrically:
-      * BAU SM growth (4a) uses full_budget × growth_capex_pct — WATER references the *capex* budget
-        (growth_capex_pct = capex_pct), SANITATION the *full* budget (growth_capex_pct = 1.0).
-      * Financing availability (4d) uses the capex budget (× capex_pct) for both."""
+    `full_budget` is the sector's FULL budget per year in real terms, from EITHER %GDP mode
+    (GDP_real × budget%) OR direct entry (actual expenditure series). The BAU INVESTMENT that drives
+    the model = the capex budget (full_budget × capex_pct) = `bau_available`, for BOTH sectors. The BAU
+    additional safely-managed HH each year (4a) =
+        (BAU investment − replacement capex) × HH/(HH+non-HH) ÷ SM cost
+    so replacement (depreciation of the existing stock) is funded first, and only the household share
+    buys new connections. `growth_capex_pct` and `planned_list` are kept for the caller signature but
+    are no longer used. NOTE: this deliberately DIVERGES from the reference workbook's BAU (which grew
+    SM on the %GDP capex budget alone); the 4d investment-need / financing-gap formulas are unchanged."""
     n, bi, years, total_hh = ctx['n'], ctx['bi'], ctx['years'], ctx['total_hh']
     msy, by = period.model_start_year, period.baseline_year
     t1y, t2y = period.target1_year, period.target2_year
@@ -87,10 +90,9 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     # Execution rate scales ALLOCATED capex down to what is actually SPENT (%GDP mode). At 1.0 this
     # is a no-op, reproducing the pre-execution-rate results.
     exec_rate = float(execution_rate)
-    capex_budget = active * full_budget * capex_pct * exec_rate                      # 4d actual capex (I!313 / I!318)
-    growth_budget = active * full_budget * growth_capex_pct * exec_rate              # 4a SM growth (I!313 / I!317)
-    planned_annual = _planned_annual(planned_list, years, by, t2y)
-    bau_available = capex_budget + planned_annual                                    # J163/J188
+    capex_budget = active * full_budget * capex_pct * exec_rate                      # capex actually spent
+    planned_annual = np.zeros(n)                                                     # planned investment removed from the model
+    bau_available = capex_budget                                                     # BAU investment = the capex budget
     # Display-only series (ALL years, unmasked by the active flag): the allocated capex the formula
     # implies each year, and the actual capex after execution. The engine only *spends* in forecast
     # years (active), but these rows show the %GDP × GDP × %capex figure the user entered.
@@ -130,9 +132,52 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     # OWN prior unadjusted value (NOT the rescaled/adjusted prior), seeded at the baseline from the
     # adjusted baseline counts. SM accumulates the budget-funded increase; the others grow at CAGR.
     # The adjusted row (r45-49) is then derived each year: SM kept, lower × total/Σunadj, Basic = plug.
-    unadj = [bau[r, bi] for r in range(5)]
+    # 4b prep — target COUNTS at T1 / T2 (independent of the BAU path)
+    eai = int(eay - msy)
+    t1i, t2i = int(t1y - msy), int(t2y - msy)
+    tc1 = [total_hh[t1i] * tgt1[r] for r in range(5)]
+    tc2 = [total_hh[t2i] * tgt2[r] for r in range(5)]
+    ny1, ny2 = t1y - eay, t2y - t1y
+
+    # 4c — opening asset stock (booked at the baseline year)
+    opening_stock = (bau[0, bi] * cost_sm + bau[1, bi] * cost_basic) * (1.0 + nonhh_mult)
+
+    # BAU forecast (4a), targets (4b) and investment need (4d) are computed together in ONE forward
+    # pass, because the BAU additional safely-managed HH depend on the BAU replacement capex:
+    #     additional HH = (BAU investment − BAU replacement) × HH-share ÷ SM cost
+    # BAU investment = bau_available (capex budget); BAU replacement = prior-year BAU-OWN asset stock ×
+    # depreciation (performance-improvement years only); HH-share = HH/(HH+non-HH) = 1 − non-HH%. The BAU
+    # stock is kept separate from the target `stock` so the BAU never depends on the target (no circularity).
+    depr = 1.0 / asset_life
+    hh_share = 1.0 - nonhh_pct
+    tgt_unadj = np.zeros((5, n)); tgt = np.zeros((5, n))
+    hh_gap = np.zeros(n); new_capex_total = np.zeros(n); stock = np.zeros(n)
+    replacement = np.zeros(n); total_need = np.zeros(n); financing_gap = np.zeros(n)
+    # BAU's OWN asset stock + its depreciation, kept SEPARATE from `stock` (which accumulates the
+    # target-gap capex nc_total). The BAU 4a replacement depreciates THIS, so the BAU counterfactual
+    # never depends on the target path — this fixes the cross-scenario circularity.
+    bau_stock = np.zeros(n); bau_replacement = np.zeros(n)
+
+    # History (start..baseline): target = BAU; the opening stock is booked at the baseline year.
+    for t in range(bi + 1):
+        tgt_unadj[:, t] = bau[:, t]; tgt[:, t] = bau[:, t]
+        booked = opening_stock if years[t] == by else 0.0
+        stock[t] = booked + (stock[t - 1] if t > 0 else 0.0)
+        bau_stock[t] = booked + (bau_stock[t - 1] if t > 0 else 0.0)
+
+    unadj = [bau[r, bi] for r in range(5)]                              # forecast SM accumulates on the baseline count
+    cg1 = cg2 = None
     for t in range(bi + 1, n):
-        new_sm = growth_budget[t] / cost_sm if cost_sm > 0 else 0.0
+        ff, pf = ctx['forecast_flag'][t], ctx['perf_flag'][t]
+        prior_stock = stock[t - 1]
+        # Depreciation starts the FIRST forecast year (baseline+1, e.g. 2026), matching excel2 — which
+        # depreciates the existing stock from baseline+1, NOT the later performance-improvement year (2028).
+        replacement[t] = prior_stock * depr if ff > 0 else 0.0        # TARGET-stock depreciation → 4d only
+        # 4a — additional safely-managed HH funded by (BAU investment − replacement), household share only.
+        # BAU replacement depreciates the BAU's OWN stock (baseline existing stock + BAU's own additions),
+        # NOT the target-gap stock — so the BAU counterfactual is independent of the target path.
+        bau_replacement[t] = bau_stock[t - 1] * depr if ff > 0 else 0.0
+        new_sm = max(0.0, bau_available[t] - bau_replacement[t]) * hh_share / cost_sm if cost_sm > 0 else 0.0
         unadj[0] = unadj[0] + new_sm                                   # r34: prior unadj SM + increase
         for r in range(1, 5):
             unadj[r] = unadj[r] * (1.0 + cagr[r])                      # r37-40: prior unadj × (1+CAGR)
@@ -142,73 +187,45 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
             bau[r, t] = unadj[r] * scale
         bau[0, t] = unadj[0]                                           # r45 SM = unadj
         bau[1, t] = total_hh[t] - unadj[0] - sum(bau[r, t] for r in LOWER)  # r46 Basic = plug
+        # BAU stock roll-forward (final workbook C|Urban Water r29 = X29 + budget − replacement): the
+        # existing stock DEPRECIATES and the FULL capex budget is added each year — so an underfunded
+        # sector (budget < replacement) sees the stock, and next year's replacement, DECLINE. Independent
+        # of the target path (driven by bau_available / bau_replacement, not the target-gap stock).
+        bau_stock[t] = bau_stock[t - 1] - bau_replacement[t] + bau_available[t]
 
-    # 4b — Target forecast
-    eai = int(eay - msy)
-    t1i, t2i = int(t1y - msy), int(t2y - msy)
-    branch = [bau[r, eai] for r in range(5)]
-    tc1 = [total_hh[t1i] * tgt1[r] for r in range(5)]
-    tc2 = [total_hh[t2i] * tgt2[r] for r in range(5)]
-    ny1, ny2 = t1y - eay, t2y - t1y
-    cg1 = [((tc1[r] / branch[r]) ** (1.0 / ny1) - 1.0) if branch[r] > 0 and ny1 > 0 else 0.0 for r in range(5)]
-    cg2 = [((tc2[r] / tc1[r]) ** (1.0 / ny2) - 1.0) if tc1[r] > 0 and ny2 > 0 else 0.0 for r in range(5)]
-    # Unadjusted target path (water r121-125 / sanitation r120-124): SELF-CONTAINED — each rung
-    # compounds from its OWN prior unadjusted value at the T1 rate through target1, then the T2 rate.
-    # Seeded from BAU through end-of-as-is.
-    tgt_unadj = np.zeros((5, n))
-    tgt = np.zeros((5, n))
-    for t in range(n):
+        # 4b — target path: = BAU through end-of-as-is, then CAGR to T1 then T2 (adjusted block)
         if years[t] <= eay:
-            for r in range(5):
-                tgt_unadj[r, t] = bau[r, t]
-                tgt[r, t] = bau[r, t]
-            continue
-        chosen = [cg1[r] if years[t] <= t1y else cg2[r] for r in range(5)]
-        for r in range(5):
-            tgt_unadj[r, t] = tgt_unadj[r, t - 1] * (1.0 + chosen[r])
-        if not target_adjusted:
-            # Raw CAGR path — no plug, no rescale. Not used by the current workbook (both sectors'
-            # final target rows apply the adjusted block); kept for sheet variants that skip it.
-            for r in range(5):
-                tgt[r, t] = tgt_unadj[r, t]
+            tgt_unadj[:, t] = bau[:, t]; tgt[:, t] = bau[:, t]
         else:
-            # Adjusted block (water r129-133 / sanitation r128-132, same formulas):
-            #   SM (r129)    = unadjusted SM
-            #   Basic (r130) = IF(SUM(unadj Basic..None)=0, total-SM, unadj Basic)
-            #   lower (r131-133) = (total - SM - Basic) × prior-year ADJUSTED lower shares
-            sm = tgt_unadj[0, t]
-            rest = sum(tgt_unadj[r, t] for r in range(1, 5))
-            basic = (total_hh[t] - sm) if rest == 0.0 else tgt_unadj[1, t]
-            remaining = total_hh[t] - sm - basic
-            prior_lower = [tgt[r, t - 1] for r in LOWER]
-            psum = sum(prior_lower)
-            for j, r in enumerate(LOWER):
-                tgt[r, t] = remaining * (prior_lower[j] / psum) if psum > 0 else 0.0
-            tgt[0, t], tgt[1, t] = sm, basic
+            if cg1 is None:                                            # branch off the (new) BAU at end-of-as-is
+                branch = [bau[r, eai] for r in range(5)]
+                cg1 = [((tc1[r] / branch[r]) ** (1.0 / ny1) - 1.0) if branch[r] > 0 and ny1 > 0 else 0.0 for r in range(5)]
+                cg2 = [((tc2[r] / tc1[r]) ** (1.0 / ny2) - 1.0) if tc1[r] > 0 and ny2 > 0 else 0.0 for r in range(5)]
+            chosen = [cg1[r] if years[t] <= t1y else cg2[r] for r in range(5)]
+            for r in range(5):
+                tgt_unadj[r, t] = tgt_unadj[r, t - 1] * (1.0 + chosen[r])
+            if not target_adjusted:
+                for r in range(5):
+                    tgt[r, t] = tgt_unadj[r, t]
+            else:
+                # Adjusted block: SM = unadjusted, Basic = plug (or total−SM when the lower rungs hit 0),
+                # lower rungs = (total − SM − Basic) × prior-year adjusted lower shares.
+                sm = tgt_unadj[0, t]
+                rest = sum(tgt_unadj[r, t] for r in range(1, 5))
+                basic = (total_hh[t] - sm) if rest == 0.0 else tgt_unadj[1, t]
+                remaining = total_hh[t] - sm - basic
+                prior_lower = [tgt[r, t - 1] for r in LOWER]
+                psum = sum(prior_lower)
+                for j, r in enumerate(LOWER):
+                    tgt[r, t] = remaining * (prior_lower[j] / psum) if psum > 0 else 0.0
+                tgt[0, t], tgt[1, t] = sm, basic
 
-    # 4c — opening asset stock (booked at baseline)
-    g149 = bau[0, bi] * cost_sm
-    g153 = bau[1, bi] * cost_basic
-    opening_stock = (g149 + g153) * (1.0 + nonhh_mult)
-
-    # 4d — investment need & financing gap
-    depr = 1.0 / asset_life
-    hh_gap = np.zeros(n); new_capex_total = np.zeros(n); stock = np.zeros(n)
-    replacement = np.zeros(n); total_need = np.zeros(n); financing_gap = np.zeros(n)
-    for t in range(n):
-        ff, pf = ctx['forecast_flag'][t], ctx['perf_flag'][t]
-        gap = max(0.0, tgt[0, t] - bau[0, t])
-        hh_gap[t] = gap
-        # J179 = gap*cost (HH connections) + capex_adder (a per-year treatment/NRW/physical-loss
-        # amount). In WATER this adder = cost × (treat% × NRW% × physical%) ≈ 7,750 mn — NOT
-        # negligible. In SANITATION the analogous term multiplies the HH count, so it is ~0.
+        # 4d — investment need & financing gap (formulas UNCHANGED; only the BAU inputs differ)
+        gap = max(0.0, tgt[0, t] - bau[0, t]); hh_gap[t] = gap
         nc_hh = (gap * cost_sm + capex_adder) if gap > 0 else 0.0
-        nc_total = nc_hh * (1.0 + nonhh_mult)
-        new_capex_total[t] = nc_total
+        nc_total = nc_hh * (1.0 + nonhh_mult); new_capex_total[t] = nc_total
         booked = opening_stock if years[t] == by else 0.0
-        prior_stock = stock[t - 1] if t > 0 else 0.0
         stock[t] = booked + prior_stock + nc_total
-        replacement[t] = prior_stock * depr if pf > 0 else 0.0
         total_need[t] = (nc_total + replacement[t]) if (ff > 0 or pf > 0) else 0.0
         shortfall = total_need[t] - bau_available[t]
         financing_gap[t] = shortfall if ((ff > 0 or pf > 0) and shortfall > 0) else 0.0
@@ -230,6 +247,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         'household_gap': hh_gap.tolist(),
         'new_capex_total': new_capex_total.tolist(),
         'replacement_capex': replacement.tolist(),
+        'bau_replacement_capex': bau_replacement.tolist(),
         'total_investment_need': total_need.tolist(),
         'financing_gap': financing_gap.tolist(),
     }
@@ -244,6 +262,8 @@ def calculate_water_supply(inputs, ctx):
     capex_adder = cost_sm * nrw.nrw_treatment_cost_pct_capex * nrw.nrw_current_pct * nrw.nrw_physical_loss_pct
     full_budget = sector_full_budget(ctx, budget_pct=b.ws_budget_pct_gdp,
         direct_series=b.ws_budget_direct, direct_ongoing=b.ws_budget_direct_ongoing, mode=b.budget_input_mode)
+    # Water capex share of the water budget (workbook G321 = 0.21); falls back to the shared capex%.
+    ws_capex = b.ws_capex_pct if b.ws_capex_pct is not None else b.capex_pct_budget
     res = sector_bau(
         ctx, period=inputs.period,
         pct_start=[sl.pct_serv1_start, sl.pct_serv2_start, sl.pct_serv3_start, sl.pct_serv4_start, sl.pct_serv5_start],
@@ -251,8 +271,8 @@ def calculate_water_supply(inputs, ctx):
         tgt1=[wt.target1_serv1, wt.target1_serv2, wt.target1_serv3, wt.target1_serv4, wt.target1_serv5],
         tgt2=[wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5],
         cost_sm=cost_sm, cost_basic=cost_no_treatment(wc),
-        full_budget=full_budget, capex_pct=b.capex_pct_budget,
-        growth_capex_pct=b.capex_pct_budget,                   # water 4a uses the CAPEX budget (I!313)
+        full_budget=full_budget, capex_pct=ws_capex,
+        growth_capex_pct=ws_capex,                             # water 4a uses the water CAPEX budget (I!326)
         hist_all_proportional=True,                            # water history I!143-147 = all-proportional
         target_adjusted=True,                                  # water targets use the adjusted block r129-133
         planned_list=inputs.planned_investments.ws_planned,

@@ -19,6 +19,8 @@ export default function App() {
   const [subArea, setSubArea] = useState<'urban' | 'rural'>('urban'); // which dataset is being edited when both are on
   const [altInputs, setAltInputs] = useState<Record<string, any>>({});
   const [sectorTab, setSectorTab] = useState<'water' | 'sanitation'>('water');
+  // Which area the BAU graph shows when both Urban & Rural are entered (toggle instead of 3 stacked charts).
+  const [bauChartScope, setBauChartScope] = useState<'national' | 'urban' | 'rural'>('national');
   const [showGuide, setShowGuide] = useState(false);
   const [guideSection, setGuideSection] = useState<string | null>(null);
 
@@ -140,7 +142,7 @@ export default function App() {
     const ssSum = Math.round((st.target1_sserv1 + st.target1_sserv2 + st.target1_sserv3 + st.target1_sserv4 + st.target1_sserv5) * 100);
     if (ssSum !== 100) warnings.push(`Sanitation Target 1 service levels sum to ${ssSum}%, must be 100%`);
     if (st.providers && st.providers.length) {
-      const sanProvSum = Math.round((st.providers.reduce((s: number, p: any) => s + p.share_pct, 0) + (st.onsite_collection_treatment_pct || 0)) * 100);
+      const sanProvSum = Math.round((st.providers.reduce((s: number, p: any) => s + p.share_pct, 0)) * 100);
       if (sanProvSum !== 100) warnings.push(`Sanitation provider shares + on-site sum to ${sanProvSum}%, must be 100%`);
     }
   }
@@ -255,9 +257,12 @@ export default function App() {
         {activeTab <= 2 && (
           <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px' }}>
             {activeTab === 0 ? (
-              <>
+              <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, color: '#312e81' }}>Data entry mode:</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center' }}>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Step 1</span>
+                    How are you entering data?
+                  </span>
                   {([
                     { key: 'urban_rural', label: 'Urban / Rural', tip: 'Enter urban and rural data separately. Include both to produce a national total, or just one to analyse that area on its own.' },
                     { key: 'national', label: 'National', tip: 'This option should only be used if you do not have and cannot estimate urban/rural breakdowns for WSS data and access.' },
@@ -301,7 +306,7 @@ export default function App() {
                     )}
                   </div>
                 )}
-              </>
+              </div>
             ) : (
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {both ? (
@@ -336,14 +341,29 @@ export default function App() {
           <div style={{ flex: '0 1 460px', display: 'flex', minWidth: 0 }}>
             <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
           </div>
-          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0, background: '#fff', borderLeft: '1px solid #e2e8f0' }}>
             {chartScope === 'urban_rural' ? (
-              // Both areas entered: show Urban, Rural, and the National (Urban + Rural) aggregate.
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-                <LiveBAUChart inputsList={[inputs]} sector={sectorTab} scopeLabel="Urban" />
-                <LiveBAUChart inputsList={[altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="Rural" />
-                <LiveBAUChart inputsList={[inputs, altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="National" />
-              </div>
+              // Both areas entered: one chart at a time, switched via a scope toggle (Urban / Rural / National).
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: '#475569', marginRight: 4 }}>View:</span>
+                  {([['national', 'National (Urban + Rural)'], ['urban', 'Urban'], ['rural', 'Rural']] as const).map(([k, l]) => (
+                    <button key={k} onClick={() => setBauChartScope(k)} style={{
+                      padding: '6px 14px', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 12,
+                      fontWeight: bauChartScope === k ? 700 : 500,
+                      background: bauChartScope === k ? '#2563eb' : '#e5e7eb',
+                      color: bauChartScope === k ? '#fff' : '#374151',
+                    }}>{l}</button>
+                  ))}
+                </div>
+                {bauChartScope === 'national' ? (
+                  <LiveBAUChart inputsList={[inputs, altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="National" />
+                ) : bauChartScope === 'urban' ? (
+                  <LiveBAUChart inputsList={[inputs]} sector={sectorTab} scopeLabel="Urban" />
+                ) : (
+                  <LiveBAUChart inputsList={[altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="Rural" />
+                )}
+              </>
             ) : (
               <LiveBAUChart inputsList={[activeInputs]} sector={sectorTab}
                 scopeLabel={inputScope === 'national' ? 'National' : inputScope === 'rural' ? 'Rural' : 'Urban'} />
@@ -367,7 +387,7 @@ export default function App() {
             }}>
               {showGuide ? '✕ Close' : '📋 Guide'}
             </button>
-            {showGuide && <DataGuide tab={activeTab} activeSection={guideSection} />}
+            {showGuide && <DataGuide tab={activeTab} activeSection={guideSection} onSelectSection={setGuideSection} />}
           </>
         )}
 
@@ -491,7 +511,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>Data Inputs</strong> — In <em>Country, Region &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates and choose how to provide the WSS budget (as % of GDP or directly year-by-year). Then complete the year-by-year table, which covers economic data (GDP, inflation, exchange rate), demographics (population, households), budget &amp; execution, and historical water and sanitation service levels. Growth rates, household size, and execution rates are calculated for you. Forecast-year service levels are derived from your BAU targets. The BAU data entry also appears further down this tab, where you select Water Supply or Sanitation to fill each sector.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections, which are <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, <em>Planned Investments</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
+              <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections, which are <em>Targets</em> (service-level shares for the target years), <em>Unit Costs</em>, and <em>Technical Parameters</em>. These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation. Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
@@ -750,12 +770,12 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_unit_costs: {
     title: 'Water Supply Unit Costs',
-    content: "Enter the capital cost per household to connect to the distribution network at each service level (except No Service). Also, enter the cost per MLD of water treatment and costs for non-piped solutions. All costs should be in real terms at the base year price level. You can use costs for each distribution network and water treatment from the utility's data, and average prices for non-piped solutions from web search.",
+    content: "Enter the capital cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average prices for individual technologies from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   san_unit_costs: {
     title: 'Sanitation Supply Unit Costs',
-    content: "Enter sewerage cost per household at each service level and the on-site facility capex. All costs should be in real terms at the base year price level. You can use costs for each distribution network from the utility's data, and average costs for on-site solutions from a web search.",
+    content: "Enter the sewerage cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average costs for on-site solutions from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   planned_investments: {
@@ -763,9 +783,17 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     content: 'If there are programmed investments that are additional to historical spending trends — with financing secured and genuinely likely to proceed — enter them here by period. These represent a shift from BAU that we are confident will happen. Select the period length and enter planned water supply and sanitation investments per period.',
     sources: [{ name: 'Government budget documents / MTEF', url: '#' }],
   },
-  technical: {
-    title: 'Technical Parameters',
-    content: 'Enter infrastructure parameters: asset useful life, non-household water share, treatment capacity (existing and planned), WHO water requirements, and the wastewater factor. Treatment capacity figures should come from utility records or feasibility studies.',
+  ws_technical: {
+    title: 'Water Supply Technical Parameters',
+    content: 'Enter the water-supply infrastructure parameters that feed the calculation: the asset useful life (which drives the replacement/depreciation capex), the non-household share of water (which scales the total capex above the household capex), and the non-revenue-water factors that feed the BAU new-capex adder.',
+    sources: [
+      { name: 'WHO water requirements guideline', url: 'https://www.who.int/publications/i/item/9789241548151' },
+      { name: 'IBNET', url: 'https://www.ib-net.org/' },
+    ],
+  },
+  san_technical: {
+    title: 'Sanitation Technical Parameters',
+    content: 'Enter the sanitation infrastructure parameters that feed the calculation: the asset useful life (which drives the replacement/depreciation capex) and the non-household share of wastewater (which scales the total capex above the household capex).',
     sources: [
       { name: 'WHO water requirements guideline', url: 'https://www.who.int/publications/i/item/9789241548151' },
       { name: 'IBNET', url: 'https://www.ib-net.org/' },
@@ -816,14 +844,14 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 // Which guide sections belong to each tab (only these show in that tab's Guide panel)
 const guideKeysByTab: Record<number, string[]> = {
   // Data Inputs — includes the BAU data entry duplicated onto this tab
-  0: ['country', 'macro', 'ws_service_levels', 'san_service_levels', 'ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
+  0: ['country', 'macro', 'ws_service_levels', 'san_service_levels', 'ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'ws_technical', 'san_technical'],
   // BAU Scenario
-  1: ['ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'planned_investments', 'technical'],
+  1: ['ws_targets', 'san_targets', 'ws_unit_costs', 'san_unit_costs', 'ws_technical', 'san_technical'],
   // Intervention Design
   2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
 };
 
-function DataGuide({ tab, activeSection }: { tab: number; activeSection: string | null }) {
+function DataGuide({ tab, activeSection, onSelectSection }: { tab: number; activeSection: string | null; onSelectSection?: (key: string) => void }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const activeRef = React.useRef<HTMLDivElement>(null);
 
@@ -845,22 +873,27 @@ function DataGuide({ tab, activeSection }: { tab: number; activeSection: string 
         Guide
       </h3>
       <div style={{ fontSize: 10, color: '#64748b', marginBottom: 12 }}>
-        Click on any input section to see guidance here.
+        Click any input section on the left — or any card below — to see its guidance.
       </div>
 
       {allKeys.map(key => {
         const g = contextualGuide[key];
         const isActive = activeSection === key;
+        const select = () => onSelectSection?.(isActive ? '' : key);   // click active card again to collapse
         return (
-          <div key={key} ref={isActive ? activeRef : undefined} style={{
-            marginBottom: 10, padding: '8px 10px', borderRadius: 6,
-            background: isActive ? '#eef2ff' : '#fff',
-            border: isActive ? '2px solid #2563eb' : '1px solid #e5e7eb',
-            transition: 'all 0.3s',
-          }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#1e40af' : '#475569', marginBottom: 4 }}>
-              {isActive && <span style={{ color: '#2563eb', marginRight: 4 }}>▶</span>}
-              {g.title}
+          <div key={key} ref={isActive ? activeRef : undefined}
+            onClick={select} role="button" tabIndex={0}
+            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(); } }}
+            title={isActive ? 'Click to collapse' : 'Click to read this guidance'}
+            style={{
+              marginBottom: 10, padding: '8px 10px', borderRadius: 6, cursor: 'pointer',
+              background: isActive ? '#eef2ff' : '#fff',
+              border: isActive ? '2px solid #2563eb' : '1px solid #e5e7eb',
+              transition: 'all 0.3s',
+            }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: isActive ? '#1e40af' : '#475569', marginBottom: 4, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>{isActive && <span style={{ color: '#2563eb', marginRight: 4 }}>▶</span>}{g.title}</span>
+              {!isActive && <span style={{ color: '#94a3b8', fontSize: 13, fontWeight: 400 }}>›</span>}
             </div>
             {isActive && (
               <>

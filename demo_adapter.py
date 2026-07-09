@@ -38,10 +38,12 @@ _SAN_T1 = [0.66,0.34,0,0,0]
 _SAN_T2 = [1,0,0,0,0]
 _WS_COST_SM, _WS_COST_BASIC = 96878.0, 86875.59308914324
 _SAN_COST_SM = 105050.23373368701
-_WS_BUDGET_PCT, _SAN_BUDGET_PCT = 0.0016496186144332283, 0.0004178609445049989
+_WS_BUDGET_PCT, _SAN_BUDGET_PCT = 0.0016496186144332283, 0.0004  # san %GDP = final.xlsx G331
 # GDP-derived real budget 2011-2030 (real GDP x %GDP) — the seamless direct-entry default.
 _WS_BUDGET_DIRECT = [6499.543652769706, 6878.455752682857, 7004.910275298227, 6869.917578680842, 7181.824137317749, 6890.668861747498, 7551.61681596089, 8706.00809507662, 8846.447991197832, 8582.986824519227, 9127.766789271474, 10171.857267441954, 9858.69894610241, 10058.228475636557, 10363.749934479772, 10884.000000000005, 11701.58672000642, 12559.776877555345, 13475.800452242762, 14451.860633584014]
-_SAN_BUDGET_DIRECT = [1646.3838525069891, 1742.3651699877457, 1774.3970625686513, 1740.2023855589002, 1819.210689689914, 1745.4588434250131, 1912.8819883870049, 2205.2980814154935, 2240.872575499119, 2174.135857699329, 2312.132767183153, 2576.6088282191704, 2497.2834430727976, 2547.825790824143, 2625.2167006027853, 2757.0, 2964.100935966343, 3181.487031552744, 3413.522771667886, 3660.7662409767645]
+# Sanitation direct-entry default = real GDP × sanitation %GDP, DERIVED from the water series (real GDP =
+# _WS_BUDGET_DIRECT ÷ _WS_BUDGET_PCT) so it stays consistent with %GDP mode when _SAN_BUDGET_PCT changes.
+_SAN_BUDGET_DIRECT = [g * (_SAN_BUDGET_PCT / _WS_BUDGET_PCT) for g in _WS_BUDGET_DIRECT]
 _START_YR, _BASE_YR, _END_YR = 2011, 2025, 2040
 _NYEARS = _END_YR - _START_YR + 1                       # 30
 _BASE_IDX = _BASE_YR - _START_YR                        # 14
@@ -83,6 +85,9 @@ def frontend_defaults() -> dict:
         'macro': {
             'ws_budget_pct_gdp': _WS_BUDGET_PCT, 'san_budget_pct_gdp': _SAN_BUDGET_PCT,
             'capex_pct_budget': 0.21,
+            # Per-sector capex share of budget — water and sanitation differ in the workbook
+            # (excel2 I|General Urban: water G321 = 21%, sanitation G328 = 15%).
+            'ws_capex_pct': 0.21, 'san_capex_pct': 0.15,
             'execution_rate': 1.0,
             'budget_input_mode': 'pct_gdp',
             'gdp_nominal_usd': _GDP_USD,                      # hard values only; tail projected at growth
@@ -97,14 +102,10 @@ def frontend_defaults() -> dict:
         'sanitation_service': {f'sserv{i+1}_ts': _svc_series(_SAN_START[i], _SAN_BASE[i]) for i in range(5)},
         'water_targets': {**{f'target1_serv{i+1}': _WS_T1[i] for i in range(5)},
                           **{f'target2_serv{i+1}': _WS_T2[i] for i in range(5)},
-                          'providers': [], 'planned_treatment_capacity_mld': 510.0},
+                          'providers': []},
         'sanitation_targets': {**{f'target1_sserv{i+1}': _SAN_T1[i] for i in range(5)},
-                               **{f'target2_sserv{i+1}': _SAN_T2[i] for i in range(5)},
-                               'onsite_collection_treatment_pct': 0.0},
+                               **{f'target2_sserv{i+1}': _SAN_T2[i] for i in range(5)}},
         'water_costs': {'network_cost_per_hh_serv1': _WS_COST_SM, 'network_cost_per_hh_serv2': _WS_COST_BASIC,
-                        'network_cost_per_hh_serv3': 0.0, 'network_cost_per_hh_serv4': 0.0,
-                        'ws_cost_per_mld_treatment': 0.0, 'dug_well_cost': 52713.0,
-                        'borehole_cost': 400000.0, 'hh_treatment_system_cost': 8000.0,
                         # technology-mix calculators (Test Harness tab): weighted Σ(share×cost) is
                         # written through to the serv1/serv2 cost fields the engine consumes.
                         'sm_tech_mix': [
@@ -118,8 +119,6 @@ def frontend_defaults() -> dict:
                             {'name': 'Water tanker', 'share': 0.10, 'cost': 96878.0},
                             {'name': 'Borehole + handpump', 'share': 0.10, 'cost': 96877.9308914323}]},
         'sanitation_costs': {'sewer_cost_per_hh_sserv1': _SAN_COST_SM, 'sewer_cost_per_hh_sserv2': _SAN_COST_SM,
-                             'sewer_cost_per_hh_sserv3': 14600.0, 'sewer_cost_per_hh_sserv4': 16500.0,
-                             'onsite_facility_capex': 83000.0,
                              'sm_tech_mix': [
                                  {'name': 'Piped / network', 'share': 0.6570, 'cost': 117290.76671794064},
                                  {'name': 'Septic tank', 'share': 0.3360, 'cost': 83000.0},
@@ -140,19 +139,9 @@ def frontend_defaults() -> dict:
                 # switch is seamless; the user then edits the spent numbers.
                 'ws_budget_ts': list(_WS_BUDGET_DIRECT), 'san_budget_ts': list(_SAN_BUDGET_DIRECT),
                 'ws_expend_ts': list(_WS_BUDGET_DIRECT), 'san_expend_ts': list(_SAN_BUDGET_DIRECT),
-                'ws_budget_ongoing': 0.05, 'san_budget_ongoing': 0.05,
-                'period_mode': 'custom', 'period_unit_years': 5,
-                # the workbook's five 5-year Investment-Plan buckets (I!326-330 / I!338-342)
-                'investment_periods': [
-                    {'start': 2026, 'end': 2030, 'ws_inv': 16223.765355365464, 'san_inv': 17000.0, 'is_custom': True},
-                    {'start': 2031, 'end': 2035, 'ws_inv': 14005.46734156549,  'san_inv': 12000.0, 'is_custom': True},
-                    {'start': 2036, 'end': 2040, 'ws_inv': 9306.350838959635,  'san_inv': 11000.0, 'is_custom': True},
-                    {'start': 2041, 'end': 2045, 'ws_inv': 4817.250716358515,  'san_inv': 7000.0,  'is_custom': True},
-                    {'start': 2046, 'end': 2050, 'ws_inv': 2717.0869163112056, 'san_inv': 5000.0,  'is_custom': True},
-                ]},
-        'technical': {'ws_asset_life': 30, 'ws_non_hh_pct': 0.10, 'ws_existing_treatment_mld': 117.0,
-                      'ws_water_req_who_lpcd': 135, 'san_asset_life': 30, 'san_non_hh_pct': 0.10,
-                      'san_wastewater_factor': 0.8},
+                'ws_budget_ongoing': 0.05, 'san_budget_ongoing': 0.05},
+        'technical': {'ws_asset_life': 30, 'ws_non_hh_pct': 0.10,
+                      'san_asset_life': 30, 'san_non_hh_pct': 0.10},
         'water_interventions': _default_ws_intervention(),
         'sanitation_interventions': _default_san_intervention(),
         'toggles': {k: False for k in [
@@ -287,6 +276,9 @@ def to_engine(fe: dict) -> ModelInputs:
         ws_budget_pct_gdp=macro.get('ws_budget_pct_gdp', _WS_BUDGET_PCT),
         san_budget_pct_gdp=macro.get('san_budget_pct_gdp', _SAN_BUDGET_PCT),
         capex_pct_budget=macro.get('capex_pct_budget', 0.21),
+        # Per-sector capex share; None -> engine falls back to capex_pct_budget (legacy payloads).
+        ws_capex_pct=macro.get('ws_capex_pct'),
+        san_capex_pct=macro.get('san_capex_pct'),
         # Shared budget execution rate (%GDP mode): actual capex = allocated × this. Default 1.0.
         execution_rate=macro.get('execution_rate', 1.0),
         # direct-entry budget: 'actual expenditure' series drives the model (real terms, full budget)

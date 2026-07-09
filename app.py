@@ -188,6 +188,33 @@ def export_xlsx(inputs: dict = Body(...)):
     )
 
 
+@app.post("/api/template/xlsx")
+def template_xlsx(inputs: dict = Body(...)):
+    """Download a pre-filled, colour-coded Excel template of the year-by-year input table."""
+    from excel_io import build_template
+    out = build_template(inputs)
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename="wss_input_template.xlsx"'},
+    )
+
+
+@app.post("/api/import/xlsx")
+def import_xlsx(payload: dict = Body(...)):
+    """Parse a filled template (base64-encoded xlsx) and overlay its editable cells onto the
+    posted inputs. Body: { "file_b64": <str>, "inputs": <frontend-shaped dict> }.
+    Returns { "inputs": <merged dict>, "cellsUpdated": <int> } or { "error": <str> }."""
+    import base64
+    from excel_io import parse_template
+    try:
+        raw = base64.b64decode(payload.get('file_b64', ''))
+        merged, changed = parse_template(raw, payload.get('inputs') or {})
+        return {"inputs": merged, "cellsUpdated": changed}
+    except Exception as e:  # surface a readable message to the UI rather than a 500
+        return {"error": str(e)}
+
+
 @app.get("/api/health")
 def health():
     return {"status": "ok"}
