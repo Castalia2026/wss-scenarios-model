@@ -68,7 +68,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
             // Split so the pre-performance-start portion draws dotted and the rest solid (two <Line>s below).
             'Target (before performance start)': y <= perfStart ? tgtC : null,
             'Target (safely managed)': y >= perfStart ? tgtC : null,
-            'HH gap (target − BAU)': gap,
+            // Gap only exists once the target diverges from BAU — start the line at the performance-start year.
+            'HH gap (target − BAU)': y >= perfStart ? gap : null,
           };
         });
         setData(rows);
@@ -297,7 +298,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
               <LabelList content={endpointLabel} />
             </Line>
             {/* HH gap — orange line (target − BAU, safely managed) */}
-            <Line type="monotone" dataKey="HH gap (target − BAU)" stroke="#f97316" strokeWidth={2} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="5 3" />
+            <Line type="monotone" dataKey="HH gap (target − BAU)" stroke="#f97316" strokeWidth={2} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="5 3" connectNulls={false} />
             {/* Horizontal reference line at each target's safely-managed level */}
             {targetLines.map((t, i) => (
               <ReferenceLine key={i} y={isShare ? t.yShare : t.y} stroke="#16a34a" strokeDasharray="2 4" ifOverflow="extendDomain"
