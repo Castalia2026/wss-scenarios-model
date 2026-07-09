@@ -94,24 +94,6 @@ export default function TestHarness({ inputs, onChange }: Props) {
   const tgtKey = (t: 1 | 2, i: number) => sector === 'water' ? `target${t}_serv${i}` : `target${t}_sserv${i}`;
   const tgtAt = (t: 1 | 2, i: number) => (inputs?.[tgtSection]?.[tgtKey(t, i)]) || 0;
 
-  // Planned investment periods — the SAME bau.investment_periods array the Data Inputs page
-  // ("10. BAU Investment") edits: per-period start/end years and WS/SAN amounts.
-  const periods: any[] = inputs?.bau?.investment_periods || [];
-  const plannedTotal = (k: 'ws_inv' | 'san_inv') => periods.reduce((a, p) => a + (+p[k] || 0), 0);
-  const setPeriods = (arr: any[]) =>
-    onChange({ ...inputs, bau: { ...(inputs?.bau || {}), period_mode: 'custom', investment_periods: arr } });
-  const setPeriod = (idx: number, field: string, v: number) => {
-    const arr = periods.map((p, i) => i === idx ? { ...p, [field]: v } : p);
-    setPeriods(arr);
-  };
-  const addPeriod = () => {
-    const lastEnd = periods.length ? Math.max(...periods.map((p: any) => +p.end || 0)) : (per.baseline_year || 2025);
-    const start = lastEnd + 1;
-    setPeriods([...periods, { start, end: Math.min(start + 4, (per.forecast_end_year || 2040) + 10), ws_inv: 0, san_inv: 0, is_custom: true }]);
-  };
-  const rmPeriod = (idx: number) => setPeriods(periods.filter((_, i) => i !== idx));
-  const overlaps = (p: any, i: number) => periods.some((q, j) => j !== i && +p.start <= +q.end && +q.start <= +p.end);
-
   // Technology-mix calculators — Σ(share × cost) per rung, WRITTEN THROUGH to the weighted
   // SM/Basic cost fields the engine consumes (water_costs.network_cost_per_hh_serv1/2,
   // sanitation_costs.sewer_cost_per_hh_sserv1/2), which are the same fields as Data Inputs.
@@ -272,47 +254,6 @@ export default function TestHarness({ inputs, onChange }: Props) {
         <ArrField label="Total households (millions)" value={pop.hh_ts || []} onCommit={a => setIn('population', 'hh_ts', a)}
           note="Baseline year onward projected at mean historical household growth." />
         <ArrField label="Total population (millions)" value={pop.pop_ts || []} onCommit={a => setIn('population', 'pop_ts', a)} />
-
-        <h3 style={h3Style}>Planned investment periods (LCU M)</h3>
-        <div style={{ fontSize: 9.5, color: '#64748b', marginBottom: 4 }}>
-          Same periods as the Data Inputs tab ("BAU Investment"). Annual planned = Σ all periods ÷ (Target 2 − baseline), matching the workbook.
-        </div>
-        <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ color: '#64748b' }}>
-              <th style={{ textAlign: 'left' }}>start</th><th style={{ textAlign: 'left' }}>end</th>
-              <th>WS invest.</th><th>SAN invest.</th><th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {periods.map((p: any, i: number) => {
-              const bad = overlaps(p, i);
-              return (
-                <tr key={i} style={{ background: bad ? '#fef2f2' : undefined }}>
-                  <td><input type="number" style={{ ...inStyle, width: 62, padding: '3px 5px' }} value={p.start ?? 0}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setPeriod(i, 'start', v); }} /></td>
-                  <td><input type="number" style={{ ...inStyle, width: 62, padding: '3px 5px' }} value={p.end ?? 0}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setPeriod(i, 'end', v); }} /></td>
-                  <td><input type="number" style={{ ...inStyle, width: 92, padding: '3px 5px' }} value={p.ws_inv ?? 0}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setPeriod(i, 'ws_inv', v); }} /></td>
-                  <td><input type="number" style={{ ...inStyle, width: 92, padding: '3px 5px' }} value={p.san_inv ?? 0}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setPeriod(i, 'san_inv', v); }} /></td>
-                  <td><button type="button" onClick={() => rmPeriod(i)} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>✕</button></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {periods.some((p: any, i: number) => overlaps(p, i)) &&
-          <div style={{ fontSize: 10, color: '#dc2626', fontWeight: 600 }}>⚠ Periods overlap — investments would be double-counted</div>}
-        <button type="button" onClick={addPeriod} style={{ margin: '4px 0', padding: '4px 10px', fontSize: 11, border: '1px dashed #0073A8', background: '#fff', color: '#0073A8', borderRadius: 5, cursor: 'pointer' }}>+ Add period</button>
-        <div style={{ fontSize: 10.5, color: '#0073A8' }}>
-          Σ WS = <b>{plannedTotal('ws_inv').toLocaleString(undefined, { maximumFractionDigits: 1 })}</b>
-          {' '}· Σ SAN = <b>{plannedTotal('san_inv').toLocaleString(undefined, { maximumFractionDigits: 1 })}</b>
-          {' '}· annual = Σ ÷ {(per.target2_year || 2040) - (per.baseline_year || 2025)} yrs
-          {' '}→ WS <b>{(plannedTotal('ws_inv') / Math.max(1, (per.target2_year || 2040) - (per.baseline_year || 2025))).toLocaleString(undefined, { maximumFractionDigits: 1 })}</b>
-          {' '}/ SAN <b>{(plannedTotal('san_inv') / Math.max(1, (per.target2_year || 2040) - (per.baseline_year || 2025))).toLocaleString(undefined, { maximumFractionDigits: 1 })}</b> per yr
-        </div>
 
         <h3 style={h3Style}>{sector === 'water' ? 'Water' : 'Sanitation'} — service levels (% of HHs)</h3>
         <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>

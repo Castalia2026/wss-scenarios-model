@@ -19,7 +19,7 @@ Structure notes:
 """
 
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -219,9 +219,14 @@ class SanitationUnitCosts(BaseModel):
 # WSS budget  (contract #96-#98)
 # ──────────────────────────────────────────────────────────────────────────
 class WSSBudgetInputs(BaseModel):
-    capex_pct_budget: float = 0.21          # #96 capex as % of total budget
-    ws_budget_pct_gdp: float = 0.0016496186144332283   # #97 water supply budget as % of GDP (sheet G311)
-    san_budget_pct_gdp: float = 0.0004178609445049989  # #98 sanitation budget as % of GDP (sheet G316)
+    capex_pct_budget: float = 0.21          # #96 capex as % of total budget (shared fallback / legacy)
+    # Per-sector capex share of that sector's budget. Water and sanitation carry DIFFERENT capex
+    # fractions in the workbook (excel2 I|General Urban: water G321 = 0.21, sanitation G328 = 0.15).
+    # If None, the sector falls back to capex_pct_budget (backward-compatible with old payloads).
+    ws_capex_pct: Optional[float] = None    # water capex as % of water budget  (sheet G321)
+    san_capex_pct: Optional[float] = None   # sanitation capex as % of sanitation budget (sheet G328)
+    ws_budget_pct_gdp: float = 0.0016496186144332283   # #97 water supply budget as % of GDP (sheet G324)
+    san_budget_pct_gdp: float = 0.0004  # #98 sanitation budget as % of GDP (final.xlsx sheet G331)
     # Budget execution rate (%GDP mode only): the share of the ALLOCATED capex budget that is
     # actually spent. actual capex = allocated (%GDP × real GDP × %capex) × execution_rate. A single
     # rate shared by both sectors. 1.0 = full execution (reproduces the pre-execution-rate results).
