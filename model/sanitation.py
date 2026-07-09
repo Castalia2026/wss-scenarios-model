@@ -8,12 +8,13 @@ targets, costs, budget %, planned spend). The sanitation-specific divergences
 the sanitation sheet spec — there is no NRW concept here, so the new-capex adder is 0.
 """
 
-from .water_supply import sector_bau, sector_full_budget, cost_with_treatment, cost_no_treatment
+from .water_supply import sector_bau, sector_full_budget, cost_with_treatment, cost_no_treatment, _target_points
 
 
 def calculate_sanitation(inputs, ctx):
     sl, st, sc = inputs.sanitation_service, inputs.sanitation_targets, inputs.sanitation_costs
     b = inputs.wss_budget
+    src = getattr(b, 'budget_source', None) or b.budget_input_mode
     cost_sm = cost_with_treatment(sc)
     # 4d adder (sheet r178 = gap*cost + G166*(treat%*NRW%*phys%)). Unlike water — which multiplies the
     # COST (r179 = ...+G168*factors ≈ 7,750) — sanitation multiplies G166 = I!G174 = the BASELINE SM
@@ -33,6 +34,7 @@ def calculate_sanitation(inputs, ctx):
         pct_base=[sl.pct_sserv1_baseline, sl.pct_sserv2_baseline, sl.pct_sserv3_baseline, sl.pct_sserv4_baseline, sl.pct_sserv5_baseline],
         tgt1=[st.target1_sserv1, st.target1_sserv2, st.target1_sserv3, st.target1_sserv4, st.target1_sserv5],
         tgt2=[st.target2_sserv1, st.target2_sserv2, st.target2_sserv3, st.target2_sserv4, st.target2_sserv5],
+        targets=_target_points(st, inputs.period),
         cost_sm=cost_sm, cost_basic=cost_no_treatment(sc),
         full_budget=full_budget, capex_pct=san_capex,
         growth_capex_pct=1.0,   # sanitation 4a SM growth uses the sanitation capex budget (I!333)
@@ -47,6 +49,7 @@ def calculate_sanitation(inputs, ctx):
         capex_adder=capex_adder,
         # Shared execution rate (%GDP mode only); direct mode is already actual spend, so 1.0.
         execution_rate=(b.execution_rate if b.budget_input_mode == 'pct_gdp' else 1.0),
+        budget_source=src, budget_override=b.san_budget_direct, gdp_real=ctx['gdp_real_local'],
     )
     res['sector'] = 'sanitation'
     return res

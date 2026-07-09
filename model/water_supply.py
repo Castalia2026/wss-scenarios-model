@@ -67,7 +67,8 @@ def _planned_annual(planned_list, years, baseline_year, target2_year):
 
 def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_basic,
                full_budget, capex_pct, growth_capex_pct, planned_list, nonhh_pct, asset_life, capex_adder,
-               hist_all_proportional, target_adjusted, execution_rate=1.0):
+               hist_all_proportional, target_adjusted, execution_rate=1.0,
+               targets=None, budget_source='pct_gdp', budget_override=None, gdp_real=None):
     """Shared 4a-4d core. All HH and money values are in MILLIONS; costs in actual currency.
 
     `full_budget` is the sector's FULL budget per year in real terms, from EITHER %GDP mode
@@ -86,18 +87,12 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
 
     nonhh_mult = nonhh_pct / (1.0 - nonhh_pct) if nonhh_pct < 1.0 else 0.0
     active = np.maximum(ctx['forecast_flag'], ctx['perf_flag'])
-    full_budget = np.asarray(full_budget, dtype=float)
-    # Execution rate scales ALLOCATED capex down to what is actually SPENT (%GDP mode). At 1.0 this
-    # is a no-op, reproducing the pre-execution-rate results.
     exec_rate = float(execution_rate)
-    capex_budget = active * full_budget * capex_pct * exec_rate                      # capex actually spent
     planned_annual = np.zeros(n)                                                     # planned investment removed from the model
-    bau_available = capex_budget                                                     # BAU investment = the capex budget
-    # Display-only series (ALL years, unmasked by the active flag): the allocated capex the formula
-    # implies each year, and the actual capex after execution. The engine only *spends* in forecast
-    # years (active), but these rows show the %GDP × GDP × %capex figure the user entered.
-    allocated_capex = full_budget * capex_pct
-    actual_capex = allocated_capex * exec_rate
+    full_budget_in = full_budget                                                     # raw pct_gdp/direct budget (unused by from_cost)
+    # Budget (capex_budget / bau_available / allocated / actual) is finalised AFTER the 4a history
+    # block below — the 'from_cost' source derives the historical budget from the historical household
+    # counts, which must be computed first. See "Budget finalisation" further down.
 
     # Historical CAGR per rung (on HH counts, start -> baseline)
     n_hist = by - msy
@@ -128,16 +123,56 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                 bau[r, t] = unadj[r] * scale
             bau[0, t] = unadj[0]
             bau[1, t] = total_hh[t] - unadj[0] - sum(bau[r, t] for r in LOWER)
+    # ── Budget finalisation ──────────────────────────────────────────────────────────────────────
+    # capex_budget = the capex actually SPENT each forecast year (the BAU investment that funds new
+    # connections). For pct_gdp/direct this is full_budget × %capex × execution. For 'from_cost' the
+    # budget IS the capital investment, so no further %capex split applies (capex%/execution = 1).
+    if budget_source == 'from_cost':
+        gdp = np.asarray(gdp_real if gdp_real is not None else ctx['gdp_real_local'], dtype=float)
+        # Historical budget = cost of the NEW connections added that year (Safely-managed + Basic),
+        # floored per rung at 0 (a shrinking rung is not refunded).
+        hist_budget = np.zeros(n)
+        for t in range(1, bi + 1):
+            d_sm = max(0.0, bau[0, t] - bau[0, t - 1])
+            d_basic = max(0.0, bau[1, t] - bau[1, t - 1])
+            hist_budget[t] = d_sm * cost_sm + d_basic * cost_basic
+        ratios = [hist_budget[t] / gdp[t] for t in range(1, bi + 1) if gdp[t] > 0 and hist_budget[t] > 0]
+        ratio = float(np.mean(ratios)) if ratios else 0.0                            # mean historical budget/GDP
+        ov = np.asarray(budget_override, dtype=float) if (budget_override is not None and len(budget_override)) else np.zeros(0)
+        full_budget = np.zeros(n)
+        for t in range(n):
+            o = ov[t] if t < len(ov) else 0.0
+            if o > 0:
+                full_budget[t] = o                                                   # user override (any year)
+            elif t <= bi:
+                full_budget[t] = hist_budget[t]                                       # historical: from cost
+            else:
+                full_budget[t] = ratio * gdp[t] if gdp[t] > 0 else 0.0                # forecast: ratio × real GDP
+        capex_pct_eff, exec_eff = 1.0, 1.0
+    else:
+        full_budget = np.asarray(full_budget_in, dtype=float)
+        capex_pct_eff, exec_eff = capex_pct, float(exec_rate)
+    capex_budget = active * full_budget * capex_pct_eff * exec_eff                    # capex actually spent
+    bau_available = capex_budget                                                      # BAU investment = the capex budget
+    allocated_capex = full_budget * capex_pct_eff                                     # display (all years)
+    actual_capex = allocated_capex * exec_eff
+
     # Forecast keeps a SELF-CONTAINED unadjusted series (sheet r36-40): each rung compounds from its
     # OWN prior unadjusted value (NOT the rescaled/adjusted prior), seeded at the baseline from the
     # adjusted baseline counts. SM accumulates the budget-funded increase; the others grow at CAGR.
     # The adjusted row (r45-49) is then derived each year: SM kept, lower × total/Σunadj, Basic = plug.
-    # 4b prep — target COUNTS at T1 / T2 (independent of the BAU path)
+    # 4b prep — target boundary points. test2: ANY number of targets (a sorted list of (year, [5
+    # shares])); falls back to the two target1/target2 sets when no list is supplied. Each boundary's
+    # COUNTS = that year's total households × share; the path CAGRs between consecutive boundaries.
     eai = int(eay - msy)
-    t1i, t2i = int(t1y - msy), int(t2y - msy)
-    tc1 = [total_hh[t1i] * tgt1[r] for r in range(5)]
-    tc2 = [total_hh[t2i] * tgt2[r] for r in range(5)]
-    ny1, ny2 = t1y - eay, t2y - t1y
+    if targets:
+        tlist = sorted(((int(ty), list(sh)) for ty, sh in targets if int(ty) > eay), key=lambda x: x[0])
+    else:
+        tlist = [tp for tp in [(int(t1y), list(tgt1)), (int(t2y), list(tgt2))] if tp[0] > eay]
+    tgt_years = [ty for ty, _ in tlist]
+    tgt_counts = [[total_hh[int(np.clip(ty - msy, 0, n - 1))] * sh[r] for r in range(5)] for ty, sh in tlist]
+    last_tgt_year = tgt_years[-1] if tgt_years else eay
+    last_shares = tlist[-1][1] if tlist else [0.0, 0.0, 0.0, 0.0, 0.0]
 
     # 4c — opening asset stock (booked at the baseline year)
     opening_stock = (bau[0, bi] * cost_sm + bau[1, bi] * cost_basic) * (1.0 + nonhh_mult)
@@ -166,7 +201,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         bau_stock[t] = booked + (bau_stock[t - 1] if t > 0 else 0.0)
 
     unadj = [bau[r, bi] for r in range(5)]                              # forecast SM accumulates on the baseline count
-    cg1 = cg2 = None
+    seg_cagr = None
     for t in range(bi + 1, n):
         ff, pf = ctx['forecast_flag'][t], ctx['perf_flag'][t]
         prior_stock = stock[t - 1]
@@ -193,15 +228,25 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         # of the target path (driven by bau_available / bau_replacement, not the target-gap stock).
         bau_stock[t] = bau_stock[t - 1] - bau_replacement[t] + bau_available[t]
 
-        # 4b — target path: = BAU through end-of-as-is, then CAGR to T1 then T2 (adjusted block)
-        if years[t] <= eay:
+        # 4b — target path: = BAU through end-of-as-is, then piecewise CAGR through the ordered target
+        # boundaries (test2: any number). Past the last target the target SHARES are held (counts scale
+        # with total HHs). With no targets at all, the target path just equals the BAU path.
+        if years[t] <= eay or not tgt_years:
             tgt_unadj[:, t] = bau[:, t]; tgt[:, t] = bau[:, t]
+        elif years[t] > last_tgt_year:
+            for r in range(5):
+                tgt_unadj[r, t] = total_hh[t] * last_shares[r]
+                tgt[r, t] = total_hh[t] * last_shares[r]
         else:
-            if cg1 is None:                                            # branch off the (new) BAU at end-of-as-is
-                branch = [bau[r, eai] for r in range(5)]
-                cg1 = [((tc1[r] / branch[r]) ** (1.0 / ny1) - 1.0) if branch[r] > 0 and ny1 > 0 else 0.0 for r in range(5)]
-                cg2 = [((tc2[r] / tc1[r]) ** (1.0 / ny2) - 1.0) if tc1[r] > 0 and ny2 > 0 else 0.0 for r in range(5)]
-            chosen = [cg1[r] if years[t] <= t1y else cg2[r] for r in range(5)]
+            if seg_cagr is None:                                       # branch off the (new) BAU at end-of-as-is
+                bpoints = [(eay, [bau[r, eai] for r in range(5)])] + list(zip(tgt_years, tgt_counts))
+                seg_cagr = []
+                for k in range(1, len(bpoints)):
+                    (y0, c0), (y1, c1) = bpoints[k - 1], bpoints[k]
+                    dy = y1 - y0
+                    seg_cagr.append([((c1[r] / c0[r]) ** (1.0 / dy) - 1.0) if (c0[r] > 0 and c1[r] > 0 and dy > 0) else 0.0 for r in range(5)])
+            seg = next((k for k, ty in enumerate(tgt_years) if years[t] <= ty), len(tgt_years) - 1)
+            chosen = seg_cagr[seg]
             for r in range(5):
                 tgt_unadj[r, t] = tgt_unadj[r, t - 1] * (1.0 + chosen[r])
             if not target_adjusted:
@@ -238,7 +283,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         'capex_budget': capex_budget.tolist(),
         'allocated_capex': allocated_capex.tolist(),
         'actual_capex': actual_capex.tolist(),
-        'execution_rate': exec_rate,
+        'execution_rate': exec_eff,
         'planned_annual': planned_annual.tolist(),
         'bau_available': bau_available.tolist(),
         'bau_hh': bau.tolist(),
@@ -253,6 +298,14 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     }
 
 
+def _target_points(tgt_inputs, per):
+    """test2: the target list the engine consumes — an explicit N-target list when present, else the
+    two legacy target1/target2 sets pinned to the period's target years."""
+    if getattr(tgt_inputs, 'targets', None):
+        return [(tp.year, list(tp.shares)) for tp in tgt_inputs.targets]
+    return None
+
+
 def calculate_water_supply(inputs, ctx):
     sl, wt, wc = inputs.water_service, inputs.water_targets, inputs.water_costs
     nrw = inputs.water_interventions
@@ -260,6 +313,7 @@ def calculate_water_supply(inputs, ctx):
     cost_sm = cost_with_treatment(wc)
     # WATER adder (G168 × G173 × G174 × G175): cost × treatment%capex × current-NRW% × physical-loss%
     capex_adder = cost_sm * nrw.nrw_treatment_cost_pct_capex * nrw.nrw_current_pct * nrw.nrw_physical_loss_pct
+    src = getattr(b, 'budget_source', None) or b.budget_input_mode
     full_budget = sector_full_budget(ctx, budget_pct=b.ws_budget_pct_gdp,
         direct_series=b.ws_budget_direct, direct_ongoing=b.ws_budget_direct_ongoing, mode=b.budget_input_mode)
     # Water capex share of the water budget (workbook G321 = 0.21); falls back to the shared capex%.
@@ -270,6 +324,7 @@ def calculate_water_supply(inputs, ctx):
         pct_base=[sl.pct_serv1_baseline, sl.pct_serv2_baseline, sl.pct_serv3_baseline, sl.pct_serv4_baseline, sl.pct_serv5_baseline],
         tgt1=[wt.target1_serv1, wt.target1_serv2, wt.target1_serv3, wt.target1_serv4, wt.target1_serv5],
         tgt2=[wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5],
+        targets=_target_points(wt, inputs.period),
         cost_sm=cost_sm, cost_basic=cost_no_treatment(wc),
         full_budget=full_budget, capex_pct=ws_capex,
         growth_capex_pct=ws_capex,                             # water 4a uses the water CAPEX budget (I!326)
@@ -281,6 +336,7 @@ def calculate_water_supply(inputs, ctx):
         # Execution rate applies only in %GDP mode; in direct mode the entered series is already the
         # actual spend, so execution is 1.0 (no double-count).
         execution_rate=(b.execution_rate if b.budget_input_mode == 'pct_gdp' else 1.0),
+        budget_source=src, budget_override=b.ws_budget_direct, gdp_real=ctx['gdp_real_local'],
     )
     res['sector'] = 'water'
     return res

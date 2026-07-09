@@ -76,10 +76,15 @@ class PeriodInputs(BaseModel):
 # Macroeconomics  (contract #19-#23) — annual time series
 # ──────────────────────────────────────────────────────────────────────────
 class MacroInputs(BaseModel):
+    # test2: REAL GDP in local currency (millions) is now the PRIMARY macro input — entered directly,
+    # so the engine no longer needs nominal-USD / inflation / FX to derive real GDP. Historical values
+    # are hard; blank forecast years are filled at the mean historical growth (or a user override).
+    gdp_real_local: List[float] = []      # real GDP, local currency millions (base-year prices)
     gdp_growth: List[float] = []          # #19 annual real GDP growth, % (historical)
-    gdp_growth_forecast: float = 0.05     # fixed real GDP growth applied to forecast years (after the USD/GDP data ends)
-    gdp_nominal_usd: List[float] = []     # #20 GDP hard values (historical + any forecast years with data); the
-                                          #     tail is projected at gdp_growth_forecast (real terms)
+    gdp_growth_forecast: float = 0.05     # fallback real GDP growth if <2 historical points to average
+    # ── Legacy nominal-USD chain (kept only for backward compatibility / the Test Harness). When
+    #    gdp_real_local is supplied the engine uses it directly and ignores everything below. ──
+    gdp_nominal_usd: List[float] = []     # #20 GDP hard values (historical + any forecast years with data)
     inflation_local_ongoing: float = 0.05    # fixed local inflation for forecast years past the hard series
     inflation_us_ongoing: float = 0.022      # fixed US inflation for forecast years past the hard series
     inflation_local: List[float] = []   # #21 annual local inflation, %
@@ -135,7 +140,19 @@ class SanitationServiceLevelInputs(BaseModel):
 # ──────────────────────────────────────────────────────────────────────────
 # Targets  (contract #46-#66)
 # ──────────────────────────────────────────────────────────────────────────
+class TargetPoint(BaseModel):
+    """test2: one target year and its 5-rung service-level shares (fractions, Σ≈1).
+
+    A target is any forecast year the user fills a full service-level column for. The engine
+    interpolates (piecewise CAGR) between consecutive targets, so ANY number of them is allowed."""
+    year: int
+    shares: List[float] = [0.0, 0.0, 0.0, 0.0, 0.0]
+
+
 class WaterTargetInputs(BaseModel):
+    # test2: N-target list (any number of target years). When non-empty this REPLACES the two
+    # target1/target2 sets below; those remain as a fallback for legacy payloads.
+    targets: List[TargetPoint] = []
     # Target 1 (2030) — % of HHs at each level (#46-#50)
     target1_serv1: float = 0.66
     target1_serv2: float = 0.34
@@ -152,6 +169,7 @@ class WaterTargetInputs(BaseModel):
 
 class SanitationTargetInputs(BaseModel):
     onsite_collection_treatment_pct: float = 0.12   # #56 % on-site sanitation
+    targets: List[TargetPoint] = []                 # test2: N-target list (see WaterTargetInputs)
     # Target 1 (2030) (#57-#61)
     target1_sserv1: float = 0.66
     target1_sserv2: float = 0.34
@@ -231,11 +249,15 @@ class WSSBudgetInputs(BaseModel):
     # actually spent. actual capex = allocated (%GDP × real GDP × %capex) × execution_rate. A single
     # rate shared by both sectors. 1.0 = full execution (reproduces the pre-execution-rate results).
     execution_rate: float = 1.0
-    # Budget source: 'pct_gdp' (full budget = real GDP × %GDP) or 'direct' (enter the actual
-    # expenditure series directly, real terms). In 'direct' mode the *_budget_direct series is the
-    # full sector budget per year; years past the hard values compound at *_budget_direct_ongoing.
+    # Budget source: 'pct_gdp' (full budget = real GDP × %GDP), 'direct' (enter the actual expenditure
+    # series directly, real terms), or 'from_cost' (test2: historical budget = cost of NEW connections
+    # that year = Σ_rung max(0,ΔHH)×unit cost for the Safely-managed + Basic rungs; forecast budget =
+    # avg historical (budget ÷ real GDP) × real GDP, then blank cells filled at mean growth / overridden).
+    # In 'direct' mode the *_budget_direct series is the full sector budget per year; years past the
+    # hard values compound at *_budget_direct_ongoing.
     budget_input_mode: str = 'pct_gdp'
-    ws_budget_direct: List[float] = []
+    budget_source: str = 'pct_gdp'          # test2 alias: 'pct_gdp' | 'direct' | 'from_cost'
+    ws_budget_direct: List[float] = []      # user overrides (direct mode; also per-year overrides in from_cost)
     san_budget_direct: List[float] = []
     ws_budget_direct_ongoing: float = 0.05
     san_budget_direct_ongoing: float = 0.05
