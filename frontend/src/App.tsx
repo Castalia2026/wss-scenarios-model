@@ -299,7 +299,6 @@ export default function App() {
                             fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
                           }}>{a}</button>
                         ))}
-                        <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Graphs &amp; outputs show National (Urban + Rural).</span>
                       </>
                     ) : (
                       <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginLeft: 4 }}>Graphs &amp; outputs show {onlyRural ? 'Rural' : 'Urban'} only.</span>
