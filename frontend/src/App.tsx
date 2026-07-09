@@ -260,7 +260,7 @@ export default function App() {
               <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Step 1</span>
+                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Start here</span>
                     How are you entering data?
                   </span>
                   {([
