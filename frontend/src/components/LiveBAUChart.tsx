@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, LabelList,
+  Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, ReferenceDot, LabelList,
 } from 'recharts';
 import { toPng } from 'html-to-image';
 
@@ -25,12 +25,19 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   const [constrained, setConstrained] = useState<{ avail: number; repl: number; cur: string } | null>(null);
   // Reference lines carry BOTH the absolute (count) and share value so they track the Y-axis unit toggle.
   const [targetLines, setTargetLines] = useState<{ y: number; yShare: number; label: string }[]>([]);
+  // On-chart annotation anchors: one per target year — the target point (chat-box callout) and the
+  // gap-line point (financing-gap flag). These REPLACE the old four KPI cards.
+  const [targetPoints, setTargetPoints] = useState<any[]>([]);
+  // Which flags the user has closed (✕). Keys: `t-<year>` (target callout), `f-<year>` (finance flag).
+  // A closed flag leaves a small marker at its anchor that reopens it on click.
+  const [closedFlags, setClosedFlags] = useState<Set<string>>(new Set());
+  const toggleFlag = (key: string, open: boolean) => setClosedFlags(prev => {
+    const n = new Set(prev); if (open) n.delete(key); else n.add(key); return n;
+  });
   // Y-axis unit: absolute household counts (millions) or share of total households (%).
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
   // Show/hide the per-year data-point dots on the chart.
   const [showDots, setShowDots] = useState(true);
-  // Which target the gap KPI cards report (Target 1 vs Target 2).
-  const [gapTarget, setGapTarget] = useState<'t1' | 't2'>('t1');
   const chartRef = useRef<HTMLDivElement>(null);
 
   const depKey = JSON.stringify(datasets) + '|' + sector;
@@ -74,17 +81,49 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         });
         setData(rows);
 
-        // Horizontal reference line at each target's safely-managed level (Target 1 & Target 2 years)
-        const t1y = per.target1_year || 2030, t2y = per.target2_year || 2040;
-        const refs: { y: number; yShare: number; label: string }[] = [];
-        ([[t1y, 'Target 1'], [t2y, 'Target 2']] as [number, string][]).forEach(([yr, lbl]) => {
-          const ix = years.indexOf(yr);
-          if (ix >= 0) {
-            const yv = +Math.min(total[ix], tgt[ix]).toFixed(4);
-            refs.push({ y: yv, yShare: total[ix] > 0 ? yv / total[ix] : 0, label: `${lbl} (${yr})` });
+        // test2: target years come from the service table — any forecast column whose 5 rung shares
+        // sum to ~100% is a target. Union across areas; fall back to the legacy fixed Target 1/2
+        // years for old payloads that define none in the table.
+        const svcSection = sector === 'water' ? 'water_service' : 'sanitation_service';
+        const svcPrefix = sector === 'water' ? 'serv' : 'sserv';
+        const tgtYearSet = new Set<number>();
+        datasets.forEach((inp: any) => {
+          const svc = inp?.[svcSection] || {};
+          const arrs = [1, 2, 3, 4, 5].map(k => svc[`${svcPrefix}${k}_ts`] || []);
+          const msy = inp?.period?.model_start_year ?? years[0];
+          const by = inp?.period?.baseline_year ?? msy;
+          const end = inp?.period?.forecast_end_year ?? years[years.length - 1];
+          const maxLen = Math.max(0, ...arrs.map((a: any[]) => a.length));
+          for (let idx = 0; idx < maxLen; idx++) {
+            const yr = msy + idx;
+            if (yr <= by || yr > end) continue;
+            let s = 0, any = false;
+            arrs.forEach((a: any[]) => { const v = a[idx]; if (v != null && v > 0) { s += v; any = true; } });
+            if (any && Math.abs(s - 1) < 0.02) tgtYearSet.add(yr);
           }
         });
-        setTargetLines(refs);
+        const t1y = per.target1_year || 2030, t2y = per.target2_year || 2040;
+        const tgtYears = tgtYearSet.size ? [...tgtYearSet].sort((a, b) => a - b)
+          : [t1y, t2y].filter((y, i, arr) => years.includes(y) && arr.indexOf(y) === i);
+        // Per-target anchor + KPI payload for the on-chart flags (all additive across areas).
+        const gapMoneyAt = (yr: number) => { const ix = years.indexOf(yr); return ix >= 0 ? resList.reduce((a, res) => a + (secOf(res).financing_gap[ix] || 0), 0) : null; };
+        const cur0 = datasets[0]?.country_config?.currency || 'LCU';
+        const points = tgtYears.map((yr: number) => {
+          const ix = years.indexOf(yr);
+          if (ix < 0) return null;
+          const tot = total[ix] || 0;
+          const t = Math.min(tot, tgt[ix]), b = Math.min(tot, bau[ix]);
+          const gapHH = Math.max(0, t - b);
+          return {
+            year: yr, cur: cur0,
+            y: +t.toFixed(4), yShare: tot > 0 ? t / tot : 0,                    // target point (callout anchor)
+            gapY: +gapHH.toFixed(4), gapYShare: tot > 0 ? gapHH / tot : 0,      // gap-line point (flag anchor)
+            bauCov: tot > 0 ? b / tot : 0, tgtCov: tot > 0 ? t / tot : 0,
+            svcGap: gapHH, finGap: gapMoneyAt(yr),
+          };
+        }).filter(Boolean) as any[];
+        setTargetPoints(points);
+        setTargetLines(points.map(p => ({ y: p.y, yShare: p.yShare, label: `Target (${p.year})` })));
 
         // Budget-constrained (frozen) detection: if for EVERY forecast year the BAU capex budget is at
         // or below the replacement/depreciation need, new safely-managed connections = max(0, budget −
@@ -97,26 +136,20 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         const avgOf = (arr: number[]) => fcast.reduce((a: number, i: number) => a + (arr[i] || 0), 0) / fcast.length;
         setConstrained(frozen ? { avail: avgOf(availS), repl: avgOf(replS), cur: datasets[0]?.country_config?.currency || 'LCU' } : null);
 
-        // ── Headline KPIs (all additive across areas; same clamping as the chart) ──
+        // ── Headline summary (the per-target KPIs now live in the on-chart flags) ──
         const endIdx = years.length - 1;                       // last year = forecast end
         const totEnd = total[endIdx] || 0;
         const cov = (arr: number[]) => totEnd > 0 ? Math.min(totEnd, arr[endIdx]) / totEnd : 0;
-        const gapAt = (yr: number) => { const ix = years.indexOf(yr); return ix >= 0 ? resList.reduce((a, res) => a + (secOf(res).financing_gap[ix] || 0), 0) : null; };
-        // Per-target coverage / service-gap (used by the Target 1 / Target 2 KPI tabs).
-        const covAt = (arr: number[], yr: number) => { const ix = years.indexOf(yr); return ix >= 0 && total[ix] > 0 ? Math.min(total[ix], arr[ix]) / total[ix] : 0; };
-        const svcGapAt = (yr: number) => { const ix = years.indexOf(yr); return ix >= 0 ? Math.max(0, Math.min(total[ix], tgt[ix]) - Math.min(total[ix], bau[ix])) : 0; };
-        const perTarget = (yr: number) => ({ year: yr, bauCov: covAt(bau, yr), tgtCov: covAt(tgt, yr), svcGap: svcGapAt(yr), finGap: gapAt(yr) });
         const tin = sum((res, i) => (secOf(res).total_investment_need || [])[i] || 0);
         const baseline = per.baseline_year ?? years[0];
         let cumNeed = 0; years.forEach((y: number, i: number) => { if (y > baseline) cumNeed += tin[i] || 0; });
         setSummary({
           costSM: datasets.length === 1 ? secOf(base).cost_per_hh : null,
-          currency: datasets[0]?.country_config?.currency || 'LCU',
+          currency: cur0,
           endline: years[endIdx], baseline, firstForecast: baseline + 1,
           bauCov: cov(bau), tgtCov: cov(tgt),
           gapEnd: Math.max(0, Math.min(totEnd, tgt[endIdx]) - Math.min(totEnd, bau[endIdx])),
-          t1: t1y, gapT1: gapAt(t1y), t2: t2y, gapT2: gapAt(t2y),
-          byTarget: { t1: perTarget(t1y), t2: perTarget(t2y) },
+          firstTgt: points.length ? { year: points[0].year, finGap: points[0].finGap } : null,
           cumNeed,
         });
         setError(null);
@@ -205,6 +238,92 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
     background: '#fff', color: '#475569', cursor: 'pointer', fontWeight: 500,
   };
 
+  // ── On-chart annotations (replace the four KPI cards) ─────────────────────────────────────────
+  // TargetBubble: a chat-box callout with a tail pointing at the target point, closable via ✕.
+  // FinanceFlag: a flag on a pole anchored to the gap line, showing the financing gap for that year.
+  // Both leave a small clickable marker when closed so they can be reopened.
+  const pct1 = (f: number) => (f * 100).toFixed(1) + '%';
+
+  const TargetBubble = (props: any) => {
+    const { cx, cy, point } = props;
+    if (cx == null || cy == null) return null;
+    const key = `t-${point.year}`;
+    if (closedFlags.has(key)) {
+      return (
+        <g onClick={() => toggleFlag(key, true)} style={{ cursor: 'pointer' }}>
+          <title>{`Reopen the Target ${point.year} call-out`}</title>
+          <circle cx={cx} cy={cy} r={8} fill="#fff" stroke="#16a34a" strokeWidth={1.5} />
+          <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={9}>🎯</text>
+        </g>
+      );
+    }
+    const lines = [
+      `Target coverage: ${pct1(point.tgtCov)}`,
+      `BAU coverage: ${pct1(point.bauCov)}`,
+      `Service gap: ${point.svcGap.toFixed(2)} M HH`,
+    ];
+    const w = 142, lineH = 12, h = 22 + lines.length * lineH + 5;
+    const chartW = chartRef.current?.clientWidth || 640;
+    const bx = Math.max(4, Math.min(cx - w / 2, chartW - w - 8));    // clamp inside the chart
+    const above = cy > h + 26;                                       // flip below if too close to the top
+    const by = above ? cy - h - 12 : cy + 12;
+    const tx = Math.max(bx + 12, Math.min(cx, bx + w - 12));         // tail base, kept on the bubble edge
+    const tail = above
+      ? `M ${tx - 6} ${by + h} L ${tx + 6} ${by + h} L ${cx} ${cy - 3} Z`
+      : `M ${tx - 6} ${by} L ${tx + 6} ${by} L ${cx} ${cy + 3} Z`;
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={3.5} fill="#16a34a" stroke="#fff" strokeWidth={1} />
+        <path d={tail} fill="#f0fdf4" stroke="#16a34a" strokeWidth={1} />
+        <rect x={bx} y={by} width={w} height={h} rx={7} fill="#f0fdf4" stroke="#16a34a" strokeWidth={1.2} />
+        <text x={bx + 9} y={by + 15} fontSize={10} fontWeight={700} fill="#15803d">🎯 Target {point.year}</text>
+        {lines.map((t, i) => (
+          <text key={i} x={bx + 9} y={by + 29 + i * lineH} fontSize={9} fill="#334155">{t}</text>
+        ))}
+        <g onClick={() => toggleFlag(key, false)} style={{ cursor: 'pointer' }}>
+          <title>Close</title>
+          <circle cx={bx + w - 11} cy={by + 11} r={7} fill="#fff" stroke="#cbd5e1" />
+          <text x={bx + w - 11} y={by + 14} textAnchor="middle" fontSize={9} fontWeight={700} fill="#64748b">✕</text>
+        </g>
+      </g>
+    );
+  };
+
+  const FinanceFlag = (props: any) => {
+    const { cx, cy, point } = props;
+    if (cx == null || cy == null) return null;
+    const key = `f-${point.year}`;
+    if (closedFlags.has(key)) {
+      return (
+        <g onClick={() => toggleFlag(key, true)} style={{ cursor: 'pointer' }}>
+          <title>{`Reopen the ${point.year} financing-gap flag`}</title>
+          <circle cx={cx} cy={cy} r={8} fill="#fff" stroke="#b91c1c" strokeWidth={1.5} />
+          <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={9}>🚩</text>
+        </g>
+      );
+    }
+    const valTxt = point.finGap == null ? '—' : Math.round(point.finGap).toLocaleString() + ' M ' + point.cur + '/yr';
+    const w = 148, h = 34, poleH = 42;
+    const chartW = chartRef.current?.clientWidth || 640;
+    const rightSide = cx + w + 10 < chartW;                          // banner right of the pole if it fits
+    const bx = rightSide ? cx + 2 : cx - w - 2;
+    const bannerTop = cy - poleH;
+    return (
+      <g>
+        <line x1={cx} y1={cy} x2={cx} y2={bannerTop} stroke="#b91c1c" strokeWidth={1.5} />
+        <circle cx={cx} cy={cy} r={3} fill="#b91c1c" stroke="#fff" strokeWidth={1} />
+        <rect x={bx} y={bannerTop} width={w} height={h} rx={5} fill="#fef2f2" stroke="#b91c1c" strokeWidth={1.2} />
+        <text x={bx + 8} y={bannerTop + 14} fontSize={9.5} fontWeight={700} fill="#b91c1c">🚩 Financing gap · {point.year}</text>
+        <text x={bx + 8} y={bannerTop + 27} fontSize={10} fontWeight={700} fill="#7f1d1d">{valTxt}</text>
+        <g onClick={() => toggleFlag(key, false)} style={{ cursor: 'pointer' }}>
+          <title>Close</title>
+          <circle cx={bx + w - 10} cy={bannerTop + 11} r={7} fill="#fff" stroke="#fca5a5" />
+          <text x={bx + w - 10} y={bannerTop + 14} textAnchor="middle" fontSize={9} fontWeight={700} fill="#b91c1c">✕</text>
+        </g>
+      </g>
+    );
+  };
+
   return (
     <div>
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
@@ -223,38 +342,15 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         const cur = summary.currency;
         const pct = (f: number) => (f * 100).toFixed(1) + '%';
         const money = (v: number | null) => v == null ? '—' : Math.round(v).toLocaleString() + ' M ' + cur;
-        // Cards report the currently-selected target (Target 1 / Target 2 tabs below).
-        const g = summary.byTarget?.[gapTarget] || { year: summary.endline, bauCov: summary.bauCov, tgtCov: summary.tgtCov, svcGap: summary.gapEnd, finGap: summary.gapT1 };
-        const tLabel = gapTarget === 't1' ? 'target 1' : 'target 2';
-        const cards = [
-          { label: `BAU coverage · ${g.year}`, value: pct(g.bauCov), sub: 'safely managed, business-as-usual', color: '#0ea5e9' },
-          { label: `Service coverage target · ${g.year}`, value: pct(g.tgtCov), sub: 'policy target', color: '#16a34a' },
-          { label: `Service gap · ${g.year}`, value: g.svcGap.toFixed(2) + ' M HH', sub: 'households short of target', color: '#f97316' },
-          { label: `Financing gap · ${g.year}`, value: money(g.finGap), sub: `annual, at ${tLabel}`, color: '#b91c1c' },
-        ];
         return (
           <div style={{ marginBottom: 12 }}>
-            {/* Target 1 / Target 2 tabs — switch which target the KPI cards report */}
-            <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden', marginBottom: 8 }}>
-              {([['t1', `Target 1 · ${summary.t1}`], ['t2', `Target 2 · ${summary.t2}`]] as const).map(([m, l]) => (
-                <button key={m} onClick={() => setGapTarget(m)} style={{
-                  padding: '3px 12px', fontSize: 11, border: 'none', cursor: 'pointer',
-                  background: gapTarget === m ? '#2563eb' : '#fff', color: gapTarget === m ? '#fff' : '#475569',
-                  fontWeight: gapTarget === m ? 700 : 500,
-                }}>{l}</button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
-              {cards.map((c, i) => (
-                <div key={i} style={{ flex: '1 1 130px', minWidth: 120, background: '#fff', border: '1px solid #e2e8f0', borderTop: `3px solid ${c.color}`, borderRadius: 8, padding: '8px 10px', boxShadow: '0 1px 2px rgba(0,0,0,0.04)' }}>
-                  <div style={{ fontSize: 10, color: '#64748b', fontWeight: 600, marginBottom: 3 }}>{c.label}</div>
-                  <div style={{ fontSize: 18, fontWeight: 700, color: '#1e293b', lineHeight: 1.1 }}>{c.value}</div>
-                  <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 2 }}>{c.sub}</div>
-                </div>
-              ))}
+            {/* The per-target KPIs (coverage / service gap / financing gap) are now drawn ON the chart:
+                a 🎯 chat-box callout at each target point and a 🚩 financing-gap flag on the gap line. */}
+            <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 6 }}>
+              🎯 Target call-outs and 🚩 financing-gap flags are drawn on the chart — click a flag's ✕ to close it, or click its marker to reopen.
             </div>
             <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #2563eb', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55 }}>
-              <b>Summary.</b> Under business-as-usual, safely-managed {sectorLabel.toLowerCase()} coverage reaches <b>{pct(summary.bauCov)}</b> by {summary.endline}, against a target of <b>{pct(summary.tgtCov)}</b> — a shortfall of <b>{summary.gapEnd.toFixed(2)} M households</b>. Meeting the target needs <b>{Math.round(summary.cumNeed).toLocaleString()} M {cur}</b> cumulatively ({summary.firstForecast}–{summary.endline}); the annual financing gap at {summary.t1} is <b>{money(summary.gapT1)}</b>.
+              <b>Summary.</b> Under business-as-usual, safely-managed {sectorLabel.toLowerCase()} coverage reaches <b>{pct(summary.bauCov)}</b> by {summary.endline}, against a target of <b>{pct(summary.tgtCov)}</b> — a shortfall of <b>{summary.gapEnd.toFixed(2)} M households</b>. Meeting the target needs <b>{Math.round(summary.cumNeed).toLocaleString()} M {cur}</b> cumulatively ({summary.firstForecast}–{summary.endline}){summary.firstTgt ? <>; the annual financing gap at {summary.firstTgt.year} is <b>{money(summary.firstTgt.finGap)}</b></> : null}.
               {summary.costSM != null && <> Weighted safely-managed cost per household: <b>{Math.round(summary.costSM).toLocaleString()} {cur}</b>.</>}
             </div>
           </div>
@@ -303,6 +399,16 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
             {targetLines.map((t, i) => (
               <ReferenceLine key={i} y={isShare ? t.yShare : t.y} stroke="#16a34a" strokeDasharray="2 4" ifOverflow="extendDomain"
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
+            ))}
+            {/* Chat-box call-out at each target point + financing-gap flag on the gap line
+                (these replace the four KPI cards; each closable via ✕, reopenable via its marker) */}
+            {targetPoints.map((p) => (
+              <ReferenceDot key={`ff-${p.year}`} x={p.year} y={isShare ? p.gapYShare : p.gapY} ifOverflow="extendDomain"
+                shape={(sp: any) => <FinanceFlag {...sp} point={p} />} />
+            ))}
+            {targetPoints.map((p) => (
+              <ReferenceDot key={`tb-${p.year}`} x={p.year} y={isShare ? p.yShare : p.y} ifOverflow="extendDomain"
+                shape={(sp: any) => <TargetBubble {...sp} point={p} />} />
             ))}
           </ComposedChart>
         </ResponsiveContainer>
