@@ -431,9 +431,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
           💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed households × Safely-managed unit cost) + (new Basic households × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. You can override any year directly in the <b>budget</b> rows of the table below.
         </div>
-        <F label="Real GDP growth — fallback" value={inputs.macro.gdp_growth_forecast ?? 0.05}
-          onChange={v => u('macro','gdp_growth_forecast',v)} isPercent unit="%"
-          tip="Used to grow real GDP only when there are fewer than two historical GDP values to average from. Otherwise blank GDP years fill at the mean historical growth." />
         <SubHead text="Year-by-year data" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — leave them blank to auto-fill at the mean historical growth (shown in the grey “→ … used” row below each), or type your own projection. For service levels, fill a full forecast column (Σ 100%) to set a <b style={{ color: '#16a34a' }}>🎯 target</b> year. GDP/pop growth and avg household size are auto-calculated.

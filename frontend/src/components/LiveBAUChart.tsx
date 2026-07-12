@@ -34,6 +34,16 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   const toggleFlag = (key: string, open: boolean) => setClosedFlags(prev => {
     const n = new Set(prev); if (open) n.delete(key); else n.add(key); return n;
   });
+  // Multi-select of target YEARS whose call-out + finance flag are drawn at all (the 🎯 Targets
+  // dropdown). null = all targets visible (so newly-added targets show automatically).
+  const [visibleTargets, setVisibleTargets] = useState<Set<number> | null>(null);
+  const [tgtDropOpen, setTgtDropOpen] = useState(false);
+  const isTargetVisible = (yr: number) => !visibleTargets || visibleTargets.has(yr);
+  const toggleTargetVisible = (yr: number, allYears: number[]) => setVisibleTargets(prev => {
+    const n = new Set(prev ?? allYears);          // null (all) -> materialize the full set first
+    if (n.has(yr)) n.delete(yr); else n.add(yr);
+    return n;
+  });
   // Y-axis unit: absolute household counts (millions) or share of total households (%).
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
   // Show/hide the per-year data-point dots on the chart.
@@ -274,8 +284,10 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
     return (
       <g>
         <circle cx={cx} cy={cy} r={3.5} fill="#16a34a" stroke="#fff" strokeWidth={1} />
-        <path d={tail} fill="#f0fdf4" stroke="#16a34a" strokeWidth={1} />
-        <rect x={bx} y={by} width={w} height={h} rx={7} fill="#f0fdf4" stroke="#16a34a" strokeWidth={1.2} />
+        {/* Solid white box + shadow so the chart lines can never show through or clash with the text */}
+        <rect x={bx + 2} y={by + 2.5} width={w} height={h} rx={7} fill="#0f172a" opacity={0.16} />
+        <path d={tail} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />
+        <rect x={bx} y={by} width={w} height={h} rx={7} fill="#ffffff" stroke="#16a34a" strokeWidth={1.4} />
         <text x={bx + 9} y={by + 15} fontSize={10} fontWeight={700} fill="#15803d">🎯 Target {point.year}</text>
         {lines.map((t, i) => (
           <text key={i} x={bx + 9} y={by + 29 + i * lineH} fontSize={9} fill="#334155">{t}</text>
@@ -312,7 +324,9 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
       <g>
         <line x1={cx} y1={cy} x2={cx} y2={bannerTop} stroke="#b91c1c" strokeWidth={1.5} />
         <circle cx={cx} cy={cy} r={3} fill="#b91c1c" stroke="#fff" strokeWidth={1} />
-        <rect x={bx} y={bannerTop} width={w} height={h} rx={5} fill="#fef2f2" stroke="#b91c1c" strokeWidth={1.2} />
+        {/* Solid white banner + shadow so chart lines never show through */}
+        <rect x={bx + 2} y={bannerTop + 2.5} width={w} height={h} rx={5} fill="#0f172a" opacity={0.16} />
+        <rect x={bx} y={bannerTop} width={w} height={h} rx={5} fill="#ffffff" stroke="#b91c1c" strokeWidth={1.4} />
         <text x={bx + 8} y={bannerTop + 14} fontSize={9.5} fontWeight={700} fill="#b91c1c">🚩 Financing gap · {point.year}</text>
         <text x={bx + 8} y={bannerTop + 27} fontSize={10} fontWeight={700} fill="#7f1d1d">{valTxt}</text>
         <g onClick={() => toggleFlag(key, false)} style={{ cursor: 'pointer' }}>
@@ -368,6 +382,34 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           ))}
         </div>
         <button onClick={() => setShowDots(d => !d)} style={{ ...toolBtn, fontWeight: 600, background: showDots ? '#eff6ff' : '#fff', color: showDots ? '#2563eb' : '#475569', borderColor: showDots ? '#93c5fd' : '#cbd5e1' }} title="Show or hide the per-year data-point dots">● Data points: {showDots ? 'on' : 'off'}</button>
+        {/* Multi-select dropdown: which target years' call-outs + finance flags are drawn (declutters
+            the chart when there are many targets). null selection = all visible. */}
+        {targetPoints.length > 0 && (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setTgtDropOpen(o => !o)} title="Choose which targets' call-outs and financing-gap flags are shown on the chart"
+              style={{ ...toolBtn, fontWeight: 600, background: tgtDropOpen ? '#f0fdf4' : '#fff', borderColor: '#86efac', color: '#15803d' }}>
+              🎯 Targets shown: {visibleTargets ? visibleTargets.size : targetPoints.length}/{targetPoints.length} ▾
+            </button>
+            {tgtDropOpen && (<>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setTgtDropOpen(false)} />
+              <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '8px 10px', minWidth: 180 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 6 }}>Show call-out &amp; 🚩 flag for:</div>
+                {targetPoints.map((p) => (
+                  <label key={p.year} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, padding: '3px 2px', cursor: 'pointer', color: '#334155' }}>
+                    <input type="checkbox" checked={isTargetVisible(p.year)}
+                      onChange={() => toggleTargetVisible(p.year, targetPoints.map((q: any) => q.year))}
+                      style={{ accentColor: '#16a34a' }} />
+                    🎯 Target {p.year}
+                  </label>
+                ))}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, borderTop: '1px solid #e2e8f0', paddingTop: 6 }}>
+                  <button onClick={() => setVisibleTargets(null)} style={{ ...toolBtn, padding: '2px 10px', fontSize: 10 }}>All</button>
+                  <button onClick={() => setVisibleTargets(new Set())} style={{ ...toolBtn, padding: '2px 10px', fontSize: 10 }}>None</button>
+                </div>
+              </div>
+            </>)}
+          </div>
+        )}
         <button onClick={exportPng} style={toolBtn} title="Download this graph as a PNG image">⤓ PNG</button>
         <button onClick={exportCsv} style={toolBtn} title="Download the graph's values as CSV">⤓ CSV</button>
       </div>
@@ -401,12 +443,13 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
             ))}
             {/* Chat-box call-out at each target point + financing-gap flag on the gap line
-                (these replace the four KPI cards; each closable via ✕, reopenable via its marker) */}
-            {targetPoints.map((p) => (
+                (these replace the four KPI cards; each closable via ✕, reopenable via its marker;
+                whole target years toggled via the 🎯 Targets dropdown in the toolbar) */}
+            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
               <ReferenceDot key={`ff-${p.year}`} x={p.year} y={isShare ? p.gapYShare : p.gapY} ifOverflow="extendDomain"
                 shape={(sp: any) => <FinanceFlag {...sp} point={p} />} />
             ))}
-            {targetPoints.map((p) => (
+            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
               <ReferenceDot key={`tb-${p.year}`} x={p.year} y={isShare ? p.yShare : p.y} ifOverflow="extendDomain"
                 shape={(sp: any) => <TargetBubble {...sp} point={p} />} />
             ))}
