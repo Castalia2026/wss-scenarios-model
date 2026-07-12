@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
@@ -60,7 +60,6 @@ export default function App() {
 
   // Resolve the scope into the concrete area being edited and what the graphs/outputs should show.
   const both = scopeMode === 'urban_rural' && areaUrban && areaRural;
-  const onlyUrban = scopeMode === 'urban_rural' && areaUrban && !areaRural;
   const onlyRural = scopeMode === 'urban_rural' && !areaUrban && areaRural;
   // inputScope = which single dataset the input forms currently edit ('urban' | 'rural' | 'national')
   const inputScope = scopeMode === 'national' ? 'national'
@@ -88,19 +87,28 @@ export default function App() {
     else setAltInputs(prev => ({ ...prev, [inputScope]: resized }));
   }, [resizeMacroArrays, inputScope]);
 
-  // Toggle whether Urban / Rural is included (at least one must stay on)
-  const toggleArea = (area: 'urban' | 'rural') => {
-    if (area === 'urban') {
-      if (areaUrban && !areaRural) return;          // don't allow turning the last one off
-      const next = !areaUrban;
-      setAreaUrban(next);
-      if (!next && subArea === 'urban') setSubArea('rural');
-    } else {
-      if (areaRural && !areaUrban) return;
-      const next = !areaRural;
-      setAreaRural(next);
-      if (!next && subArea === 'rural') setSubArea('urban');
-    }
+  // Geographical scope as ONE dropdown value: 'both' (Urban + Rural), 'urban', 'rural', 'national'.
+  const scopeValue = scopeMode === 'national' ? 'national' : (areaUrban && areaRural) ? 'both' : areaRural ? 'rural' : 'urban';
+  const setScopeValue = (v: string) => {
+    if (v === 'national') { setScopeMode('national'); return; }
+    setScopeMode('urban_rural');
+    if (v === 'both') { setAreaUrban(true); setAreaRural(true); }
+    else if (v === 'urban') { setAreaUrban(true); setAreaRural(false); setSubArea('urban'); }
+    else { setAreaUrban(false); setAreaRural(true); setSubArea('rural'); }
+  };
+  // First-visit attention sequence: after the Tool Overview (guide) closes, pulse the scope card and
+  // point at the dropdown with a "Start here" nudge. Shown once (localStorage), dismissed on use.
+  const [scopeHint, setScopeHint] = useState(false);
+  const scopeHintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerScopeHint = () => {
+    if (localStorage.getItem('wss_scope_hint_seen')) return;
+    localStorage.setItem('wss_scope_hint_seen', '1');
+    setScopeHint(true);
+    scopeHintTimer.current = setTimeout(() => setScopeHint(false), 10000);
+  };
+  const dismissScopeHint = () => {
+    if (scopeHintTimer.current) clearTimeout(scopeHintTimer.current);
+    setScopeHint(false);
   };
 
   const saveScenario = () => {
@@ -257,52 +265,59 @@ export default function App() {
         {activeTab <= 2 && (
           <div style={{ background: '#eef2ff', borderBottom: '1px solid #c7d2fe', padding: '8px 24px' }}>
             {activeTab === 0 ? (
-              <div style={{ background: '#fff', border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' }}>
+              <div onClickCapture={dismissScopeHint} style={{
+                background: '#fff', border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8,
+                padding: '10px 14px', boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+                animation: scopeHint ? 'scopePulse 1.2s ease-in-out infinite' : undefined,
+              }}>
+                <style>{`
+                  @keyframes scopePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(37,99,235,0.45); } 50% { box-shadow: 0 0 0 7px rgba(37,99,235,0.12); } }
+                  @keyframes hintNudge { 0%,100% { transform: translateX(0); } 50% { transform: translateX(-9px); } }
+                `}</style>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center' }}>
                     <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Start here</span>
-                    How are you entering data?
+                    Select geographical scope
                   </span>
-                  {([
-                    { key: 'urban_rural', label: 'Urban / Rural', tip: 'Enter urban and rural data separately. Include both to produce a national total, or just one to analyse that area on its own.' },
-                    { key: 'national', label: 'National', tip: 'This option should only be used if you do not have and cannot estimate urban/rural breakdowns for WSS data and access.' },
-                  ] as const).map(m => (
-                    <button key={m.key} onClick={() => setScopeMode(m.key)} title={m.tip} style={{
-                      padding: '6px 20px', border: 'none', borderRadius: 6, cursor: 'pointer',
-                      background: scopeMode === m.key ? '#2563eb' : '#fff',
-                      color: scopeMode === m.key ? '#fff' : '#374151',
-                      fontWeight: scopeMode === m.key ? 700 : 500, fontSize: 13,
-                      boxShadow: scopeMode === m.key ? '0 2px 6px rgba(37,99,235,0.3)' : '0 1px 2px rgba(0,0,0,0.05)',
-                      transition: 'all 0.15s',
-                    }}>{m.label}</button>
-                  ))}
+                  <select value={scopeValue} onChange={e => { setScopeValue(e.target.value); dismissScopeHint(); }} style={{
+                    padding: '7px 14px', borderRadius: 6, border: '1.5px solid #2563eb', background: '#fff',
+                    color: '#1e293b', fontSize: 13, fontWeight: 600, cursor: 'pointer', outline: 'none',
+                  }}>
+                    <option value="both">Urban + Rural (national total)</option>
+                    <option value="urban">Urban only</option>
+                    <option value="rural">Rural only</option>
+                    <option value="national">National (single dataset)</option>
+                  </select>
+                  {scopeHint && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff',
+                      fontWeight: 700, fontSize: 12, padding: '6px 14px', borderRadius: 20, whiteSpace: 'nowrap',
+                      boxShadow: '0 2px 12px rgba(37,99,235,0.5)', animation: 'hintNudge 0.7s ease-in-out infinite',
+                    }}>👈 Start here</span>
+                  )}
                 </div>
-                {scopeMode === 'urban_rural' && (
+                {scopeValue === 'national' && (
+                  <div style={{ fontSize: 10.5, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4, padding: '4px 10px', marginTop: 8 }}>
+                    National should only be used if you do not have — and cannot estimate — urban/rural breakdowns for WSS data and access.
+                  </div>
+                )}
+                {(scopeValue === 'urban' || scopeValue === 'rural') && (
+                  <div style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginTop: 8 }}>
+                    Graphs &amp; outputs show {scopeValue === 'rural' ? 'Rural' : 'Urban'} only.
+                  </div>
+                )}
+                {scopeValue === 'both' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Include:</span>
-                    {([{ key: 'urban', on: areaUrban }, { key: 'rural', on: areaRural }] as const).map(a => (
-                      <button key={a.key} onClick={() => toggleArea(a.key)} style={{
-                        padding: '5px 14px', border: a.on ? '1px solid #2563eb' : '1px solid #cbd5e1', borderRadius: 14, cursor: 'pointer',
-                        background: a.on ? '#2563eb' : '#fff',
-                        color: a.on ? '#fff' : '#94a3b8',
-                        fontWeight: a.on ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
-                      }}>{a.on ? '✓ ' : ''}{a.key}</button>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
+                    {(['urban', 'rural'] as const).map(a => (
+                      <button key={a} onClick={() => setSubArea(a)} style={{
+                        padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
+                        background: subArea === a ? '#312e81' : '#fff',
+                        color: subArea === a ? '#fff' : '#475569',
+                        fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
+                      }}>{a}</button>
                     ))}
-                    {both ? (
-                      <>
-                        <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b', marginLeft: 8 }}>Editing:</span>
-                        {(['urban', 'rural'] as const).map(a => (
-                          <button key={a} onClick={() => setSubArea(a)} style={{
-                            padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
-                            background: subArea === a ? '#312e81' : '#fff',
-                            color: subArea === a ? '#fff' : '#475569',
-                            fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
-                          }}>{a}</button>
-                        ))}
-                      </>
-                    ) : (
-                      <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic', marginLeft: 4 }}>Graphs &amp; outputs show {onlyRural ? 'Rural' : 'Urban'} only.</span>
-                    )}
+                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Enter each area's data separately — graphs &amp; outputs show the national total (Urban + Rural).</span>
                   </div>
                 )}
               </div>
@@ -438,8 +453,9 @@ export default function App() {
         </div>
       </div>
 
-      {/* Onboarding */}
-      {showOnboarding && <OnboardingModal onClose={() => setShowOnboarding(false)} />}
+      {/* Onboarding. When the guide closes on a first visit, the scope card pulses with a
+          "👈 Start here" nudge pointing at the geographical-scope dropdown. */}
+      {showOnboarding && <OnboardingModal onClose={() => { setShowOnboarding(false); triggerScopeHint(); }} />}
     </div>
   );
 }
@@ -504,7 +520,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
           <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
             <li style={{ marginBottom: 6 }}>
-              <strong>Make your selections first.</strong> At the top of the screen, choose a <strong>data entry mode</strong>: <em>Urban / Rural</em> (enter urban and rural data separately — include both to produce a national total, or just one to analyse that area on its own) or <em>National</em> (a single national data set, for when you cannot break down by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
+              <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (a single national data set, for when you cannot break down by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates, then complete the year-by-year table: <strong>real GDP</strong> (local currency), population and households, the WSS budget, and the water &amp; sanitation service levels. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
