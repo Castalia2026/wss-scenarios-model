@@ -562,7 +562,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (no urban/rural breakdown — for when you cannot split the data by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2a. Analysis Period</em>, set the key dates; then complete the year-by-year sections — <em>2b. Service levels</em> (water &amp; sanitation), <em>2c. Economic &amp; demographic data</em> (real GDP, population, households) and <em>2d. Budget</em>. <em>Country</em> and the <em>Analysis Period</em> are shared across Urban and Rural; the year-by-year sections are entered separately per area. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
+              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2. Analysis Period</em>, set the key dates; then complete the year-by-year sections — <em>3. Service levels</em> (water &amp; sanitation), <em>4. Economic &amp; demographic data</em> (real GDP, population, households) and <em>5. Budget</em>. <em>Country</em> and the <em>Analysis Period</em> are shared across Urban and Rural; the year-by-year sections are entered separately per area. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
@@ -678,7 +678,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
   period: {
-    title: '2a. Analysis Period',
+    title: '2. Analysis Period',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool. These dates apply to the whole analysis and are shared across the Urban and Rural datasets.</p>
@@ -704,13 +704,13 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the <b>2b. Service levels</b> section — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
+          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the <b>3. Service levels</b> section — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
         </div>
       </div>
     ),
   },
   service_levels: {
-    title: '2b. Service levels',
+    title: '3. Service levels',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>The share of households at each of the 5 JMP service levels, for water supply and sanitation. Cream cells are historical inputs; grey in-between years follow the engine's path; a full blue forecast column is an optional target.</p>
@@ -725,7 +725,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
   },
   econ_demo: {
-    title: '2c. Economic & demographic data',
+    title: '4. Economic & demographic data',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>Real GDP, population and households, year by year. Cream cells are historical inputs; blue forecast cells are optional (blank = auto-fill at the mean historical growth); grey “→ used” rows show the values the model applies.</p>
@@ -757,7 +757,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     ),
   },
   budget: {
-    title: '2d. Budget',
+    title: '5. Budget',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>The water-supply and sanitation budgets, year by year — computed for you, with per-year overrides.</p>
