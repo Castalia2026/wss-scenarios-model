@@ -416,7 +416,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== TIME SCALES & MACROECONOMICS ===== */}
-      <Section title="2. Time Scales & Macroeconomics" sectionKey="macro" onFocus={onSectionFocus}>
+      <Section title="2. Analysis Period & Year-by-Year Data" sectionKey="macro" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the baseline year. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
@@ -588,6 +588,19 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
           const hhLbl = `${scopeLabel} households`;
           const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
+            // Service levels FIRST (the data users know best), then economic / demographic / budget.
+            sectionRow(`${scopeLabel} water service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
+            svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
+            svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
+            svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
+            svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
+            svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
+            sectionRow(`${scopeLabel} sanitation service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
+            svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
+            svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
+            svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
+            svcRow(`% ${ss[3]}`, 'sanitation_service', 'sserv4_ts'),
+            svcRow(`% ${ss[4]}`, 'sanitation_service', 'sserv5_ts'),
             sectionRow('Economic'),
             { label: `Real GDP (${CUR} M)`, tip: `Real GDP in local currency (millions, base-year prices). Enter historical years; blank forecast years auto-fill at mean historical growth — or type your own. This drives the forecast budget.`, cells: years.map((_: number, i: number) => editCell('macro', 'gdp_real_local', i, false, years[i] > baseYr2, true)) },
             projRow(`→ Real GDP used (${CUR} M)`, 'Auto-fill: real GDP the model uses each year (your entries; blank years filled at mean historical growth).', (i) => resAt('gdp_real_local', i), false),
@@ -616,18 +629,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             projRow('→ WS budget used', 'Auto-fill: the water budget the model uses each year.', (i) => secRes('water_supply', 'allocated_capex', i), false),
             { label: 'SAN budget', tip: 'Sanitation budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('san_expend_ts', 'sanitation', i)) },
             projRow('→ SAN budget used', 'Auto-fill: the sanitation budget the model uses each year.', (i) => secRes('sanitation', 'allocated_capex', i), false),
-            sectionRow(`${scopeLabel} water service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
-            svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
-            svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
-            svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
-            svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
-            svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
-            sectionRow(`${scopeLabel} sanitation service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
-            svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
-            svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
-            svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
-            svcRow(`% ${ss[3]}`, 'sanitation_service', 'sserv4_ts'),
-            svcRow(`% ${ss[4]}`, 'sanitation_service', 'sserv5_ts'),
           ];
           return (
             <div style={{ gridColumn: '1 / -1', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
@@ -740,7 +741,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
       {isInterventions && <>
       {/* ===== WATER INTERVENTIONS ===== */}
-      <Section title="7. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
+      <Section title="4. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -798,7 +799,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== SANITATION INTERVENTIONS ===== */}
-      <Section title="8. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
+      <Section title="5. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -846,7 +847,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== CUSTOM INTERVENTIONS ===== */}
-      <Section title="9. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
+      <Section title="6. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
         {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
           const updateCI = (field: string, val: any) => {
             const arr = [...inputs.custom_interventions];

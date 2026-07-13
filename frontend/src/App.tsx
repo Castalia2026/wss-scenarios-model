@@ -279,15 +279,25 @@ export default function App() {
                     <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Start here</span>
                     Select geographical scope
                   </span>
-                  <select value={scopeValue} onChange={e => { setScopeValue(e.target.value); dismissScopeHint(); }} style={{
-                    padding: '7px 14px', borderRadius: 6, border: '1.5px solid #2563eb', background: '#fff',
-                    color: '#1e293b', fontSize: 13, fontWeight: 600, cursor: 'pointer', outline: 'none',
-                  }}>
-                    <option value="both">Urban + Rural (national total)</option>
-                    <option value="urban">Urban only</option>
-                    <option value="rural">Rural only</option>
-                    <option value="national">National (single dataset)</option>
-                  </select>
+                  {/* Filled amber dropdown with an explicit ▼ so it's unmistakably a dropdown */}
+                  <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
+                    <select value={scopeValue} onChange={e => { setScopeValue(e.target.value); dismissScopeHint(); }} style={{
+                      appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
+                      padding: '8px 40px 8px 14px', borderRadius: 8, border: '2px solid #b45309',
+                      background: '#f59e0b', color: '#1e293b', fontSize: 13, fontWeight: 700,
+                      cursor: 'pointer', outline: 'none', boxShadow: '0 1px 4px rgba(180,83,9,0.35)',
+                    }}>
+                      <option value="both" style={{ background: '#fff', color: '#333' }}>Urban + Rural (national total)</option>
+                      <option value="urban" style={{ background: '#fff', color: '#333' }}>Urban only</option>
+                      <option value="rural" style={{ background: '#fff', color: '#333' }}>Rural only</option>
+                      <option value="national" style={{ background: '#fff', color: '#333' }}>National (single dataset)</option>
+                    </select>
+                    <span style={{ position: 'absolute', right: 10, pointerEvents: 'none', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
+                      <span style={{ fontSize: 8, color: '#7c2d12' }}>▲</span>
+                      <span style={{ fontSize: 8, color: '#7c2d12' }}>▼</span>
+                    </span>
+                  </span>
+                  <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>▲▼ click to choose</span>
                   {scopeHint && (
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 6, background: '#2563eb', color: '#fff',
@@ -523,7 +533,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (a single national data set, for when you cannot break down by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Time Scales &amp; Macroeconomics</em>, set the key dates, then complete the year-by-year table: <strong>real GDP</strong> (local currency), population and households, the WSS budget, and the water &amp; sanitation service levels. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
+              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>Analysis Period &amp; Year-by-Year Data</em>, set the key dates, then complete the year-by-year table: the water &amp; sanitation <strong>service levels</strong> (first), then <strong>real GDP</strong> (local currency), population and households, and the WSS budget. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
@@ -639,7 +649,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
   macro: {
-    title: 'Time Scales & Macroeconomics',
+    title: 'Analysis Period & Year-by-Year Data',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool.</p>
@@ -727,12 +737,12 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     sources: [{ name: 'National WASH strategy document', url: '#' }],
   },
   ws_unit_costs: {
-    title: 'Water Supply Unit Costs',
+    title: 'Water Supply — Unit Costs & Technical Parameters',
     content: "Enter the capital cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average prices for individual technologies from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   san_unit_costs: {
-    title: 'Sanitation Supply Unit Costs',
+    title: 'Sanitation — Unit Costs & Technical Parameters',
     content: "Enter the sewerage cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average costs for on-site solutions from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
