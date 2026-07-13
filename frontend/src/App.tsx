@@ -71,8 +71,28 @@ export default function App() {
     : both ? 'urban_rural'
     : onlyRural ? 'rural'
     : 'urban';
-  // 'urban' is the primary dataset (held in `inputs`); other areas keep their own dataset in altInputs.
-  const activeInputs = inputScope === 'urban' ? inputs : (altInputs[inputScope] ?? inputs);
+  // §2a start-year change re-anchors EVERY area's positional (index-by-year) series, so a SHARED
+  // analysis period keeps urban & rural aligned. Mirrors InputPanel's shiftYearSeries.
+  const shiftAreaArrays = useCallback((obj: any, delta: number) => {
+    if (!obj || !delta) return obj;
+    const shift = (arr: any) => !Array.isArray(arr) ? arr : delta > 0 ? arr.slice(delta) : [...Array(-delta).fill(0), ...arr];
+    const g = (o: any, fields: string[]) => { if (!o) return o; const n = { ...o }; fields.forEach(f => { if (Array.isArray(n[f])) n[f] = shift(n[f]); }); return n; };
+    return { ...obj,
+      macro: g(obj.macro, ['gdp_real_local', 'gdp_nominal_usd', 'inflation_nepal', 'inflation_us', 'exchange_rate', 'gdp_growth']),
+      population: g(obj.population, ['pop_ts', 'hh_ts']),
+      water_service: g(obj.water_service, ['serv1_ts', 'serv2_ts', 'serv3_ts', 'serv4_ts', 'serv5_ts']),
+      sanitation_service: g(obj.sanitation_service, ['sserv1_ts', 'sserv2_ts', 'sserv3_ts', 'sserv4_ts', 'sserv5_ts']),
+      bau: g(obj.bau, ['ws_budget_ts', 'san_budget_ts', 'ws_expend_ts', 'san_expend_ts']) };
+  }, []);
+  // 'urban' is the primary dataset (held in `inputs`). §1 Country config and §2a Analysis Period are
+  // SHARED across urban/rural: always sourced from the primary and overlaid onto the area being edited,
+  // so editing them from either area keeps both in sync. (National is a separate single-dataset mode.)
+  const activeInputsRaw = inputScope === 'urban' ? inputs : (altInputs[inputScope] ?? inputs);
+  const activeInputs = React.useMemo(() =>
+    (inputScope === 'rural' && inputs && activeInputsRaw)
+      ? { ...activeInputsRaw, country_config: inputs.country_config, period: inputs.period }
+      : activeInputsRaw,
+    [inputScope, inputs, activeInputsRaw]);
   // Live engine results for the ACTIVE dataset (debounced), so the input table can show the engine's
   // computed forecast-year values (population, GDP, budget, allocated/actual capex, …).
   const [results, setResults] = useState<any>(null);
@@ -83,9 +103,21 @@ export default function App() {
   }, [activeInputs]);
   const handleSetActiveInputs = useCallback((newInputs: any) => {
     const resized = resizeMacroArrays(newInputs);
-    if (inputScope === 'urban') setInputs(resized);
-    else setAltInputs(prev => ({ ...prev, [inputScope]: resized }));
-  }, [resizeMacroArrays, inputScope]);
+    const oldStart = inputs?.period?.model_start_year, newStart = resized?.period?.model_start_year;
+    const delta = (Number.isFinite(newStart) && Number.isFinite(oldStart)) ? newStart - oldStart : 0;
+    if (inputScope === 'urban') {
+      // Primary edit. If the (shared) start year moved, re-anchor the other areas' series too.
+      if (delta) setAltInputs(prev => { const n: Record<string, any> = {}; for (const k of Object.keys(prev)) n[k] = shiftAreaArrays(prev[k], delta); return n; });
+      setInputs(resized);
+    } else if (inputScope === 'rural') {
+      // Rural edit: area series stay in altInputs.rural; shared Country/Period propagate to the primary
+      // (and a start-year change re-anchors the primary's series so both areas stay aligned).
+      setAltInputs(prev => ({ ...prev, rural: resized }));
+      setInputs((prev: any) => { let next = { ...prev, country_config: resized.country_config, period: resized.period }; if (delta) next = shiftAreaArrays(next, delta); return resizeMacroArrays(next); });
+    } else {
+      setAltInputs(prev => ({ ...prev, [inputScope]: resized }));   // national — isolated single dataset
+    }
+  }, [resizeMacroArrays, inputScope, inputs, shiftAreaArrays]);
 
   // Geographical scope as ONE dropdown value: 'both' (Urban + Rural), 'urban', 'rural', 'national'.
   const scopeValue = scopeMode === 'national' ? 'national' : (areaUrban && areaRural) ? 'both' : areaRural ? 'rural' : 'urban';
@@ -276,25 +308,24 @@ export default function App() {
                 `}</style>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center' }}>
-                    <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 0.5, color: '#2563eb', background: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 4, padding: '2px 6px', marginRight: 8, textTransform: 'uppercase' }}>Start here</span>
                     Select geographical scope
                   </span>
                   {/* Filled amber dropdown with an explicit ▼ so it's unmistakably a dropdown */}
                   <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center' }}>
                     <select value={scopeValue} onChange={e => { setScopeValue(e.target.value); dismissScopeHint(); }} style={{
                       appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none',
-                      padding: '8px 40px 8px 14px', borderRadius: 8, border: '2px solid #b45309',
-                      background: '#f59e0b', color: '#1e293b', fontSize: 13, fontWeight: 700,
-                      cursor: 'pointer', outline: 'none', boxShadow: '0 1px 4px rgba(180,83,9,0.35)',
+                      padding: '8px 38px 8px 14px', borderRadius: 6, border: '1px solid #94a3b8',
+                      background: '#fff', color: '#1e293b', fontSize: 13, fontWeight: 600,
+                      cursor: 'pointer', outline: 'none', boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
                     }}>
                       <option value="both" style={{ background: '#fff', color: '#333' }}>Urban + Rural (national total)</option>
                       <option value="urban" style={{ background: '#fff', color: '#333' }}>Urban only</option>
                       <option value="rural" style={{ background: '#fff', color: '#333' }}>Rural only</option>
-                      <option value="national" style={{ background: '#fff', color: '#333' }}>National (single dataset)</option>
+                      <option value="national" style={{ background: '#fff', color: '#333' }}>National (no urban/rural breakdown)</option>
                     </select>
                     <span style={{ position: 'absolute', right: 10, pointerEvents: 'none', display: 'inline-flex', flexDirection: 'column', alignItems: 'center', lineHeight: 1 }}>
-                      <span style={{ fontSize: 8, color: '#7c2d12' }}>▲</span>
-                      <span style={{ fontSize: 8, color: '#7c2d12' }}>▼</span>
+                      <span style={{ fontSize: 8, color: '#64748b' }}>▲</span>
+                      <span style={{ fontSize: 8, color: '#64748b' }}>▼</span>
                     </span>
                   </span>
                   <span style={{ fontSize: 10.5, color: '#64748b', fontStyle: 'italic' }}>▲▼ click to choose</span>
@@ -318,7 +349,7 @@ export default function App() {
                 )}
                 {scopeValue === 'both' && (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Entering data for:</span>
                     {(['urban', 'rural'] as const).map(a => (
                       <button key={a} onClick={() => setSubArea(a)} style={{
                         padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
@@ -327,7 +358,6 @@ export default function App() {
                         fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
                       }}>{a}</button>
                     ))}
-                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Enter each area's data separately — graphs &amp; outputs show the national total (Urban + Rural).</span>
                   </div>
                 )}
               </div>
@@ -335,7 +365,7 @@ export default function App() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                 {both ? (
                   <>
-                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Editing:</span>
+                    <span style={{ fontSize: 11, fontWeight: 600, color: '#64748b' }}>Entering data for:</span>
                     {(['urban', 'rural'] as const).map(a => (
                       <button key={a} onClick={() => setSubArea(a)} style={{
                         padding: '5px 14px', border: '1px solid #c7d2fe', borderRadius: 14, cursor: 'pointer',
@@ -344,7 +374,6 @@ export default function App() {
                         fontWeight: subArea === a ? 700 : 500, fontSize: 12, transition: 'all 0.15s', textTransform: 'capitalize',
                       }}>{a}</button>
                     ))}
-                    <span style={{ fontSize: 10, color: '#64748b', fontStyle: 'italic' }}>Graphs &amp; outputs show National (Urban + Rural). Change the scope on the Data Inputs tab.</span>
                   </>
                 ) : (
                   <span style={{ fontSize: 11, color: '#64748b' }}>
@@ -530,10 +559,10 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
           <ol style={{ margin: 0, padding: '0 0 0 20px', fontSize: 13, color: '#334155', lineHeight: 1.45 }}>
             <li style={{ marginBottom: 6 }}>
-              <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (a single national data set, for when you cannot break down by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
+              <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (no urban/rural breakdown — for when you cannot split the data by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2a. Analysis Period</em>, set the key dates; then in <em>2b. Year-by-Year Data</em> complete the table: the water &amp; sanitation <strong>service levels</strong> (first), then <strong>real GDP</strong> (local currency), population and households, and the WSS budget. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
+              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2a. Analysis Period</em>, set the key dates; then complete the year-by-year sections — <em>2b. Service levels</em> (water &amp; sanitation), <em>2c. Economic &amp; demographic data</em> (real GDP, population, households) and <em>2d. Budget</em>. <em>Country</em> and the <em>Analysis Period</em> are shared across Urban and Rural; the year-by-year sections are entered separately per area. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
@@ -645,14 +674,14 @@ function GFind({ items }: { items: string[] }) {
 const contextualGuide: Record<string, { title: string; content: React.ReactNode; sources?: { name: string; url: string }[] }> = {
   country: {
     title: 'Country & Area of focus',
-    content: 'Select the country and the area of focus for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed.',
+    content: 'Select the country and the area of focus for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed. This section applies to the whole analysis and is shared across the Urban and Rural datasets.',
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
   period: {
     title: '2a. Analysis Period',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool.</p>
+        <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool. These dates apply to the whole analysis and are shared across the Urban and Rural datasets.</p>
 
         <div style={gFieldWrap}>
           <span style={gFieldLbl}>Model Start Year:</span> The first year of the analysis period. The tool will compute information for every year from the Model Start Year up to the Baseline Year, building the historical record used to construct the Business-as-Usual (BAU) scenario.
@@ -675,25 +704,33 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the year-by-year table in section 2b — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
+          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the <b>2b. Service levels</b> section — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
         </div>
       </div>
     ),
   },
-  macro: {
-    title: '2b. Year-by-Year Data',
+  service_levels: {
+    title: '2b. Service levels',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The year-by-year table. Cream cells are historical inputs; blue forecast cells are optional (blank = auto-fill at the mean historical growth); grey rows show the values the model uses.</p>
-
+        <p style={{ margin: '0 0 6px' }}>The share of households at each of the 5 JMP service levels, for water supply and sanitation. Cream cells are historical inputs; grey in-between years follow the engine's path; a full blue forecast column is an optional target.</p>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Water / sanitation service levels (% HH):</span> The share of households at each of the 5 JMP service levels. Enter the start-year and baseline-year splits (each summing to 100%); in-between years follow the engine's historical path. Fill a FULL forecast column (Σ 100%) to set a 🎯 target year.
+          <span style={gFieldLbl}>Water / sanitation service levels (% HH):</span> Enter the start-year and baseline-year splits (each summing to 100%); in-between years follow the engine's historical path. Fill a FULL forecast column (Σ 100%) to set a 🎯 target year — set as many as you like; the model interpolates between them.
           <GFind items={[
             'WHO/UNICEF JMP – washdata.org/data/household',
           ]} />
         </div>
+      </div>
+    ),
+    sources: [{ name: 'WHO/UNICEF JMP', url: 'https://washdata.org/data/household' }],
+  },
+  econ_demo: {
+    title: '2c. Economic & demographic data',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>Real GDP, population and households, year by year. Cream cells are historical inputs; blue forecast cells are optional (blank = auto-fill at the mean historical growth); grey “→ used” rows show the values the model applies.</p>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Real GDP (local currency, millions):</span> Real GDP in local currency at constant (base-year) prices. Enter the historical years; leave forecast years blank to auto-fill at the mean historical growth, or type your own projection (the grey “→ used” row shows the value the model applies). This drives the forecast WSS budget.
+          <span style={gFieldLbl}>Real GDP (local currency, millions):</span> Real GDP at constant (base-year) prices. Enter the historical years; leave forecast years blank to auto-fill at the mean historical growth, or type your own projection. This drives the forecast WSS budget.
           <GFind items={[
             'World Bank – data.worldbank.org/indicator/NY.GDP.MKTP.KN (GDP in constant local currency)',
             'IMF World Economic Outlook Database – imf.org/en/Publications/WEO',
@@ -716,6 +753,14 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
           ]} />
           <span style={gNote}>Note: If household data is unavailable, it can be estimated by dividing the population by the average household size.</span>
         </div>
+      </div>
+    ),
+  },
+  budget: {
+    title: '2d. Budget',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The water-supply and sanitation budgets, year by year — computed for you, with per-year overrides.</p>
         <div style={gFieldWrap}>
           <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you — historically from the cost of the new connections added each year (Safely-managed + Basic households × their unit cost), and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type into any cell to override that year — e.g. if you have actual government budget figures.
           <GFind items={[
@@ -823,7 +868,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 const guideKeysByTab: Record<number, string[]> = {
   // Data Inputs — includes the BAU data entry duplicated onto this tab. test2: targets & technical
   // params are folded into the table / the merged unit-cost section.
-  0: ['country', 'period', 'macro', 'ws_unit_costs', 'san_unit_costs'],
+  0: ['country', 'period', 'service_levels', 'econ_demo', 'budget', 'ws_unit_costs', 'san_unit_costs'],
   // BAU Scenario
   1: ['ws_unit_costs', 'san_unit_costs'],
   // Intervention Design

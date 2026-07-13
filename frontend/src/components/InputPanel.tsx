@@ -33,6 +33,64 @@ function SubHead({ text }: { text: string }) {
   return <div style={{ gridColumn: '1 / -1', fontSize: 13, fontWeight: 700, color: '#1e3a5f', margin: '6px 0 2px', borderBottom: '1px solid #e5e7eb', paddingBottom: 3 }}>{text}</div>;
 }
 
+// A row in a year-by-year table. `section`/`sub` render a band header instead of data cells.
+type YRow = { label: string; tip?: string; section?: boolean; sub?: boolean; computed?: boolean; cells: React.ReactNode[] };
+
+// Shared year-by-year table used by the split Data-Inputs sections (service levels / economic &
+// demographic / budget). IMPORTANT: border-collapse must be SEPARATE (not collapse) — otherwise the
+// sticky left label column does not freeze when the user scrolls the year columns horizontally.
+function YearTable({ rows, years, baseYr2, colIsTarget, markTargets = false }: {
+  rows: YRow[]; years: number[]; baseYr2: number; colIsTarget?: (idx: number) => boolean; markTargets?: boolean;
+}) {
+  return (
+    <div style={{ gridColumn: '1 / -1', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
+      <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11 }}>
+        <thead>
+          <tr>
+            <th style={{ padding: '4px 8px', textAlign: 'left', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 3, minWidth: 150 }}></th>
+            {years.map((yr: number, i: number) => {
+              const tgt = !!(markTargets && yr > baseYr2 && colIsTarget?.(i));
+              return (
+                <th key={yr} title={tgt ? 'Target year (a full service-level column is entered here)' : undefined} style={{ padding: '4px 4px', textAlign: 'center', fontSize: 10, fontWeight: yr > baseYr2 ? 600 : 500, color: tgt ? '#16a34a' : yr > baseYr2 ? '#f59e0b' : '#334155', minWidth: 62, background: tgt ? '#f0fdf4' : '#f1f5f9' }}>
+                  {yr}{tgt ? <span style={{ fontSize: 9 }}> 🎯</span> : yr > baseYr2 ? <span style={{ fontSize: 7, verticalAlign: 'super' }}>F</span> : null}
+                </th>
+              );
+            })}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, ri) => row.section ? (
+            <tr key={ri}>
+              {/* Full-width band; the label is wrapped in a sticky span so it stays visible when the
+                  year columns are scrolled right (a full-colSpan cell itself can't be pinned). */}
+              <td colSpan={years.length + 1} style={{ padding: 0, background: row.sub ? '#eef2ff' : '#e0e7ff' }}>
+                <div style={{ position: 'sticky', left: 0, display: 'inline-block', padding: row.sub ? '3px 8px 3px 22px' : '5px 8px', fontWeight: row.sub ? 600 : 700, fontStyle: row.sub ? 'italic' : 'normal', fontSize: row.sub ? 10.5 : 11, color: row.sub ? '#4f46e5' : '#312e81' }}>
+                  {row.label}
+                </div>
+              </td>
+            </tr>
+          ) : (
+            <tr key={ri} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
+              <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 2, whiteSpace: 'nowrap' }} title={row.tip || undefined}>
+                {row.label}
+                {row.tip && <span style={{
+                  width: 14, height: 14, borderRadius: '50%', marginLeft: 5,
+                  background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex',
+                  alignItems: 'center', justifyContent: 'center', cursor: 'help', verticalAlign: 'middle',
+                  fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
+                }} title={row.tip}>i</span>}
+              </td>
+              {row.cells.map((cell, ci) => (
+                <td key={ci} style={{ padding: '2px 2px', textAlign: 'center' }}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 // Color convention: blue text = editable input, green text = cross-linked, gray = computed/derived
 function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slider, fieldType, integer }: {
   label: string; value: number; onChange: (v: number) => void; unit?: string; step?: number; isPercent?: boolean;
@@ -155,7 +213,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   }, []);
 
   const handleXlsxDownload = async () => {
-    try { setXlsxStatus({ kind: 'busy', msg: 'Preparing template…' }); await downloadTemplate(inputs); setXlsxStatus({ kind: 'ok', msg: 'Template downloaded — fill the cream cells and upload it back.' }); }
+    try { setXlsxStatus({ kind: 'busy', msg: 'Preparing template…' }); await downloadTemplate(inputs); setXlsxStatus({ kind: 'ok', msg: 'Template downloaded — fill the cream (historical) and blue (forecast) cells, then upload it back.' }); }
     catch (e) { setXlsxStatus({ kind: 'err', msg: String(e) }); }
   };
   const handleXlsxUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,7 +387,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         </span>
       </div>
 
-      {/* Area-scope banner — all inputs below apply to this area (also carries the BAU note on the BAU tab) */}
+      {/* Area-scope banner. On BAU/intervention tabs it sits at the top (every field there is scope-specific).
+          On the Data Inputs tab it is moved BELOW §2a instead (see the "every section below" flag there), since
+          §1 Country and §2a Analysis Period apply to the whole analysis rather than to one area. */}
+      {!isInputs && (
       <div style={{
         display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 12, textAlign: 'left',
         padding: '8px 14px', borderRadius: 6, fontSize: 12.5,
@@ -346,6 +407,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           </div>
         )}
       </div>
+      )}
 
       {/* ===== INTERVENTION TOGGLES (shown in interventions step) ===== */}
       {isInterventions && inputs.toggles && <>
@@ -367,23 +429,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </>}
 
       {isInputs && <>
-
-      {/* ===== EXCEL ROUND-TRIP (bulk year-by-year data entry) ===== */}
-      <div style={{ marginBottom: 8, border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, background: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>📊 Bulk data entry (Excel)</span>
-        <span style={{ fontSize: 11, color: '#64748b', flex: '1 1 220px', minWidth: 180 }}>
-          Download a template of the year-by-year table for <b style={{ textTransform: 'capitalize' }}>{scopeLabel}</b>, fill the cream cells offline, then upload it to populate the table.
-        </span>
-        <button onClick={handleXlsxDownload} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #2563eb', borderRadius: 6, background: '#fff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>⤓ Download template</button>
-        <button onClick={() => fileRef.current?.click()} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>⤒ Upload filled template</button>
-        <input ref={fileRef} type="file" accept=".xlsx" onChange={handleXlsxUpload} style={{ display: 'none' }} />
-        {xlsxStatus.kind !== 'idle' && (
-          <span style={{ gridColumn: '1 / -1', fontSize: 11, width: '100%',
-            color: xlsxStatus.kind === 'err' ? '#b91c1c' : xlsxStatus.kind === 'ok' ? '#15803d' : '#64748b' }}>
-            {xlsxStatus.kind === 'busy' ? '⏳ ' : xlsxStatus.kind === 'ok' ? '✓ ' : '⚠ '}{xlsxStatus.msg}
-          </span>
-        )}
-      </div>
 
       {/* ===== COUNTRY CONFIG ===== */}
       <Section title="1. Country, Area of Focus & Currency" sectionKey="country" onFocus={onSectionFocus}>
@@ -429,19 +474,42 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         </div>
       </Section>
 
+      {/* ===== SCOPE-SPECIFICITY FLAG. §1 and §2a above apply to the whole analysis; every section below
+              (the year-by-year table and the cost/technical sections) is entered per the selected scope. ===== */}
+      <div style={{
+        display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 8, textAlign: 'left',
+        padding: '8px 14px', borderRadius: 6, fontSize: 12.5,
+        background: '#EBF6FB', border: '1px solid #9fd3ec', borderLeft: '4px solid #0073A8', color: '#0073A8',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 600 }}>
+          <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
+          <span>Every section below is <span style={{ display: 'inline-block', background: '#0073A8', color: '#fff', fontWeight: 700, padding: '1px 10px', borderRadius: 12, fontSize: 12, textTransform: 'capitalize', verticalAlign: 'baseline' }}>{scopeLabel}</span>-specific — enter {scopeLower} figures here. Sections 1 and 2a above apply to the whole analysis and are shared across areas.</span>
+        </div>
+      </div>
+
+      {/* ===== EXCEL ROUND-TRIP — OPTIONAL bulk entry covering every section of the year-by-year table ===== */}
+      <div style={{ marginBottom: 8, border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, background: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>📊 Bulk data entry (Excel) — optional</span>
+        <span style={{ fontSize: 11, color: '#64748b', flex: '1 1 220px', minWidth: 180 }}>
+          Optional — you can either enter the data directly in the year-by-year sections below, <b>or</b> download an Excel template for <b style={{ textTransform: 'capitalize' }}>{scopeLabel}</b>, fill it offline, and upload it. One template covers <b>all three</b> year-by-year sections below (2b service levels, 2c economic &amp; demographic, 2d budget) and mirrors their colours (cream = historical, blue = forecast, grey = auto-calculated). Use whichever you prefer.
+        </span>
+        <button onClick={handleXlsxDownload} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #2563eb', borderRadius: 6, background: '#fff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>⤓ Download template</button>
+        <button onClick={() => fileRef.current?.click()} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>⤒ Upload filled template</button>
+        <input ref={fileRef} type="file" accept=".xlsx" onChange={handleXlsxUpload} style={{ display: 'none' }} />
+        {xlsxStatus.kind !== 'idle' && (
+          <span style={{ gridColumn: '1 / -1', fontSize: 11, width: '100%',
+            color: xlsxStatus.kind === 'err' ? '#b91c1c' : xlsxStatus.kind === 'ok' ? '#15803d' : '#64748b' }}>
+            {xlsxStatus.kind === 'busy' ? '⏳ ' : xlsxStatus.kind === 'ok' ? '✓ ' : '⚠ '}{xlsxStatus.msg}
+          </span>
+        )}
+      </div>
+
       {/* ===== 2b. YEAR-BY-YEAR DATA (service levels, GDP, demographics, budget) ===== */}
-      <Section title="2b. Year-by-Year Data" sectionKey="macro" onFocus={onSectionFocus}>
-        <SubHead text="How the WSS budget is derived" />
-        <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
-          💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed households × Safely-managed unit cost) + (new Basic households × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. You can override any year directly in the <b>budget</b> rows of the table below.
-        </div>
-        <SubHead text="Year-by-year table" />
-        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-          Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — leave them blank to auto-fill at the mean historical growth (shown in the grey “→ … used” row below each), or type your own projection. For service levels, fill a full forecast column (Σ 100%) to set a <b style={{ color: '#16a34a' }}>🎯 target</b> year. GDP/pop growth and avg household size are auto-calculated.
-        </div>
-        {(() => {
-          // Table spans the FULL model window (start -> forecast end), independent of series length:
-          // hard values render editable; the tail shows grey markers for the engine's fills.
+      {(() => {
+          // ── Shared computation for the three split year-by-year sections (service levels / economic
+          // & demographic / budget); each renders the same year columns via <YearTable>. The table
+          // spans the FULL model window (start -> forecast end): hard values render editable; the tail
+          // shows grey markers for the engine's fills. ──
           const startYr2 = inputs.period.model_start_year || 2011;
           const endYr2 = inputs.period.forecast_end_year || 2040;
           // Clamp the rendered span so a half-typed year (e.g. "20" mid-entry) can't spawn thousands of columns.
@@ -515,22 +583,23 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           const svcFields = (section: string) => section === 'water_service'
             ? ['serv1_ts', 'serv2_ts', 'serv3_ts', 'serv4_ts', 'serv5_ts']
             : ['sserv1_ts', 'sserv2_ts', 'sserv3_ts', 'sserv4_ts', 'sserv5_ts'];
-          // Projected total households at a year-offset (mirrors engine _project_hh): actuals are
-          // hh_ts[:bi]; the baseline year and beyond are projected at the MEAN historical YoY growth.
+          // Projected total households at a year-offset (mirrors engine _project_series): every
+          // user-entered value > 0 is HONOURED — including the baseline year and forecast overrides —
+          // and blank years fill from the prior year at the mean YoY growth of the leading
+          // contiguous run of entered values.
           const hhSeries = inputs.population?.hh_ts || [];
           const hhProj = (() => {
-            const act = hhSeries.slice(0, biSvc);                 // actuals through baseline−1
-            if (act.length < 2) return null;
+            const n = years.length;
+            const out = Array.from({ length: n }, (_: unknown, t: number) => (hhSeries[t] ?? 0) > 0 ? hhSeries[t] : 0);
+            const known: number[] = [];
+            for (let t = 0; t < n; t++) { if (out[t] > 0) known.push(out[t]); else break; }
             const yoy: number[] = [];
-            for (let i = 1; i < act.length; i++) if (act[i - 1] > 0) yoy.push(act[i] / act[i - 1] - 1);
+            for (let i = 1; i < known.length; i++) if (known[i - 1] > 0) yoy.push(known[i] / known[i - 1] - 1);
             const g = yoy.length ? yoy.reduce((a, b) => a + b, 0) / yoy.length : 0;
-            return { act, g };
+            for (let t = 1; t < n; t++) if (out[t] <= 0) out[t] = out[t - 1] * (1 + g);
+            return out;
           })();
-          const totalHHAt = (t: number) => {
-            if (!hhProj) return 0;
-            const { act, g } = hhProj;
-            return t < act.length ? act[t] : act[act.length - 1] * Math.pow(1 + g, t - (act.length - 1));
-          };
+          const totalHHAt = (t: number) => hhProj[t] ?? 0;
           const histSvcPct = (section: string, rung0: number, t: number) => {
             if (biSvc <= 0) return 0;
             const fields = svcFields(section);
@@ -587,25 +656,26 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             cells: years.map((_: number, i: number) => svcCell(section, field, i)),
           });
 
-          // Section headers as row separators
-          const sectionRow = (label: string) => ({ label, section: true as const, computed: false, cells: [] as React.ReactNode[] });
+          // Lighter sub-header band (Water supply / Sanitation) inside the Service levels table.
+          const subRow = (label: string): YRow => ({ label, section: true, sub: true, computed: false, cells: [] });
 
           const hhLbl = `${scopeLabel} households`;
-          const rows: { label: string; tip?: string; section?: boolean; computed?: boolean; cells: React.ReactNode[] }[] = [
-            // Service levels FIRST (the data users know best), then economic / demographic / budget.
-            sectionRow(`${scopeLabel} water service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
+          const anyTarget = (i: number) => colIsTarget('water_service', i) || colIsTarget('sanitation_service', i);
+          const serviceRows: YRow[] = [
+            subRow('Water supply'),
             svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
             svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
             svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
             svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
             svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
-            sectionRow(`${scopeLabel} sanitation service levels (% HH) — fill a full forecast column (Σ 100%) to set a target year`),
+            subRow('Sanitation'),
             svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
             svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
             svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
             svcRow(`% ${ss[3]}`, 'sanitation_service', 'sserv4_ts'),
             svcRow(`% ${ss[4]}`, 'sanitation_service', 'sserv5_ts'),
-            sectionRow('Economic'),
+          ];
+          const econRows: YRow[] = [
             { label: `Real GDP (${CUR} M)`, tip: `Real GDP in local currency (millions, base-year prices). Enter historical years; blank forecast years auto-fill at mean historical growth — or type your own. This drives the forecast budget.`, cells: years.map((_: number, i: number) => editCell('macro', 'gdp_real_local', i, false, years[i] > baseYr2, true)) },
             projRow(`→ Real GDP used (${CUR} M)`, 'Auto-fill: real GDP the model uses each year (your entries; blank years filled at mean historical growth).', (i) => resAt('gdp_real_local', i), false),
             { label: 'GDP growth %', tip: 'Year-on-year real GDP growth (auto-calculated from the values the model uses).', computed: true, cells: years.map((_: number, i: number) => {
@@ -613,7 +683,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            sectionRow('Demographic'),
             { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in millions. Historical years are inputs; blank forecast years auto-fill at mean historical growth — or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'pop_ts', i, false, years[i] > baseYr2, true)) },
             projRow('→ Population used (mill)', 'Auto-fill: population the model uses each year.', (i) => resAt('population', i), false),
             { label: 'Pop growth %', tip: 'Year-on-year population growth (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
@@ -628,56 +697,38 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
               const sz = (h > 0 && p > 0) ? p / h : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(2) : '—'}</span>;
             }) },
-            sectionRow(`Budget (${CUR} M, real / baseline prices) — derived from connection cost; type any cell to override`),
+          ];
+          const budgetRows: YRow[] = [
             { label: 'WS budget', tip: 'Water supply budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('ws_expend_ts', 'water_supply', i)) },
             projRow('→ WS budget used', 'Auto-fill: the water budget the model uses each year.', (i) => secRes('water_supply', 'allocated_capex', i), false),
             { label: 'SAN budget', tip: 'Sanitation budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('san_expend_ts', 'sanitation', i)) },
             projRow('→ SAN budget used', 'Auto-fill: the sanitation budget the model uses each year.', (i) => secRes('sanitation', 'allocated_capex', i), false),
           ];
           return (
-            <div style={{ gridColumn: '1 / -1', overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
-              <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
-                <thead>
-                  <tr style={{ background: '#f1f5f9' }}>
-                    <th style={{ padding: '4px 8px', textAlign: 'left', position: 'sticky', left: 0, background: '#f1f5f9', zIndex: 1, minWidth: 150 }}></th>
-                    {years.map((yr: number, i: number) => {
-                      const tgt = yr > baseYr2 && (colIsTarget('water_service', i) || colIsTarget('sanitation_service', i));
-                      return (
-                      <th key={yr} title={tgt ? 'Target year (a full service-level column is entered here)' : undefined} style={{ padding: '4px 4px', textAlign: 'center', fontSize: 10, fontWeight: yr > baseYr2 ? 600 : 500, color: tgt ? '#16a34a' : yr > baseYr2 ? '#f59e0b' : '#334155', minWidth: 62, background: tgt ? '#f0fdf4' : undefined }}>
-                        {yr}{tgt ? <span style={{ fontSize: 9 }}> 🎯</span> : yr > baseYr2 && <span style={{ fontSize: 7, verticalAlign: 'super' }}>F</span>}
-                      </th>
-                    );})}
-                  </tr>
-                </thead>
-                <tbody>
-                  {rows.map((row, ri) => row.section ? (
-                    <tr key={ri} style={{ background: '#e0e7ff' }}>
-                      <td colSpan={years.length + 1} style={{ padding: '5px 8px', fontWeight: 700, fontSize: 11, color: '#312e81', position: 'sticky', left: 0, background: '#e0e7ff', zIndex: 1 }}>
-                        {row.label}
-                      </td>
-                    </tr>
-                  ) : (
-                    <tr key={ri} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
-                      <td style={{ padding: '4px 8px', fontWeight: 600, fontSize: 11, color: row.computed ? '#94a3b8' : '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff', zIndex: 1, whiteSpace: 'nowrap' }} title={row.tip || undefined}>
-                        {row.label}
-                        {row.tip && <span style={{
-                          width: 14, height: 14, borderRadius: '50%', marginLeft: 5,
-                          background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex',
-                          alignItems: 'center', justifyContent: 'center', cursor: 'help', verticalAlign: 'middle',
-                          fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
-                        }} title={row.tip}>i</span>}
-                      </td>
-                      {row.cells.map((cell, ci) => (
-                        <td key={ci} style={{ padding: '2px 2px', textAlign: 'center' }}>{cell}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <>
+              <Section title="2b. Service levels" sectionKey="service_levels" onFocus={onSectionFocus}>
+                <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+                  Fill the <b style={{ color: '#B45309' }}>cream</b> start &amp; baseline cells for each rung (each column Σ 100%). In-between historical years follow the engine's path (grey). To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill a full <b style={{ color: '#2563eb' }}>blue</b> forecast column (Σ 100%) — set as many as you like.
+                </div>
+                <YearTable rows={serviceRows} years={years} baseYr2={baseYr2} markTargets colIsTarget={anyTarget} />
+              </Section>
+
+              <Section title="2c. Economic & demographic data" sectionKey="econ_demo" onFocus={onSectionFocus}>
+                <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
+                  Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — blank auto-fills at the mean historical growth (grey “→ … used” row). GDP/pop growth and average household size are auto-calculated.
+                </div>
+                <YearTable rows={econRows} years={years} baseYr2={baseYr2} />
+              </Section>
+
+              <Section title="2d. Budget" sectionKey="budget" onFocus={onSectionFocus}>
+                <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 4 }}>
+                  💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed HH × Safely-managed unit cost) + (new Basic HH × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. Type any cell to override that year.
+                </div>
+                <YearTable rows={budgetRows} years={years} baseYr2={baseYr2} />
+              </Section>
+            </>
           );
         })()}
-      </Section>
 
       </>}
 
