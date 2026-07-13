@@ -460,8 +460,8 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         </>}
       </Section>
 
-      {/* ===== 2a. ANALYSIS PERIOD (key dates) ===== */}
-      <Section title="2a. Analysis Period" sectionKey="period" onFocus={onSectionFocus}>
+      {/* ===== 2. ANALYSIS PERIOD (key dates) ===== */}
+      <Section title="2. Analysis Period" sectionKey="period" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the baseline year. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
@@ -470,7 +470,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="As-is forecast length" value={inputs.period.as_is_forecast_length ?? 2} onChange={v => u('period','as_is_forecast_length',v)} unit="yrs" min={1} max={10} tip="Number of as-is years (workbook G19). End of as-is = start + length − 1; the target path branches from the end-of-as-is year" />
         <F label="Performance improvement start" value={(inputs.period.as_is_forecast_start || inputs.period.baseline_year + 1) + (inputs.period.as_is_forecast_length || 2)} onChange={() => {}} fieldType="computed" tip="Derived: end of as-is forecast + 1 (= as-is start + as-is length). Matches the workbook's G21." />
         <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#0369a1', background: '#EBF6FB', border: '1px solid #9fd3ec', borderRadius: 6, padding: '8px 12px' }}>
-          🎯 <b>Target years are set in the year-by-year table in section 2b below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
+          🎯 <b>Target years are set in the Service levels section (3) below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
         </div>
       </Section>
 
@@ -483,16 +483,18 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontWeight: 600 }}>
           <span style={{ fontSize: 14, lineHeight: 1.3 }}>📍</span>
-          <span>Every section below is <span style={{ display: 'inline-block', background: '#0073A8', color: '#fff', fontWeight: 700, padding: '1px 10px', borderRadius: 12, fontSize: 12, textTransform: 'capitalize', verticalAlign: 'baseline' }}>{scopeLabel}</span>-specific — enter {scopeLower} figures here. Sections 1 and 2a above apply to the whole analysis and are shared across areas.</span>
+          <span>Every section below is <span style={{ display: 'inline-block', background: '#0073A8', color: '#fff', fontWeight: 700, padding: '1px 10px', borderRadius: 12, fontSize: 12, textTransform: 'capitalize', verticalAlign: 'baseline' }}>{scopeLabel}</span>-specific — enter {scopeLower} figures here. Sections 1 and 2 above apply to the whole analysis and are shared across areas.</span>
         </div>
       </div>
 
       {/* ===== EXCEL ROUND-TRIP — OPTIONAL bulk entry covering every section of the year-by-year table ===== */}
       <div style={{ marginBottom: 8, border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, background: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b' }}>📊 Bulk data entry (Excel) — optional</span>
-        <span style={{ fontSize: 11, color: '#64748b', flex: '1 1 220px', minWidth: 180 }}>
-          Optional — you can either enter the data directly in the year-by-year sections below, <b>or</b> download an Excel template for <b style={{ textTransform: 'capitalize' }}>{scopeLabel}</b>, fill it offline, and upload it. One template covers <b>all three</b> year-by-year sections below (2b service levels, 2c economic &amp; demographic, 2d budget) and mirrors their colours (cream = historical, blue = forecast, grey = auto-calculated). Use whichever you prefer.
+        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help' }}
+          title={`Optional — enter the data directly in the year-by-year sections below (3 Service levels, 4 Economic & demographic, 5 Budget), or download one Excel template for ${scopeLabel}, fill it offline, and upload it. The template covers all three sections and mirrors their colours (cream = historical, blue = forecast, grey = auto-calculated). Use whichever you prefer.`}>
+          📊 Bulk data entry (Excel) — optional
+          <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }}>i</span>
         </span>
+        <span style={{ flex: 1, minWidth: 8 }} />
         <button onClick={handleXlsxDownload} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #2563eb', borderRadius: 6, background: '#fff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>⤓ Download template</button>
         <button onClick={() => fileRef.current?.click()} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>⤒ Upload filled template</button>
         <input ref={fileRef} type="file" accept=".xlsx" onChange={handleXlsxUpload} style={{ display: 'none' }} />
@@ -504,7 +506,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         )}
       </div>
 
-      {/* ===== 2b. YEAR-BY-YEAR DATA (service levels, GDP, demographics, budget) ===== */}
+      {/* ===== 3-5. YEAR-BY-YEAR DATA — split into Service levels / Economic & demographic / Budget ===== */}
       {(() => {
           // ── Shared computation for the three split year-by-year sections (service levels / economic
           // & demographic / budget); each renders the same year columns via <YearTable>. The table
@@ -706,21 +708,21 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           ];
           return (
             <>
-              <Section title="2b. Service levels" sectionKey="service_levels" onFocus={onSectionFocus}>
+              <Section title="3. Service levels" sectionKey="service_levels" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
                   Fill the <b style={{ color: '#B45309' }}>cream</b> start &amp; baseline cells for each rung (each column Σ 100%). In-between historical years follow the engine's path (grey). To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill a full <b style={{ color: '#2563eb' }}>blue</b> forecast column (Σ 100%) — set as many as you like.
                 </div>
                 <YearTable rows={serviceRows} years={years} baseYr2={baseYr2} markTargets colIsTarget={anyTarget} />
               </Section>
 
-              <Section title="2c. Economic & demographic data" sectionKey="econ_demo" onFocus={onSectionFocus}>
+              <Section title="4. Economic & demographic data" sectionKey="econ_demo" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
                   Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — blank auto-fills at the mean historical growth (grey “→ … used” row). GDP/pop growth and average household size are auto-calculated.
                 </div>
                 <YearTable rows={econRows} years={years} baseYr2={baseYr2} />
               </Section>
 
-              <Section title="2d. Budget" sectionKey="budget" onFocus={onSectionFocus}>
+              <Section title="5. Budget" sectionKey="budget" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 4 }}>
                   💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed HH × Safely-managed unit cost) + (new Basic HH × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. Type any cell to override that year.
                 </div>
@@ -746,7 +748,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
       {/* ===== UNIT COSTS + TECHNICAL (merged, sector-dependent). Targets are now set in the §2 table. ===== */}
       {bauSector === 'water' && (
-      <Section title={`3. ${scopeLabel} Water Supply — Unit Costs & Technical Parameters`} cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
+      <Section title={`6. ${scopeLabel} Water Supply — Unit Costs & Technical Parameters`} cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Unit costs (nominal → real)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
           Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ws[0]}</b> and <b>{ws[1]}</b> weighted costs, built from the technology mixes.
@@ -772,7 +774,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       )}
 
       {bauSector === 'sanitation' && (
-      <Section title={`3. ${scopeLabel} Sanitation — Unit Costs & Technical Parameters`} cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
+      <Section title={`6. ${scopeLabel} Sanitation — Unit Costs & Technical Parameters`} cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Unit costs (nominal → real)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
           Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ss[0]}</b> and <b>{ss[1]}</b> weighted costs, built from the technology mixes.
@@ -796,7 +798,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
       {isInterventions && <>
       {/* ===== WATER INTERVENTIONS ===== */}
-      <Section title="4. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
+      <Section title="7. Water Supply Interventions" cols={2} sectionKey="ws_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -854,7 +856,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== SANITATION INTERVENTIONS ===== */}
-      <Section title="5. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
+      <Section title="8. Sanitation Interventions" cols={2} sectionKey="san_interventions" onFocus={onSectionFocus}>
         <SubHead text="Collection efficiency" />
         <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the intervention begins; must be after baseline" />
         <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year the target is fully achieved; must be after start year" />
@@ -902,7 +904,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== CUSTOM INTERVENTIONS ===== */}
-      <Section title="6. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
+      <Section title="9. Custom Interventions" cols={2} sectionKey="custom_interventions" onFocus={onSectionFocus}>
         {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
           const updateCI = (field: string, val: any) => {
             const arr = [...inputs.custom_interventions];
