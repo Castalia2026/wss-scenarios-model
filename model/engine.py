@@ -117,8 +117,11 @@ def build_context(inputs: ModelInputs) -> dict:
     years = np.arange(p.model_start_year, p.forecast_end_year + 1)
     n = len(years)
     bi = int(p.baseline_year - p.model_start_year)             # baseline index
-    end_asis_year = p.as_is_forecast_start + p.as_is_forecast_length - 1  # G20 (e.g. 2026+2-1=2027)
-    perf_start_year = end_asis_year + 1                        # G21 (e.g. 2028)
+    # test2: NO as-is lag. Performance improvement begins the year after the last year of historical
+    # data (baseline). The former as-is forecast window is removed, so the target path branches
+    # immediately at baseline + 1.
+    end_asis_year = int(p.baseline_year)                       # = last historical year (kept for payload)
+    perf_start_year = int(p.baseline_year) + 1
 
     # J7 (forecast years) and J8 (performance-improvement years) flags
     forecast_flag = (years > p.baseline_year).astype(float)

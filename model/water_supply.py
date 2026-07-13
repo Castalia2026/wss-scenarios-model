@@ -68,7 +68,8 @@ def _planned_annual(planned_list, years, baseline_year, target2_year):
 def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_basic,
                full_budget, capex_pct, growth_capex_pct, planned_list, nonhh_pct, asset_life, capex_adder,
                hist_all_proportional, target_adjusted, execution_rate=1.0,
-               targets=None, budget_source='pct_gdp', budget_override=None, gdp_real=None):
+               targets=None, budget_source='pct_gdp', budget_override=None, gdp_real=None,
+               hist_series=None, first_year_idx=0):
     """Shared 4a-4d core. All HH and money values are in MILLIONS; costs in actual currency.
 
     `full_budget` is the sector's FULL budget per year in real terms, from EITHER %GDP mode
@@ -94,32 +95,64 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     # block below — the 'from_cost' source derives the historical budget from the historical household
     # counts, which must be computed first. See "Budget finalisation" further down.
 
-    # Historical CAGR per rung (on HH counts, start -> baseline)
-    n_hist = by - msy
-    hh_s, hh_b = total_hh[0], total_hh[bi]
-    cagr = []
+    # ── Per-rung historical growth RATE (mean year-on-year) + unadjusted count path ──────────────
+    # test2 (items 7 & 8): service levels may be entered for EVERY historical year (like real GDP),
+    # and each rung's growth rate is the MEAN of its year-on-year count growth over the window
+    # [first_year .. baseline]; blank years fill forward at that rate. `first_year_idx` lets the user
+    # choose where the BAU rate starts. BACKWARD-COMPAT: with only the start & baseline points entered,
+    # mean-YoY over a two-point geometric series equals the previous two-point CAGR, so the validated
+    # numbers are unchanged unless richer annual data / a later first year is supplied.
+    fi = max(0, min(int(first_year_idx or 0), bi))
+    hs = hist_series or []
+    def _hist_share(r, t):
+        if r < len(hs):
+            a = hs[r]
+            if a is not None and t < len(a):
+                v = a[t]
+                return float(v) if (v and v > 0) else 0.0
+        if t == 0:
+            return float(pct_start[r] or 0.0)
+        if t == bi:
+            return float(pct_base[r] or 0.0)
+        return 0.0
+    cagr = []                          # kept name; now holds the MEAN-YoY rate per rung
+    unadj_hist = np.zeros((5, bi + 1))
     for r in range(5):
-        a, b = pct_start[r] * hh_s, pct_base[r] * hh_b
-        cagr.append(((b / a) ** (1.0 / n_hist) - 1.0) if (a > 0 and b > 0 and n_hist > 0) else 0.0)
+        known = {}
+        for t in range(bi + 1):
+            sh = _hist_share(r, t)
+            if sh > 0:
+                known[t] = sh * total_hh[t]                              # entered count = share × total HHs
+        ks = sorted(k for k in known if fi <= k <= bi)
+        yoy = []
+        for j in range(1, len(ks)):
+            t0, t1 = ks[j - 1], ks[j]
+            if known[t0] > 0 and t1 > t0:
+                yoy.append((known[t1] / known[t0]) ** (1.0 / (t1 - t0)) - 1.0)   # annualised between entered years
+        g = float(np.mean(yoy)) if yoy else 0.0
+        cagr.append(g)
+        prev = None
+        for t in range(bi + 1):
+            if t in known:
+                unadj_hist[r, t] = known[t]; prev = known[t]
+            elif prev is not None:
+                unadj_hist[r, t] = prev * (1.0 + g); prev = unadj_hist[r, t]
+            else:
+                unadj_hist[r, t] = 0.0
 
     # 4a — BAU forecast
     bau = np.zeros((5, n))
-    # Historical block (2011..baseline): the sheet does NOT interpolate %s linearly. Each rung's
-    # UNADJUSTED count grows geometrically from its 2011 count at the rung's historical CAGR
-    # (X186: 2011# × (1+CAGR)^t, 2011# = start% × total_HH[2011]); then the ADJUSTED counts
-    # (X193:197, the displayed series) rescale to that year's total HHs exactly like 4a:
-    # SM kept, lower rungs × (total/Σ-all-5-unadjusted), Basic = plug. The two coincide at 2011
-    # and (because the CAGR is calibrated to hit total×baseline%) at the baseline year.
-    base0 = [pct_start[r] * total_hh[0] for r in range(5)]
+    # Historical block: the UNADJUSTED per-rung counts above are rescaled to each year's total HHs —
+    # WATER: all five rungs × (total/Σunadj); SANITATION: SM kept, lower proportional, Basic = plug.
     for t in range(bi + 1):
-        unadj = [base0[r] * (1.0 + cagr[r]) ** t for r in range(5)]     # I!136-140 = 2011# × (1+CAGR)^t
-        total_unadj = sum(unadj)                                        # I!141
+        unadj = [unadj_hist[r, t] for r in range(5)]
+        total_unadj = sum(unadj)
         scale = total_hh[t] / total_unadj if total_unadj > 0 else 0.0
-        if hist_all_proportional:                                      # WATER I!143-147: every rung × total/Σunadj
+        if hist_all_proportional:
             for r in range(5):
                 bau[r, t] = unadj[r] * scale
-        else:                                                          # SANITATION I!193-197: SM kept, lower
-            for r in LOWER:                                            # proportional, Basic = plug
+        else:
+            for r in LOWER:
                 bau[r, t] = unadj[r] * scale
             bau[0, t] = unadj[0]
             bau[1, t] = total_hh[t] - unadj[0] - sum(bau[r, t] for r in LOWER)
@@ -322,6 +355,8 @@ def calculate_water_supply(inputs, ctx):
         ctx, period=inputs.period,
         pct_start=[sl.pct_serv1_start, sl.pct_serv2_start, sl.pct_serv3_start, sl.pct_serv4_start, sl.pct_serv5_start],
         pct_base=[sl.pct_serv1_baseline, sl.pct_serv2_baseline, sl.pct_serv3_baseline, sl.pct_serv4_baseline, sl.pct_serv5_baseline],
+        hist_series=[getattr(sl, f'serv{i+1}_ts', None) for i in range(5)],
+        first_year_idx=(int(sl.bau_first_year) - inputs.period.model_start_year) if getattr(sl, 'bau_first_year', 0) else 0,
         tgt1=[wt.target1_serv1, wt.target1_serv2, wt.target1_serv3, wt.target1_serv4, wt.target1_serv5],
         tgt2=[wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5],
         targets=_target_points(wt, inputs.period),

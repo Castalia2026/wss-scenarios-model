@@ -88,7 +88,7 @@ def _editable(kind, i, bi):
     if kind in ('proj', 'ovr'):
         return True               # all years — historical actuals + forecast projections / overrides
     if kind == 'svc_tgt':
-        return i == 0 or i >= bi  # start, baseline, or any forecast year (a full forecast column = a target)
+        return True  # test2: every historical year is editable now, plus forecast target columns
     return False
 
 

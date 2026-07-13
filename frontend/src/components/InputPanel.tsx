@@ -34,7 +34,7 @@ function SubHead({ text }: { text: string }) {
 }
 
 // A row in a year-by-year table. `section`/`sub` render a band header instead of data cells.
-type YRow = { label: string; tip?: string; section?: boolean; sub?: boolean; computed?: boolean; cells: React.ReactNode[] };
+type YRow = { label: React.ReactNode; tip?: string; section?: boolean; sub?: boolean; computed?: boolean; cells: React.ReactNode[] };
 
 // Shared year-by-year table used by the split Data-Inputs sections (service levels / economic &
 // demographic / budget). IMPORTANT: border-collapse must be SEPARATE (not collapse) — otherwise the
@@ -466,9 +466,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the last year of historical data. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Last year of historical data" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
         <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} tip="Last year of projection" />
-        <F label="As-is forecast start" value={inputs.period.as_is_forecast_start || (inputs.period.baseline_year + 1)} onChange={v => u('period','as_is_forecast_start',v)} min={inputs.period.baseline_year + 1} tip="First year of the as-is forecast (workbook G18); usually baseline + 1" />
-        <F label="As-is forecast length" value={inputs.period.as_is_forecast_length ?? 2} onChange={v => u('period','as_is_forecast_length',v)} unit="yrs" min={1} max={10} tip="Number of as-is years (workbook G19). End of as-is = start + length − 1; the target path branches from the end-of-as-is year" />
-        <F label="Performance improvement start" value={(inputs.period.as_is_forecast_start || inputs.period.baseline_year + 1) + (inputs.period.as_is_forecast_length || 2)} onChange={() => {}} fieldType="computed" tip="Derived: end of as-is forecast + 1 (= as-is start + as-is length). Matches the workbook's G21." />
+        <F label="Performance improvement start" value={inputs.period.baseline_year + 1} onChange={() => {}} fieldType="computed" tip="The year after the last year of historical data — the target path branches from here. There is no as-is lag." />
         <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#0369a1', background: '#EBF6FB', border: '1px solid #9fd3ec', borderRadius: 6, padding: '8px 12px' }}>
           🎯 <b>Target years are set in the Service levels section (3) below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
         </div>
@@ -523,7 +521,13 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           const CREAM: React.CSSProperties = { border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452' };  // historical input
           const BLUE: React.CSSProperties = { border: '1px solid #93C5FD', background: '#EFF6FF', color: '#1E3A5F' };    // forecast / projection input
           const grey = (txt: string, note: string) => <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title={note}>{txt}</span>;
-          const fmtNum = (v: number) => Math.abs(v) >= 1000 ? Math.round(v).toLocaleString() : String(Math.round(v * 100) / 100);
+          // 3 significant figures, thousands-separated (no scientific notation) — used by the grey
+          // "→ … used" projection rows.
+          const fmtNum = (v: number) => {
+            if (!isFinite(v) || v === 0) return '0';
+            const m = Math.pow(10, 2 - Math.floor(Math.log10(Math.abs(v))));
+            return (Math.round(v * m) / m).toLocaleString('en-US', { maximumFractionDigits: 20 });
+          };
           const resAt = (key: string, idx: number): number | null => {
             const a = results?.[key];
             return Array.isArray(a) && idx < a.length && a[idx] != null ? a[idx] : null;
@@ -633,15 +637,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
           const svcCell = (section: string, field: string, idx: number) => {
             const yr = years[idx];
-            if (yr === startYr2 || yr === baseYr2) {
-              return editCell(section, field, idx, true, false);          // cream: historical start / baseline input
-            }
-            if (yr < baseYr2) {
-              // Display only: the engine's historical path (each rung's count grows at its historical
-              // CAGR, then rescaled to total households) — tracks edits to either endpoint.
-              const rung0 = parseInt(field.replace(/\D/g, ''), 10) - 1;
-              const pct = histSvcPct(section, rung0, yr - startYr2);
-              return grey((pct * 100).toFixed(1), 'Display only — follows the engine’s historical path, matching the model’s BAU block');
+            // test2 (item 7): EVERY historical year is an editable cream input (like the GDP / population
+            // rows); blank years are ignored and filled by the engine at the mean historical growth.
+            if (yr <= baseYr2) {
+              return editCell(section, field, idx, true, false, true);    // cream, blank when unentered
             }
             // Forecast year: EDITABLE target cell (blue). Fill all 5 rungs (Σ 100%) to make this a target year.
             return editCell(section, field, idx, true, true, true);
@@ -654,23 +653,44 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             return Math.abs(s - 1) < 0.02;
           };
           const svcRow = (label: string, section: string, field: string) => ({
-            label, tip: 'Share of households at this service level. Start & baseline years are historical inputs; fill a full forecast column (all 5 rungs, Σ 100%) to set a target year.',
+            label, tip: 'Share of households at this service level. Historical years are editable inputs; fill a full forecast column (all 5 rungs, Σ 100%) to set a target year.',
             cells: years.map((_: number, i: number) => svcCell(section, field, i)),
           });
 
           // Lighter sub-header band (Water supply / Sanitation) inside the Service levels table.
-          const subRow = (label: string): YRow => ({ label, section: true, sub: true, computed: false, cells: [] });
+          const subRow = (label: React.ReactNode): YRow => ({ label, section: true, sub: true, computed: false, cells: [] });
+          // Per-sector "first year" picker (item 8): the BAU growth rate = mean year-on-year growth from
+          // this year to the last historical year. Stored as inputs.<section>.bau_first_year — a YEAR, so
+          // it survives a model-start-year shift. Rendered in the sector band so it's clearly on the table.
+          const firstYearPicker = (section: string, label: string) => {
+            const histYears = years.filter((y: number) => y <= baseYr2);
+            const cur = inputs[section]?.bau_first_year || startYr2;
+            return (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span>{label}</span>
+                <span style={{ fontWeight: 500, fontStyle: 'normal', fontSize: 10.5, color: '#4f46e5', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  BAU rate from
+                  <select value={cur} onChange={e => u(section, 'bau_first_year', parseInt(e.target.value, 10))}
+                    style={{ fontSize: 10.5, padding: '1px 4px', border: '1px solid #c7d2fe', borderRadius: 4, background: '#fff', color: '#312e81', cursor: 'pointer' }}>
+                    {histYears.map((y: number) => <option key={y} value={y}>{y}</option>)}
+                  </select>
+                  to {baseYr2}
+                  <span title="The BAU growth rate for this sector is the mean year-on-year growth from the chosen first year to the last historical year, then projected forward." style={{ width: 13, height: 13, borderRadius: '50%', background: '#C2CBD6', color: '#fff', fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }}>i</span>
+                </span>
+              </span>
+            );
+          };
 
           const hhLbl = `${scopeLabel} households`;
           const anyTarget = (i: number) => colIsTarget('water_service', i) || colIsTarget('sanitation_service', i);
           const serviceRows: YRow[] = [
-            subRow('Water supply'),
+            subRow(firstYearPicker('water_service', 'Water supply')),
             svcRow(`% ${ws[0]}`, 'water_service', 'serv1_ts'),
             svcRow(`% ${ws[1]}`, 'water_service', 'serv2_ts'),
             svcRow(`% ${ws[2]}`, 'water_service', 'serv3_ts'),
             svcRow(`% ${ws[3]}`, 'water_service', 'serv4_ts'),
             svcRow(`% ${ws[4]}`, 'water_service', 'serv5_ts'),
-            subRow('Sanitation'),
+            subRow(firstYearPicker('sanitation_service', 'Sanitation')),
             svcRow(`% ${ss[0]}`, 'sanitation_service', 'sserv1_ts'),
             svcRow(`% ${ss[1]}`, 'sanitation_service', 'sserv2_ts'),
             svcRow(`% ${ss[2]}`, 'sanitation_service', 'sserv3_ts'),
@@ -710,7 +730,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             <>
               <Section title="3. Service levels" sectionKey="service_levels" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-                  Fill the <b style={{ color: '#B45309' }}>cream</b> start &amp; baseline cells for each rung (each column Σ 100%). In-between historical years follow the engine's path (grey). To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill a full <b style={{ color: '#2563eb' }}>blue</b> forecast column (Σ 100%) — set as many as you like.
+                  Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells for each rung (each column Σ 100%); blank years auto-fill at the mean historical growth. Pick each sector's <b>BAU-rate first year</b> in its band below. To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill a full <b style={{ color: '#2563eb' }}>blue</b> forecast column (Σ 100%) — set as many as you like.
                 </div>
                 <YearTable rows={serviceRows} years={years} baseYr2={baseYr2} markTargets colIsTarget={anyTarget} />
               </Section>
