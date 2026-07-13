@@ -648,8 +648,8 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     content: 'Select the country and the area of focus for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed.',
     sources: [{ name: 'World Bank country classification', url: 'https://datahelpdesk.worldbank.org/knowledgebase/articles/906519' }],
   },
-  macro: {
-    title: 'Analysis Period & Year-by-Year Data',
+  period: {
+    title: '2a. Analysis Period',
     content: (
       <div>
         <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool.</p>
@@ -675,10 +675,23 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the year-by-year table below — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
+          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the year-by-year table in section 2b — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
         </div>
+      </div>
+    ),
+  },
+  macro: {
+    title: '2b. Year-by-Year Data',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The year-by-year table. Cream cells are historical inputs; blue forecast cells are optional (blank = auto-fill at the mean historical growth); grey rows show the values the model uses.</p>
 
-        <div style={gSub}>Year-by-year data</div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Water / sanitation service levels (% HH):</span> The share of households at each of the 5 JMP service levels. Enter the start-year and baseline-year splits (each summing to 100%); in-between years follow the engine's historical path. Fill a FULL forecast column (Σ 100%) to set a 🎯 target year.
+          <GFind items={[
+            'WHO/UNICEF JMP – washdata.org/data/household',
+          ]} />
+        </div>
         <div style={gFieldWrap}>
           <span style={gFieldLbl}>Real GDP (local currency, millions):</span> Real GDP in local currency at constant (base-year) prices. Enter the historical years; leave forecast years blank to auto-fill at the mean historical growth, or type your own projection (the grey “→ used” row shows the value the model applies). This drives the forecast WSS budget.
           <GFind items={[
@@ -688,10 +701,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
           ]} />
         </div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>WSS budget:</span> The budget is derived automatically — historically from the cost of the new connections added each year (Safely-managed + Basic households × their unit cost), and for forecast years from the average historical budget-to-GDP ratio × real GDP. You can type into any budget cell to override that year.
-        </div>
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Urban Population:</span> The total number of people living in urban areas within the selected region for each year of the analysis. This forms the baseline from which the model calculates growth and infrastructure demand.
+          <span style={gFieldLbl}>Population:</span> The total number of people living in the selected area for each year of the analysis. This forms the baseline from which the model calculates growth and infrastructure demand.
           <GFind items={[
             'World Bank – data.worldbank.org/indicator/SP.URB.TOTL',
             'UN World Urbanization Prospects – population.un.org/wup',
@@ -699,15 +709,15 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
           ]} />
         </div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Households (in millions):</span> The total number of occupied households in the selected urban area for each year of the analysis. Used to estimate residential demand for water and sanitation services.
+          <span style={gFieldLbl}>Households (in millions):</span> The total number of occupied households in the selected area for each year of the analysis. Used to estimate residential demand for water and sanitation services — this series drives the model.
           <GFind items={[
             "Your country's national statistics office or census bureau (search \"[country] housing census households\")",
             'UN Statistics Division – unstats.un.org',
           ]} />
-          <span style={gNote}>Note: If household data is unavailable, it can be estimated by dividing the urban population by the average household size.</span>
+          <span style={gNote}>Note: If household data is unavailable, it can be estimated by dividing the population by the average household size.</span>
         </div>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you — historically from the cost of new connections, and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type to override a given year. If you have actual government budget figures you would rather use, enter them directly to override.
+          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you — historically from the cost of the new connections added each year (Safely-managed + Basic households × their unit cost), and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type into any cell to override that year — e.g. if you have actual government budget figures.
           <GFind items={[
             "Your country's Ministry of Finance (budget documents / execution reports), if overriding",
             "Your country's Ministry of Water Supply / Sanitation or equivalent sector ministry",
@@ -813,7 +823,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 const guideKeysByTab: Record<number, string[]> = {
   // Data Inputs — includes the BAU data entry duplicated onto this tab. test2: targets & technical
   // params are folded into the table / the merged unit-cost section.
-  0: ['country', 'macro', 'ws_unit_costs', 'san_unit_costs'],
+  0: ['country', 'period', 'macro', 'ws_unit_costs', 'san_unit_costs'],
   // BAU Scenario
   1: ['ws_unit_costs', 'san_unit_costs'],
   // Intervention Design
