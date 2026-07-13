@@ -32,6 +32,8 @@ def calculate_sanitation(inputs, ctx):
         ctx, period=inputs.period,
         pct_start=[sl.pct_sserv1_start, sl.pct_sserv2_start, sl.pct_sserv3_start, sl.pct_sserv4_start, sl.pct_sserv5_start],
         pct_base=[sl.pct_sserv1_baseline, sl.pct_sserv2_baseline, sl.pct_sserv3_baseline, sl.pct_sserv4_baseline, sl.pct_sserv5_baseline],
+        hist_series=[getattr(sl, f'sserv{i+1}_ts', None) for i in range(5)],
+        first_year_idx=(int(sl.bau_first_year) - inputs.period.model_start_year) if getattr(sl, 'bau_first_year', 0) else 0,
         tgt1=[st.target1_sserv1, st.target1_sserv2, st.target1_sserv3, st.target1_sserv4, st.target1_sserv5],
         tgt2=[st.target2_sserv1, st.target2_sserv2, st.target2_sserv3, st.target2_sserv4, st.target2_sserv5],
         targets=_target_points(st, inputs.period),

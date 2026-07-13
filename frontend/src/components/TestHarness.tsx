@@ -76,19 +76,13 @@ export default function TestHarness({ inputs, onChange }: Props) {
     onChange({ ...inputs, [section]: { ...(inputs?.[section] || {}), [field]: value } });
   }, [inputs, onChange]);
 
-  // Service-level start/baseline editor: writes the SAME serv{i}_ts arrays the Data Inputs
-  // year-by-year table shows (linear interpolation start→baseline over the historical years).
+  // Service-level editors read/write the SAME per-rung annual serv{i}_ts arrays the Data Inputs
+  // year-by-year table shows. test2: the engine now consumes the FULL annual series (the BAU rate is
+  // the mean year-on-year growth from bau_first_year to the baseline year), so the harness edits the
+  // whole series per rung — not two points that get linearly interpolated.
   const svcKey = (i: number) => sector === 'water' ? `serv${i}_ts` : `sserv${i}_ts`;
   const svcSection = sector === 'water' ? 'water_service' : 'sanitation_service';
   const svcAt = (i: number, idx: number) => ((inputs?.[svcSection]?.[svcKey(i)] || [])[idx]) || 0;
-  const setSvc = (i: number, which: 'start' | 'baseline', v: number) => {
-    const arr = [...(inputs?.[svcSection]?.[svcKey(i)] || Array(nYears).fill(0))];
-    while (arr.length < nYears) arr.push(arr[arr.length - 1] || 0);
-    const start = which === 'start' ? v : (arr[0] || 0);
-    const base = which === 'baseline' ? v : (arr[bi] || 0);
-    for (let t = 0; t < nYears; t++) arr[t] = t <= bi ? start + (base - start) * (bi ? t / bi : 1) : base;
-    setIn(svcSection, svcKey(i), arr);
-  };
 
   const tgtSection = sector === 'water' ? 'water_targets' : 'sanitation_targets';
   const tgtKey = (t: 1 | 2, i: number) => sector === 'water' ? `target${t}_serv${i}` : `target${t}_sserv${i}`;
@@ -196,10 +190,11 @@ export default function TestHarness({ inputs, onChange }: Props) {
           <NumField width={95} label="Model start" value={per.model_start_year} onCommit={v => setIn('period', 'model_start_year', v)} />
           <NumField width={95} label="Baseline" value={per.baseline_year} onCommit={v => setIn('period', 'baseline_year', v)} />
           <NumField width={95} label="Forecast end" value={per.forecast_end_year} onCommit={v => setIn('period', 'forecast_end_year', v)} />
-          <NumField width={95} label="As-is start" value={per.as_is_forecast_start} onCommit={v => setIn('period', 'as_is_forecast_start', v)} />
-          <NumField width={95} label="As-is length" value={per.as_is_forecast_length} onCommit={v => setIn('period', 'as_is_forecast_length', v)} />
           <NumField width={95} label="Target 1 yr" value={per.target1_year} onCommit={v => setIn('period', 'target1_year', v)} />
           <NumField width={95} label="Target 2 yr" value={per.target2_year} onCommit={v => setIn('period', 'target2_year', v)} />
+        </div>
+        <div style={{ fontSize: 9.5, color: '#64748b', marginTop: 3 }}>
+          No as-is lag: performance improvement starts at <b>{(per.baseline_year || 2025) + 1}</b> (baseline + 1).
         </div>
 
         <h3 style={h3Style}>Macro ({per.model_start_year}→{per.forecast_end_year})</h3>
@@ -255,24 +250,18 @@ export default function TestHarness({ inputs, onChange }: Props) {
           note="Baseline year onward projected at mean historical household growth." />
         <ArrField label="Total population (millions)" value={pop.pop_ts || []} onCommit={a => setIn('population', 'pop_ts', a)} />
 
-        <h3 style={h3Style}>{sector === 'water' ? 'Water' : 'Sanitation'} — service levels (% of HHs)</h3>
-        <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
-          <thead><tr style={{ color: '#64748b' }}><th style={{ textAlign: 'left' }}>rung</th><th>start {per.model_start_year}</th><th>baseline {per.baseline_year}</th></tr></thead>
-          <tbody>
-            {rungNames.map((nm, j) => {
-              const i = j + 1;
-              return (
-                <tr key={i}>
-                  <td style={{ padding: '2px 4px' }}>{nm}</td>
-                  <td><input type="number" style={{ ...inStyle, width: 90, padding: '3px 5px' }} value={Math.round(svcAt(i, 0) * 1e6) / 1e4}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setSvc(i, 'start', v / 100); }} /></td>
-                  <td><input type="number" style={{ ...inStyle, width: 90, padding: '3px 5px' }} value={Math.round(svcAt(i, bi) * 1e6) / 1e4}
-                    onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setSvc(i, 'baseline', v / 100); }} /></td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+        <h3 style={h3Style}>{sector === 'water' ? 'Water' : 'Sanitation'} — service levels (annual shares)</h3>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap', marginBottom: 2 }}>
+          <NumField width={130} label="BAU rate first year" value={(inputs?.[svcSection]?.bau_first_year) || per.model_start_year} onCommit={v => setIn(svcSection, 'bau_first_year', v)} />
+          <div style={{ fontSize: 9.5, color: '#64748b', flex: 1, minWidth: 150 }}>
+            BAU growth per rung = mean year-on-year from this first year to the baseline; blank historical years fill at that rate. A full forecast column (Σ 100%) is a target year.
+          </div>
+        </div>
+        {rungNames.map((nm, j) => {
+          const i = j + 1;
+          return <ArrField key={i} label={`${nm} — share/yr (fraction, ${per.model_start_year}→${per.forecast_end_year})`}
+            value={inputs?.[svcSection]?.[svcKey(i)] || []} onCommit={(a: number[]) => setIn(svcSection, svcKey(i), a)} />;
+        })}
 
         <h3 style={h3Style}>{sector === 'water' ? 'Water' : 'Sanitation'} — targets (T1 {per.target1_year} / T2 {per.target2_year})</h3>
         <table style={{ width: '100%', fontSize: 11, borderCollapse: 'collapse' }}>
@@ -340,9 +329,9 @@ export default function TestHarness({ inputs, onChange }: Props) {
             <h3 style={{ margin: '0 0 6px', fontSize: 15, color: '#1e3a5f' }}>{sector === 'water' ? 'Water Supply' : 'Sanitation'} — BAU (validated engine)</h3>
             <div style={{ fontSize: 11, color: '#475569', marginBottom: 8 }}>
               cost/HH (SM) = <b>{Math.round(sec.cost_per_hh).toLocaleString()}</b>
-              {' · '}hist CAGR = {sec.hist_cagr.map((x: number) => (x * 100).toFixed(2) + '%').join(' / ')}
+              {' · '}BAU rate (mean YoY) = {sec.hist_cagr.map((x: number) => (x * 100).toFixed(2) + '%').join(' / ')}
               {' · '}opening stock = <b>{M(sec.opening_stock)}</b> M
-              {' · '}end-of-as-is = <b>{result.end_asis_year}</b>
+              {' · '}perf. start = <b>{(per.baseline_year || 2025) + 1}</b>
             </div>
             <table style={{ borderCollapse: 'collapse', fontSize: 11, whiteSpace: 'nowrap' }}>
               <thead>

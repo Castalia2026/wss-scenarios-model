@@ -120,6 +120,16 @@ class WaterServiceLevelInputs(BaseModel):
     pct_serv3_baseline: float = 0.0320
     pct_serv4_baseline: float = 0.0590
     pct_serv5_baseline: float = 0.0090
+    # test2: FULL per-rung historical share series (index 0 = model_start_year), when the user enters
+    # every historical year. Empty ⇒ fall back to the start/baseline two-point path above.
+    serv1_ts: List[float] = []
+    serv2_ts: List[float] = []
+    serv3_ts: List[float] = []
+    serv4_ts: List[float] = []
+    serv5_ts: List[float] = []
+    # First historical YEAR used to compute the BAU growth rate (mean YoY, first_year → baseline).
+    # 0 ⇒ use model_start_year.
+    bau_first_year: int = 0
 
 
 class SanitationServiceLevelInputs(BaseModel):
@@ -135,6 +145,14 @@ class SanitationServiceLevelInputs(BaseModel):
     pct_sserv3_baseline: float = 0.0080
     pct_sserv4_baseline: float = 0.0030
     pct_sserv5_baseline: float = 0.0020
+    # test2: FULL per-rung historical share series (index 0 = model_start_year); empty ⇒ two-point path.
+    sserv1_ts: List[float] = []
+    sserv2_ts: List[float] = []
+    sserv3_ts: List[float] = []
+    sserv4_ts: List[float] = []
+    sserv5_ts: List[float] = []
+    # First historical YEAR used to compute the BAU growth rate (mean YoY). 0 ⇒ model_start_year.
+    bau_first_year: int = 0
 
 
 # ──────────────────────────────────────────────────────────────────────────

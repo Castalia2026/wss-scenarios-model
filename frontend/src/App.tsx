@@ -165,7 +165,6 @@ export default function App() {
     if (p.model_start_year >= p.baseline_year) warnings.push('Model start year must be before the last year of historical data');
     else if (p.baseline_year - p.model_start_year < 3) warnings.push('Model start year should be at least 3 years before the last year of historical data');
     if (p.forecast_end_year <= p.baseline_year) warnings.push('Forecast end year must be after the last year of historical data');
-    if (p.baseline_year >= p.as_is_forecast_start) warnings.push('The last year of historical data must be before as-is forecast start');
     // Targets now live in the §2 table: any forecast year with a fully-entered service column (Σ 100%).
     // Warn about partially-filled columns and about a sector with no target at all.
     const checkTargets = (svc: any, prefix: string, label: string) => {

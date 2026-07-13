@@ -291,11 +291,16 @@ def to_engine(fe: dict) -> ModelInputs:
     ws_serv = WaterServiceLevelInputs(**{
         **{f'pct_serv{i+1}_start': _at(wsv.get(f'serv{i+1}_ts', []), 0) for i in range(5)},
         **{f'pct_serv{i+1}_baseline': _at(wsv.get(f'serv{i+1}_ts', []), bi) for i in range(5)},
+        # test2: forward the FULL per-rung historical series + the per-sector BAU first year (a YEAR).
+        **{f'serv{i+1}_ts': list(wsv.get(f'serv{i+1}_ts', []) or []) for i in range(5)},
+        'bau_first_year': int(wsv.get('bau_first_year', 0) or 0),
     })
     ssv = fe.get('sanitation_service', {})
     san_serv = SanitationServiceLevelInputs(**{
         **{f'pct_sserv{i+1}_start': _at(ssv.get(f'sserv{i+1}_ts', []), 0) for i in range(5)},
         **{f'pct_sserv{i+1}_baseline': _at(ssv.get(f'sserv{i+1}_ts', []), bi) for i in range(5)},
+        **{f'sserv{i+1}_ts': list(ssv.get(f'sserv{i+1}_ts', []) or []) for i in range(5)},
+        'bau_first_year': int(ssv.get('bau_first_year', 0) or 0),
     })
 
     end_yr = per.get('forecast_end_year', _END_YR)
