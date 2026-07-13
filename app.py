@@ -192,7 +192,12 @@ def export_xlsx(inputs: dict = Body(...)):
 def template_xlsx(inputs: dict = Body(...)):
     """Download a pre-filled, colour-coded Excel template of the year-by-year input table."""
     from excel_io import build_template
-    out = build_template(inputs)
+    results = None
+    try:
+        results = calculate(coerce_to_engine(inputs))
+    except Exception:
+        pass  # incomplete inputs — the template still downloads, grey engine rows just stay blank
+    out = build_template(inputs, results)
     return StreamingResponse(
         iter([out.getvalue()]),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
