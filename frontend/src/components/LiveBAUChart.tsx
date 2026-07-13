@@ -306,9 +306,86 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   // FinanceFlag: a flag on a pole anchored to the gap line, showing the financing gap for that year.
   // Both leave a small clickable marker when closed so they can be reopened.
   const pct1 = (f: number) => (f * 100).toFixed(1) + '%';
+  const BUBBLE_W = 142, BUBBLE_H = 63, FLAG_W = 148, FLAG_H = 34;
+
+  // Global collision-aware placement: every open box (bubbles first, then finance flags, left to
+  // right) tries a list of candidate spots — above/below the anchor, shifted sideways, stacked
+  // further out — and takes the first that doesn't overlap an already-placed box (with a margin);
+  // if all candidates collide it takes the least-overlapping one. Closed boxes take no space.
+  const flagPlan = useMemo(() => {
+    if (!overlay) return null;
+    const chartW = overlay.width, chartH = overlay.height;
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    const M = 6;                                                     // min gap between boxes
+    const clampR = (c: { x: number; y: number }, w: number, h: number) => ({
+      x: Math.max(4, Math.min(c.x, chartW - w - 4)),
+      y: Math.max(2, Math.min(c.y, chartH - h - 2)), w, h,
+    });
+    const collide = (r: any) => placed.some(p =>
+      r.x < p.x + p.w + M && p.x < r.x + r.w + M && r.y < p.y + p.h + M && p.y < r.y + r.h + M);
+    const place = (cands: { x: number; y: number }[], w: number, h: number) => {
+      let best: any = null, bestScore = Infinity;
+      for (const c of cands) {
+        const r = clampR(c, w, h);
+        if (!collide(r)) { placed.push(r); return r; }
+        let s = 0;
+        placed.forEach(p => {
+          const ox = Math.max(0, Math.min(r.x + r.w, p.x + p.w) - Math.max(r.x, p.x));
+          const oy = Math.max(0, Math.min(r.y + r.h, p.y + p.h) - Math.max(r.y, p.y));
+          s += ox * oy;
+        });
+        if (s < bestScore) { bestScore = s; best = r; }
+      }
+      placed.push(best);
+      return best;
+    };
+    const vis = targetPoints.filter((p: any) => isTargetVisible(p.year));
+    const bubbles: Record<number, { x: number; y: number }> = {};
+    const flags: Record<number, { x: number; y: number }> = {};
+    vis.forEach((p: any) => {
+      if (closedFlags.has(`t-${p.year}`)) return;
+      const cx = overlay.xm * p.year + overlay.xb;
+      const cy = overlay.ym * (isShare ? p.yShare : p.y) + overlay.yb;
+      // Candidate spots: centred/left/right of the point, at growing distances above then below,
+      // so a crowded bubble keeps climbing (or dropping) until it finds free space.
+      const cands: { x: number; y: number }[] = [];
+      for (let lvl = 0; lvl < 4; lvl++) {
+        const yAbove = cy - BUBBLE_H - 12 - lvl * (BUBBLE_H + 10);
+        const yBelow = cy + 12 + lvl * (BUBBLE_H + 10);
+        for (const x of [cx - BUBBLE_W / 2, cx - BUBBLE_W - 10, cx + 10]) cands.push({ x, y: yAbove });
+        for (const x of [cx - BUBBLE_W / 2, cx - BUBBLE_W - 10, cx + 10]) cands.push({ x, y: yBelow });
+      }
+      const r = place(cands, BUBBLE_W, BUBBLE_H);
+      bubbles[p.year] = { x: r.x, y: r.y };
+    });
+    vis.forEach((p: any) => {
+      if (closedFlags.has(`f-${p.year}`)) return;
+      const cx = overlay.xm * p.year + overlay.xb;
+      const cy = overlay.ym * (isShare ? p.gapYShare : p.gapY) + overlay.yb;
+      // Candidate spots: banner right/left/centred on the pole at growing pole heights (crowded
+      // flags stack up their poles), then BELOW the anchor on a downward pole when the space above
+      // is full (e.g. near the chart's clamped right edge).
+      const cands: { x: number; y: number }[] = [];
+      for (const dy of [42, 88, 134, 180, 226, 272]) {
+        cands.push({ x: cx + 2, y: cy - dy });
+        cands.push({ x: cx - FLAG_W - 2, y: cy - dy });
+        cands.push({ x: cx - FLAG_W / 2, y: cy - dy });
+      }
+      for (const dy of [30, 76, 122, 168]) {
+        cands.push({ x: cx + 2, y: cy + dy });
+        cands.push({ x: cx - FLAG_W - 2, y: cy + dy });
+        cands.push({ x: cx - FLAG_W / 2, y: cy + dy });
+      }
+      cands.push({ x: cx + 2, y: cy - 20 });
+      cands.push({ x: cx - FLAG_W - 2, y: cy - 20 });
+      const r = place(cands, FLAG_W, FLAG_H);
+      flags[p.year] = { x: r.x, y: r.y };
+    });
+    return { bubbles, flags };
+  }, [overlay, targetPoints, visibleTargets, closedFlags, isShare]);
 
   const TargetBubble = (props: any) => {
-    const { cx, cy, point } = props;
+    const { cx, cy, point, box } = props;
     if (cx == null || cy == null) return null;
     const key = `t-${point.year}`;
     if (closedFlags.has(key)) {
@@ -320,26 +397,31 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         </g>
       );
     }
+    if (!box) return null;
     const lines = [
       `Target coverage: ${pct1(point.tgtCov)}`,
       `BAU coverage: ${pct1(point.bauCov)}`,
       `Service gap: ${point.svcGap.toFixed(2)} M HH`,
     ];
-    const w = 142, lineH = 12, h = 22 + lines.length * lineH + 5;
-    const chartW = chartRef.current?.clientWidth || 640;
-    const bx = Math.max(4, Math.min(cx - w / 2, chartW - w - 8));    // clamp inside the chart
-    const above = cy > h + 26;                                       // flip below if too close to the top
-    const by = above ? cy - h - 12 : cy + 12;
-    const tx = Math.max(bx + 12, Math.min(cx, bx + w - 12));         // tail base, kept on the bubble edge
-    const tail = above
-      ? `M ${tx - 6} ${by + h} L ${tx + 6} ${by + h} L ${cx} ${cy - 3} Z`
-      : `M ${tx - 6} ${by} L ${tx + 6} ${by} L ${cx} ${cy + 3} Z`;
+    const w = BUBBLE_W, h = BUBBLE_H, lineH = 12;
+    const bx = box.x, by = box.y;
+    // Tail (or leader line) from the box toward the anchor point, based on where the box ended up.
+    const tx = Math.max(bx + 12, Math.min(cx, bx + w - 12));
+    let connector: React.ReactNode;
+    if (by + h <= cy - 4) {          // box above the point → tail from the bottom edge
+      connector = <path d={`M ${tx - 6} ${by + h} L ${tx + 6} ${by + h} L ${cx} ${cy - 3} Z`} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />;
+    } else if (by >= cy + 4) {       // box below the point → tail from the top edge
+      connector = <path d={`M ${tx - 6} ${by} L ${tx + 6} ${by} L ${cx} ${cy + 3} Z`} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />;
+    } else {                          // box beside the point → thin leader line to the nearest edge
+      const ex = cx < bx ? bx : bx + w;
+      connector = <line x1={cx} y1={cy} x2={ex} y2={Math.max(by + 6, Math.min(cy, by + h - 6))} stroke="#16a34a" strokeWidth={1.2} />;
+    }
     return (
       <g>
         <circle cx={cx} cy={cy} r={3.5} fill="#16a34a" stroke="#fff" strokeWidth={1} />
         {/* Solid white box + shadow so the chart lines can never show through or clash with the text */}
         <rect x={bx + 2} y={by + 2.5} width={w} height={h} rx={7} fill="#0f172a" opacity={0.16} />
-        <path d={tail} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />
+        {connector}
         <rect x={bx} y={by} width={w} height={h} rx={7} fill="#ffffff" stroke="#16a34a" strokeWidth={1.4} />
         <text x={bx + 9} y={by + 15} fontSize={10} fontWeight={700} fill="#15803d">🎯 Target {point.year}</text>
         {lines.map((t, i) => (
@@ -355,7 +437,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   };
 
   const FinanceFlag = (props: any) => {
-    const { cx, cy, point } = props;
+    const { cx, cy, point, box } = props;
     if (cx == null || cy == null) return null;
     const key = `f-${point.year}`;
     if (closedFlags.has(key)) {
@@ -367,15 +449,16 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         </g>
       );
     }
+    if (!box) return null;
     const valTxt = point.finGap == null ? '—' : Math.round(point.finGap).toLocaleString() + ' M ' + point.cur + '/yr';
-    const w = 148, h = 34, poleH = 42;
-    const chartW = chartRef.current?.clientWidth || 640;
-    const rightSide = cx + w + 10 < chartW;                          // banner right of the pole if it fits
-    const bx = rightSide ? cx + 2 : cx - w - 2;
-    const bannerTop = cy - poleH;
+    const w = FLAG_W, h = FLAG_H;
+    const bx = box.x, bannerTop = box.y;
+    // Pole from the anchor to the banner's nearest edge — upward normally, downward when the
+    // planner hung the banner below the anchor (crowded corner); none if the banner straddles it.
+    const poleY2 = bannerTop + h <= cy - 2 ? bannerTop + h : bannerTop >= cy + 2 ? bannerTop : null;
     return (
       <g>
-        <line x1={cx} y1={cy} x2={cx} y2={bannerTop} stroke="#b91c1c" strokeWidth={1.5} />
+        {poleY2 != null && <line x1={cx} y1={cy} x2={cx} y2={poleY2} stroke="#b91c1c" strokeWidth={1.5} />}
         <circle cx={cx} cy={cy} r={3} fill="#b91c1c" stroke="#fff" strokeWidth={1} />
         {/* Solid white banner + shadow so chart lines never show through */}
         <rect x={bx + 2} y={bannerTop + 2.5} width={w} height={h} rx={5} fill="#0f172a" opacity={0.16} />
@@ -501,17 +584,19 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
             cursor/tooltip layer), so lines and data points can never cross the call-outs. The svg
             itself ignores pointer events; only the flag groups are clickable, so chart hover/tooltip
             still works everywhere else. */}
-        {overlay && (
+        {overlay && flagPlan && (
           <svg width={overlay.width} height={overlay.height}
             style={{ position: 'absolute', left: overlay.left, top: overlay.top, overflow: 'visible', pointerEvents: 'none', zIndex: 20 }}>
             {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
               <g key={`ff-${p.year}`} style={{ pointerEvents: 'auto' }}>
-                <FinanceFlag cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.gapYShare : p.gapY) + overlay.yb} point={p} />
+                <FinanceFlag cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.gapYShare : p.gapY) + overlay.yb}
+                  point={p} box={flagPlan.flags[p.year]} />
               </g>
             ))}
             {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
               <g key={`tb-${p.year}`} style={{ pointerEvents: 'auto' }}>
-                <TargetBubble cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.yShare : p.y) + overlay.yb} point={p} />
+                <TargetBubble cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.yShare : p.y) + overlay.yb}
+                  point={p} box={flagPlan.bubbles[p.year]} />
               </g>
             ))}
           </svg>

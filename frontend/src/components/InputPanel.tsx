@@ -415,8 +415,8 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         </>}
       </Section>
 
-      {/* ===== TIME SCALES & MACROECONOMICS ===== */}
-      <Section title="2. Analysis Period & Year-by-Year Data" sectionKey="macro" onFocus={onSectionFocus}>
+      {/* ===== 2a. ANALYSIS PERIOD (key dates) ===== */}
+      <Section title="2a. Analysis Period" sectionKey="macro" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the baseline year. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
@@ -425,13 +425,17 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="As-is forecast length" value={inputs.period.as_is_forecast_length ?? 2} onChange={v => u('period','as_is_forecast_length',v)} unit="yrs" min={1} max={10} tip="Number of as-is years (workbook G19). End of as-is = start + length − 1; the target path branches from the end-of-as-is year" />
         <F label="Performance improvement start" value={(inputs.period.as_is_forecast_start || inputs.period.baseline_year + 1) + (inputs.period.as_is_forecast_length || 2)} onChange={() => {}} fieldType="computed" tip="Derived: end of as-is forecast + 1 (= as-is start + as-is length). Matches the workbook's G21." />
         <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#0369a1', background: '#EBF6FB', border: '1px solid #9fd3ec', borderRadius: 6, padding: '8px 12px' }}>
-          🎯 <b>Target years are set in the year-by-year table below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
+          🎯 <b>Target years are set in the year-by-year table in section 2b below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
         </div>
-        <SubHead text="Government budget for WSS" />
+      </Section>
+
+      {/* ===== 2b. YEAR-BY-YEAR DATA (service levels, GDP, demographics, budget) ===== */}
+      <Section title="2b. Year-by-Year Data" sectionKey="macro" onFocus={onSectionFocus}>
+        <SubHead text="How the WSS budget is derived" />
         <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px' }}>
           💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed households × Safely-managed unit cost) + (new Basic households × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. You can override any year directly in the <b>budget</b> rows of the table below.
         </div>
-        <SubHead text="Year-by-year data" />
+        <SubHead text="Year-by-year table" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
           Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — leave them blank to auto-fill at the mean historical growth (shown in the grey “→ … used” row below each), or type your own projection. For service levels, fill a full forecast column (Σ 100%) to set a <b style={{ color: '#16a34a' }}>🎯 target</b> year. GDP/pop growth and avg household size are auto-calculated.
         </div>
