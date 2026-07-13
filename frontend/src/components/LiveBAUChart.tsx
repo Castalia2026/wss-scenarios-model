@@ -1,7 +1,7 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, ReferenceDot, LabelList,
+  Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, LabelList,
 } from 'recharts';
 import { toPng } from 'html-to-image';
 
@@ -49,6 +49,59 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   // Show/hide the per-year data-point dots on the chart.
   const [showDots, setShowDots] = useState(true);
   const chartRef = useRef<HTMLDivElement>(null);
+  // ── Flag overlay geometry ──────────────────────────────────────────────────────────────────
+  // The call-outs/flags are rendered in a SEPARATE svg stacked ABOVE the whole chart (not inside
+  // recharts), so nothing — series lines, data-point dots, even the hover cursor/active dots that
+  // recharts paints in its top layer — can ever draw across them. Pixel positions are derived from
+  // the rendered axis ticks: both axes are linear in (year, value), so two ticks fix each mapping.
+  const [overlay, setOverlay] = useState<{ left: number; top: number; width: number; height: number;
+    xm: number; xb: number; ym: number; yb: number } | null>(null);
+  const [winTick, setWinTick] = useState(0);          // bump on window resize to re-measure
+  useEffect(() => {
+    const onResize = () => setWinTick(t => t + 1);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const isShareNow = unitMode === 'share';
+  useLayoutEffect(() => {
+    // ResponsiveContainer sizes itself asynchronously (ResizeObserver), so the surface/ticks may not
+    // exist yet on the first pass after data arrives — retry shortly until they do.
+    const retry = () => { const h = setTimeout(() => setWinTick(t => t + 1), 120); return () => clearTimeout(h); };
+    const wrap = chartRef.current;
+    // Several .recharts-surface svgs exist (each legend icon is one) — take the LARGEST (the plot).
+    const surface = wrap ? ([...wrap.querySelectorAll('svg.recharts-surface')] as SVGSVGElement[])
+      .sort((a, b) => b.clientWidth - a.clientWidth)[0] : null;
+    if (!wrap || !surface || surface.clientWidth < 100) { setOverlay(null); return data.length ? retry() : undefined; }
+    const sR = surface.getBoundingClientRect();
+    const wR = wrap.getBoundingClientRect();
+    // recharts 3 renders tick labels as text.recharts-cartesian-axis-tick-value in separate z-index
+    // layers (not nested under the axis groups), so classify by CONTENT: 4-digit years = x-axis;
+    // any other number = y-axis (which only ever shows small counts or percentages here).
+    const xt: { yr: number; x: number }[] = [];
+    const yt: { v: number; y: number }[] = [];
+    let sawPct = false;
+    surface.querySelectorAll('text.recharts-cartesian-axis-tick-value').forEach((t) => {
+      const raw = (t.textContent || '').trim();
+      const x = parseFloat(t.getAttribute('x') || '');
+      const y = parseFloat(t.getAttribute('y') || '');
+      if (/^(19|20)\d{2}$/.test(raw)) {
+        if (!isNaN(x)) xt.push({ yr: parseInt(raw, 10), x });
+      } else {
+        if (/%$/.test(raw)) sawPct = true;
+        const v = parseFloat(raw.replace(/[%,\s]/g, ''));
+        if (!isNaN(v) && !isNaN(y)) yt.push({ v: isShareNow ? v / 100 : v, y });
+      }
+    });
+    // Stale-DOM guard: right after the unit toggle, recharts may not have repainted the axis yet —
+    // in share mode ticks end with '%', in count mode they don't. Mismatch => measure again shortly.
+    if (xt.length < 2 || yt.length < 2 || sawPct !== isShareNow) { setOverlay(null); return data.length ? retry() : undefined; }
+    const xa = xt[0], xz = xt[xt.length - 1];
+    const ya = yt[0], yz = yt[yt.length - 1];
+    if (xz.yr === xa.yr || yz.v === ya.v) { setOverlay(null); return; }
+    const xm = (xz.x - xa.x) / (xz.yr - xa.yr), xb = xa.x - xm * xa.yr;
+    const ym = (yz.y - ya.y) / (yz.v - ya.v), yb = ya.y - ym * ya.v;
+    setOverlay({ left: sR.left - wR.left, top: sR.top - wR.top, width: sR.width, height: sR.height, xm, xb, ym, yb });
+  }, [data, unitMode, winTick]);
 
   const depKey = JSON.stringify(datasets) + '|' + sector;
   useEffect(() => {
@@ -413,7 +466,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         <button onClick={exportPng} style={toolBtn} title="Download this graph as a PNG image">⤓ PNG</button>
         <button onClick={exportCsv} style={toolBtn} title="Download the graph's values as CSV">⤓ CSV</button>
       </div>
-      <div ref={chartRef}>
+      <div ref={chartRef} style={{ position: 'relative' }}>
         <ResponsiveContainer width="100%" height={380}>
           <ComposedChart data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -442,19 +495,27 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
               <ReferenceLine key={i} y={isShare ? t.yShare : t.y} stroke="#16a34a" strokeDasharray="2 4" ifOverflow="extendDomain"
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
             ))}
-            {/* Chat-box call-out at each target point + financing-gap flag on the gap line
-                (these replace the four KPI cards; each closable via ✕, reopenable via its marker;
-                whole target years toggled via the 🎯 Targets dropdown in the toolbar) */}
-            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
-              <ReferenceDot key={`ff-${p.year}`} x={p.year} y={isShare ? p.gapYShare : p.gapY} ifOverflow="extendDomain"
-                shape={(sp: any) => <FinanceFlag {...sp} point={p} />} />
-            ))}
-            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
-              <ReferenceDot key={`tb-${p.year}`} x={p.year} y={isShare ? p.yShare : p.y} ifOverflow="extendDomain"
-                shape={(sp: any) => <TargetBubble {...sp} point={p} />} />
-            ))}
           </ComposedChart>
         </ResponsiveContainer>
+        {/* Flag overlay: a separate svg stacked ABOVE the entire chart (and above recharts' hover
+            cursor/tooltip layer), so lines and data points can never cross the call-outs. The svg
+            itself ignores pointer events; only the flag groups are clickable, so chart hover/tooltip
+            still works everywhere else. */}
+        {overlay && (
+          <svg width={overlay.width} height={overlay.height}
+            style={{ position: 'absolute', left: overlay.left, top: overlay.top, overflow: 'visible', pointerEvents: 'none', zIndex: 20 }}>
+            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
+              <g key={`ff-${p.year}`} style={{ pointerEvents: 'auto' }}>
+                <FinanceFlag cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.gapYShare : p.gapY) + overlay.yb} point={p} />
+              </g>
+            ))}
+            {targetPoints.filter((p) => isTargetVisible(p.year)).map((p) => (
+              <g key={`tb-${p.year}`} style={{ pointerEvents: 'auto' }}>
+                <TargetBubble cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShare ? p.yShare : p.y) + overlay.yb} point={p} />
+              </g>
+            ))}
+          </svg>
+        )}
       </div>
     </div>
   );
