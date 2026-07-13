@@ -162,10 +162,10 @@ export default function App() {
   if (inputs) {
     const p = inputs.period;
     // Year sequencing: model start < baseline < forecast end, with the as-is window inside it.
-    if (p.model_start_year >= p.baseline_year) warnings.push('Model start year must be before the baseline year');
-    else if (p.baseline_year - p.model_start_year < 3) warnings.push('Model start year should be at least 3 years before the baseline year');
-    if (p.forecast_end_year <= p.baseline_year) warnings.push('Forecast end year must be after the baseline year');
-    if (p.baseline_year >= p.as_is_forecast_start) warnings.push('Baseline year must be before as-is forecast start');
+    if (p.model_start_year >= p.baseline_year) warnings.push('Model start year must be before the last year of historical data');
+    else if (p.baseline_year - p.model_start_year < 3) warnings.push('Model start year should be at least 3 years before the last year of historical data');
+    if (p.forecast_end_year <= p.baseline_year) warnings.push('Forecast end year must be after the last year of historical data');
+    if (p.baseline_year >= p.as_is_forecast_start) warnings.push('The last year of historical data must be before as-is forecast start');
     // Targets now live in the §2 table: any forecast year with a fully-entered service column (Σ 100%).
     // Warn about partially-filled columns and about a sector with no target at all.
     const checkTargets = (svc: any, prefix: string, label: string) => {
@@ -684,13 +684,13 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         <p style={{ margin: '0 0 6px' }}>Define the analysis time frame for the tool. These dates apply to the whole analysis and are shared across the Urban and Rural datasets.</p>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Model Start Year:</span> The first year of the analysis period. The tool will compute information for every year from the Model Start Year up to the Baseline Year, building the historical record used to construct the Business-as-Usual (BAU) scenario.
-          <span style={gNote}>Note: You must have data for at least two historical years from the Model start year to the baseline year, with a gap of at least 2 years, for the tool to build the BAU scenario optimally. For example, if the baseline year is 2026, the model start year must be at least 2022, with data available for inputting the 2022 and 2024 numbers.</span>
+          <span style={gFieldLbl}>Model Start Year:</span> The first year of the analysis period. The tool will compute information for every year from the Model Start Year up to the last year of historical data, building the historical record used to construct the Business-as-Usual (BAU) scenario.
+          <span style={gNote}>Note: You must have data for at least two historical years from the model start year to the last year of historical data, with a gap of at least 2 years, for the tool to build the BAU scenario optimally. For example, if the last year of historical data is 2026, the model start year must be at least 2022, with data available for inputting the 2022 and 2024 numbers.</span>
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Baseline Year:</span> The present year or the most recent year with complete data, marking the end of the historical analysis period.
-          <span style={gNote}>Note: The Baseline Year must be within three years of the present.</span>
+          <span style={gFieldLbl}>Last year of historical data:</span> The present year or the most recent year with complete data, marking the end of the historical analysis period.
+          <span style={gNote}>Note: This must be within three years of the present.</span>
         </div>
 
         <div style={gFieldWrap}>
@@ -700,7 +700,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 
         <div style={gFieldWrap}>
           <span style={gFieldLbl}>Performance improvement start:</span> The year in which interventions start closing the service level gap.
-          <span style={gNote}>Note: This should be after the baseline year with a reasonable gap for the interventions to take effect. For example, if the baseline is 2026, the financing might not be received for a year, and it might take another year for the intervention's effects to start showing, so 2028 would be a reasonable start year for performance improvement.</span>
+          <span style={gNote}>Note: This should be after the last year of historical data with a reasonable gap for the interventions to take effect. For example, if that year is 2026, the financing might not be received for a year, and it might take another year for the intervention's effects to start showing, so 2028 would be a reasonable start year for performance improvement.</span>
         </div>
 
         <div style={gFieldWrap}>
