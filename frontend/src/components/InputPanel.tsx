@@ -416,7 +416,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </Section>
 
       {/* ===== 2a. ANALYSIS PERIOD (key dates) ===== */}
-      <Section title="2a. Analysis Period" sectionKey="macro" onFocus={onSectionFocus}>
+      <Section title="2a. Analysis Period" sectionKey="period" onFocus={onSectionFocus}>
         <SubHead text="Key dates" />
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the baseline year. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Baseline year" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
