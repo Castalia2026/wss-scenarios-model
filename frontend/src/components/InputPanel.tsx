@@ -298,7 +298,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
     const cellStyle: React.CSSProperties = { padding: '4px 6px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, color: '#3A4452', outline: 'none' };
     return (
       <div style={{ gridColumn: '1 / -1' }}>
-        <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', margin: '4px 0 2px' }}>{title} — technology mix (weighted = Σ share × cost)</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', margin: '4px 0 2px' }}>{title} — technology mix</div>
         <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr style={{ color: '#64748b' }}><th style={{ textAlign: 'left', padding: '2px 6px' }}>technology</th><th>share %</th><th>cost/HH</th><th></th></tr></thead>
           <tbody>
@@ -319,7 +319,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <button onClick={() => setCostMix(section, rung, engineField, [...m, { name: 'New technology', share: 0, cost: 0 }])}
           style={{ margin: '3px 0', padding: '3px 9px', fontSize: 11, border: '1px dashed #0073A8', background: '#fff', color: '#0073A8', borderRadius: 5, cursor: 'pointer' }}>+ Add technology</button>
         <div style={{ fontSize: 10.5, color: ok ? '#0073A8' : '#b91c1c' }}>
-          Σ share {(shareSum * 100).toFixed(2)}% · weighted cost/HH <b>{Math.round(weighted).toLocaleString()}</b> → written to the “{title}” cost field above
+          Shares add up to {(shareSum * 100).toFixed(2)}%{ok ? '' : ' (they must total 100%)'}. Calculated {title} cost per household: <b>{Math.round(weighted).toLocaleString()} {CUR}</b>, used by the model.
         </div>
       </div>
     );
@@ -466,10 +466,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <YearField label="Model start year" value={inputs.period.model_start_year} onCommit={setModelStartYear} min={1950} max={inputs.period.baseline_year - 1} tip="First year of historical data; must be at least 3 years before the last year of historical data. Existing data keeps its year — newly added earlier years come in blank for you to fill." />
         <F label="Last year of historical data" value={inputs.period.baseline_year} onChange={v => u('period','baseline_year',v)} min={2023} tip="Last year with complete actual data; must be within the last three years" />
         <F label="Forecast end year" value={inputs.period.forecast_end_year} onChange={v => u('period','forecast_end_year',v)} min={inputs.period.baseline_year + 5} tip="Last year of projection" />
-        <F label="Performance improvement start" value={inputs.period.baseline_year + 1} onChange={() => {}} fieldType="computed" tip="The year after the last year of historical data — the target path branches from here. There is no as-is lag." />
-        <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#0369a1', background: '#EBF6FB', border: '1px solid #9fd3ec', borderRadius: 6, padding: '8px 12px' }}>
-          🎯 <b>Target years are set in the Service levels section (3) below.</b> Fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target. Set as many targets as you like — the model interpolates between them.
-        </div>
       </Section>
 
       {/* ===== SCOPE-SPECIFICITY FLAG. §1 and §2a above apply to the whole analysis; every section below
@@ -487,12 +483,12 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
       {/* ===== EXCEL ROUND-TRIP — OPTIONAL bulk entry covering every section of the year-by-year table ===== */}
       <div style={{ marginBottom: 8, border: '1px solid #c7d2fe', borderLeft: '4px solid #2563eb', borderRadius: 8, background: '#fff', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-        <span style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'help' }}
-          title={`Optional — enter the data directly in the year-by-year sections below (3 Service levels, 4 Economic & demographic, 5 Budget), or download one Excel template for ${scopeLabel}, fill it offline, and upload it. The template covers all three sections and mirrors their colours (cream = historical, blue = forecast, grey = auto-calculated). Use whichever you prefer.`}>
-          📊 Bulk data entry (Excel) — optional
-          <span style={{ width: 15, height: 15, borderRadius: '50%', background: '#C2CBD6', color: '#fff', fontSize: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }}>i</span>
-        </span>
-        <span style={{ flex: 1, minWidth: 8 }} />
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e293b', marginBottom: 2 }}>📊 Bulk data entry</div>
+          <div style={{ fontSize: 11.5, color: '#475569', lineHeight: 1.45 }}>
+            You can enter the year-by-year data two ways: type it directly in the sections below, or download the Excel template for {scopeLabel}, fill it in, and upload it.
+          </div>
+        </div>
         <button onClick={handleXlsxDownload} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: '1px solid #2563eb', borderRadius: 6, background: '#fff', color: '#2563eb', cursor: 'pointer', fontWeight: 600 }}>⤓ Download template</button>
         <button onClick={() => fileRef.current?.click()} disabled={xlsxStatus.kind === 'busy'} style={{ padding: '6px 12px', fontSize: 12, border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', cursor: 'pointer', fontWeight: 600 }}>⤒ Upload filled template</button>
         <input ref={fileRef} type="file" accept=".xlsx" onChange={handleXlsxUpload} style={{ display: 'none' }} />
@@ -521,12 +517,13 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           const CREAM: React.CSSProperties = { border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452' };  // historical input
           const BLUE: React.CSSProperties = { border: '1px solid #93C5FD', background: '#EFF6FF', color: '#1E3A5F' };    // forecast / projection input
           const grey = (txt: string, note: string) => <span style={{ fontSize: 10, color: '#94a3b8', fontStyle: 'italic' }} title={note}>{txt}</span>;
-          // 3 significant figures, thousands-separated (no scientific notation) — used by the grey
-          // "→ … used" projection rows.
+          // 3 significant figures, at most 2 decimals, thousands-separated (no scientific notation) —
+          // used by the grey "→ … used" projection rows. toPrecision rounds to 3 sig figs WITHOUT the
+          // float artefacts that dividing by a tiny power of ten produced (e.g. 117 / 1e-5 gave
+          // 11,699,999.999999998); maximumFractionDigits caps the shown decimals.
           const fmtNum = (v: number) => {
             if (!isFinite(v) || v === 0) return '0';
-            const m = Math.pow(10, 2 - Math.floor(Math.log10(Math.abs(v))));
-            return (Math.round(v * m) / m).toLocaleString('en-US', { maximumFractionDigits: 20 });
+            return Number(v.toPrecision(3)).toLocaleString('en-US', { maximumFractionDigits: 2 });
           };
           const resAt = (key: string, idx: number): number | null => {
             const a = results?.[key];
@@ -594,15 +591,30 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           // and blank years fill from the prior year at the mean YoY growth of the leading
           // contiguous run of entered values.
           const hhSeries = inputs.population?.hh_ts || [];
+          // Mirror the engine's _project_series: honour entered values, smooth the blanks by the YoY
+          // growth rate — interior gaps interpolate geometrically between the nearest entered value
+          // before and after; the tail (and any leading gap) extrapolates at mean historical growth.
           const hhProj = (() => {
             const n = years.length;
             const out = Array.from({ length: n }, (_: unknown, t: number) => (hhSeries[t] ?? 0) > 0 ? hhSeries[t] : 0);
+            const anchors: number[] = [];
+            for (let t = 0; t < n; t++) if (out[t] > 0) anchors.push(t);
             const known: number[] = [];
             for (let t = 0; t < n; t++) { if (out[t] > 0) known.push(out[t]); else break; }
             const yoy: number[] = [];
             for (let i = 1; i < known.length; i++) if (known[i - 1] > 0) yoy.push(known[i] / known[i - 1] - 1);
             const g = yoy.length ? yoy.reduce((a, b) => a + b, 0) / yoy.length : 0;
-            for (let t = 1; t < n; t++) if (out[t] <= 0) out[t] = out[t - 1] * (1 + g);
+            if (!anchors.length) return out;
+            for (let ai = 0; ai < anchors.length - 1; ai++) {          // interior gaps: geometric interpolation
+              const lo = anchors[ai], hi = anchors[ai + 1];
+              if (hi - lo <= 1) continue;
+              const vLo = out[lo], vHi = out[hi];
+              const r = (vLo > 0 && vHi > 0) ? Math.pow(vHi / vLo, 1 / (hi - lo)) - 1 : g;
+              for (let j = 1; j < hi - lo; j++) out[lo + j] = vLo * Math.pow(1 + r, j);
+            }
+            for (let t = anchors[anchors.length - 1] + 1; t < n; t++) out[t] = out[t - 1] * (1 + g);   // trailing
+            const denom = 1 + g;
+            for (let t = anchors[0] - 1; t >= 0; t--) out[t] = denom !== 0 ? out[t + 1] / denom : 0;   // leading
             return out;
           })();
           const totalHHAt = (t: number) => hhProj[t] ?? 0;
@@ -653,7 +665,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             return Math.abs(s - 1) < 0.02;
           };
           const svcRow = (label: string, section: string, field: string) => ({
-            label, tip: 'Share of households at this service level. Historical years are editable inputs; fill a full forecast column (all 5 rungs, Σ 100%) to set a target year.',
+            label, tip: 'Share of households at this service level. Historical years are editable inputs; fill a forecast column (all 5 rungs add up to 100%) to set a target year.',
             cells: years.map((_: number, i: number) => svcCell(section, field, i)),
           });
 
@@ -675,7 +687,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
                     {histYears.map((y: number) => <option key={y} value={y}>{y}</option>)}
                   </select>
                   to {baseYr2}
-                  <span title="The BAU growth rate for this sector is the mean year-on-year growth from the chosen first year to the last historical year, then projected forward." style={{ width: 13, height: 13, borderRadius: '50%', background: '#C2CBD6', color: '#fff', fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }}>i</span>
+                  <span title="Sets the first historical year used to work out this sector's business-as-usual trend. The tool averages year-on-year growth from that year to the last historical year, then projects it forward. Pick the year whose trend best reflects the pace you expect to continue." style={{ width: 13, height: 13, borderRadius: '50%', background: '#C2CBD6', color: '#fff', fontSize: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'help', fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700 }}>i</span>
                 </span>
               </span>
             );
@@ -698,21 +710,21 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             svcRow(`% ${ss[4]}`, 'sanitation_service', 'sserv5_ts'),
           ];
           const econRows: YRow[] = [
-            { label: `Real GDP (${CUR} M)`, tip: `Real GDP in local currency (millions, base-year prices). Enter historical years; blank forecast years auto-fill at mean historical growth — or type your own. This drives the forecast budget.`, cells: years.map((_: number, i: number) => editCell('macro', 'gdp_real_local', i, false, years[i] > baseYr2, true)) },
+            { label: `Real GDP (${CUR} M)`, tip: `Real GDP in local currency (millions, base-year prices). Enter historical years; blank forecast years fill in from the yearly growth rate, or type your own. This drives the forecast budget.`, cells: years.map((_: number, i: number) => editCell('macro', 'gdp_real_local', i, false, years[i] > baseYr2, true)) },
             projRow(`→ Real GDP used (${CUR} M)`, 'Auto-fill: real GDP the model uses each year (your entries; blank years filled at mean historical growth).', (i) => resAt('gdp_real_local', i), false),
             { label: 'GDP growth %', tip: 'Year-on-year real GDP growth (auto-calculated from the values the model uses).', computed: true, cells: years.map((_: number, i: number) => {
               const cur = resAt('gdp_real_local', i), prev = resAt('gdp_real_local', i - 1);
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in millions. Historical years are inputs; blank forecast years auto-fill at mean historical growth — or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'pop_ts', i, false, years[i] > baseYr2, true)) },
+            { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in millions. Historical years are inputs; blank forecast years fill in from the yearly growth rate, or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'pop_ts', i, false, years[i] > baseYr2, true)) },
             projRow('→ Population used (mill)', 'Auto-fill: population the model uses each year.', (i) => resAt('population', i), false),
             { label: 'Pop growth %', tip: 'Year-on-year population growth (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
               const cur = resAt('population', i), prev = resAt('population', i - 1);
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
               return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
             }) },
-            { label: `${hhLbl} (mill)`, tip: `Total ${scopeLower} households in millions — DRIVES the model. Historical years are inputs; blank forecast years auto-fill at mean historical growth — or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'hh_ts', i, false, years[i] > baseYr2, true)) },
+            { label: `${hhLbl} (mill)`, tip: `Total ${scopeLower} households in millions — DRIVES the model. Historical years are inputs; blank forecast years fill in from the yearly growth rate, or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'hh_ts', i, false, years[i] > baseYr2, true)) },
             projRow(`→ ${hhLbl} used (mill)`, 'Auto-fill: households the model uses each year.', (i) => resAt('total_hh', i), false),
             { label: 'Avg HH size', tip: 'Average household size = population ÷ households (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
               const p = resAt('population', i) ?? 0; const h = resAt('total_hh', i) ?? 0;
@@ -730,21 +742,21 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             <>
               <Section title="3. Service levels" sectionKey="service_levels" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-                  Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells for each rung (each column Σ 100%); blank years auto-fill at the mean historical growth. Pick each sector's <b>BAU-rate first year</b> in its band below. To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill a full <b style={{ color: '#2563eb' }}>blue</b> forecast column (Σ 100%) — set as many as you like.
+                  Enter the historical share of households at each service level in the <b style={{ color: '#B45309' }}>cream</b> cells. The five rungs in each year must add up to 100%. Blank years fill in automatically from the yearly growth rate. In each sector's band below, the <b>"BAU rate from"</b> dropdown sets the first historical year used to work out the business-as-usual trend: the tool averages year-on-year growth from that year to the last historical year and projects it forward, so pick the year whose trend best reflects the pace you expect to continue (or leave the default if unsure). To set a <b style={{ color: '#16a34a' }}>🎯 target</b>, fill in a <b style={{ color: '#2563eb' }}>blue</b> forecast column so its five rungs add up to 100%. You can set as many target years as you like.
                 </div>
                 <YearTable rows={serviceRows} years={years} baseYr2={baseYr2} markTargets colIsTarget={anyTarget} />
               </Section>
 
               <Section title="4. Economic & demographic data" sectionKey="econ_demo" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 4, padding: '4px 8px', background: '#f8fafc', borderRadius: 4 }}>
-                  Fill the <b style={{ color: '#B45309' }}>cream</b> historical cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional — blank auto-fills at the mean historical growth (grey “→ … used” row). GDP/pop growth and average household size are auto-calculated.
+                  Enter the historical values in the <b style={{ color: '#B45309' }}>cream</b> cells. <b style={{ color: '#2563eb' }}>Blue</b> forecast cells are optional. Blank cells fill in from the yearly growth rate, shown in the grey "used" row. GDP growth, population growth, and average household size are auto-calculated.
                 </div>
                 <YearTable rows={econRows} years={years} baseYr2={baseYr2} />
               </Section>
 
               <Section title="5. Budget" sectionKey="budget" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 4 }}>
-                  💰 <b>The WSS budget is derived from the cost of new connections.</b> For each historical year the budget = (new Safely-managed HH × Safely-managed unit cost) + (new Basic HH × Basic unit cost). Forecast-year budgets = the average historical budget-to-GDP ratio × real GDP. Type any cell to override that year.
+                  💰 <b>The budget comes from the cost of new service:</b> new households served × the unit cost of their service (set by the technology mix). Type any cell to override that year.
                 </div>
                 <YearTable rows={budgetRows} years={years} baseYr2={baseYr2} />
               </Section>
@@ -779,8 +791,9 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', background: '#f8fafc', borderRadius: 4, padding: '3px 8px' }}>Real (used by the model): {ws[0]} = <b>{Math.round((inputs.water_costs.network_cost_per_hh_serv1||0)*pi).toLocaleString()}</b> {CUR}/HH · {ws[1]} = <b>{Math.round((inputs.water_costs.network_cost_per_hh_serv2||0)*pi).toLocaleString()}</b> {CUR}/HH</div>
         ); })()}
         <SubHead text="Distribution network cost per HH (nominal)" />
-        <F label={ws[0]} value={inputs.water_costs.network_cost_per_hh_serv1} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to the distribution network. Editing this rescales the technology mix below to match." />
-        <F label={ws[1]} value={inputs.water_costs.network_cost_per_hh_serv2} onChange={v => setUnitCost('water_costs','network_cost_per_hh_serv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to the distribution network. Editing this rescales the technology mix below to match." />
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
+          Enter each rung's technology mix below. The cost per household is calculated from the mix and shown beneath it.
+        </div>
         {renderCostMix('water_costs', 'sm', 'network_cost_per_hh_serv1', ws[0])}
         {renderCostMix('water_costs', 'basic', 'network_cost_per_hh_serv2', ws[1])}
         <SubHead text="Technical parameters" />
@@ -804,9 +817,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         {(() => { const pi = (inputs.sanitation_costs.price_index ?? 100) / 100; return (
           <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', background: '#f8fafc', borderRadius: 4, padding: '3px 8px' }}>Real (used by the model): {ss[0]} = <b>{Math.round((inputs.sanitation_costs.sewer_cost_per_hh_sserv1||0)*pi).toLocaleString()}</b> {CUR}/HH · {ss[1]} = <b>{Math.round((inputs.sanitation_costs.sewer_cost_per_hh_sserv2||0)*pi).toLocaleString()}</b> {CUR}/HH</div>
         ); })()}
-        <SubHead text="Sewerage cost per HH (nominal)" />
-        <F label={ss[0]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv1} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv1','sm',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to sewer network + house connection. Editing this rescales the technology mix below to match." />
-        <F label={ss[1]} value={inputs.sanitation_costs.sewer_cost_per_hh_sserv2} onChange={v => setUnitCost('sanitation_costs','sewer_cost_per_hh_sserv2','basic',v)} step={1000} unit={CUR} min={0} max={10000000} integer tip="Nominal capital cost to connect one HH to sewer network + house connection. Editing this rescales the technology mix below to match." />
+        <SubHead text="Sanitation cost per HH (nominal)" />
+        <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
+          Enter each rung's technology mix below. The cost per household is calculated from the mix and shown beneath it.
+        </div>
         {renderCostMix('sanitation_costs', 'sm', 'sewer_cost_per_hh_sserv1', ss[0])}
         {renderCostMix('sanitation_costs', 'basic', 'sewer_cost_per_hh_sserv2', ss[1])}
         <SubHead text="Technical parameters" />

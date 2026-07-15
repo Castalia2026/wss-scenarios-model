@@ -186,9 +186,9 @@ export default function App() {
     if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
   }
 
-  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export', 'Test Harness'];
-  // Only Data Inputs, BAU and the Test Harness are active in this build; the rest are greyed out
+  // Test Harness is hidden in this build. Data Inputs and BAU are active; the rest are greyed out
   // until the intervention engine is ported and validated.
+  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
   const disabledTabs = new Set([2, 3, 4]);
 
   return (
@@ -535,7 +535,13 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
 
       {!closing && (
         <div style={{ background: '#fff', borderRadius: 12, maxWidth: 1040, width: '96%', maxHeight: '96vh', overflowY: 'auto', padding: '22px 40px' }} onClick={e => e.stopPropagation()}>
-          <h2 style={{ fontSize: 20, color: '#002244', margin: '0 0 10px' }}>Tool Overview</h2>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, margin: '0 0 10px' }}>
+            <h2 style={{ fontSize: 20, color: '#002244', margin: 0 }}>Tool Overview</h2>
+            <button onClick={handleGetStarted}
+              style={{ padding: '9px 22px', border: 'none', borderRadius: 6, background: '#2563eb', color: '#fff', fontWeight: 600, fontSize: 14, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+              Get Started
+            </button>
+          </div>
 
           {/* Tab bar */}
           <div style={{ display: 'flex', gap: 6, borderBottom: '1px solid #e2e8f0', marginBottom: 14 }}>
@@ -561,7 +567,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>Make your selections first.</strong> At the top of the screen, use the <strong>Select geographical scope</strong> dropdown: <em>Urban + Rural</em> (enter each separately to produce a national total), <em>Urban only</em> / <em>Rural only</em> (analyse one area on its own), or <em>National</em> (no urban/rural breakdown — for when you cannot split the data by urban and rural). On the input tabs, also use the <strong>Water Supply / Sanitation</strong> toggle to choose which sector you are entering, and switch between the two to complete both.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2. Analysis Period</em>, set the key dates; then complete the year-by-year sections — <em>3. Service levels</em> (water &amp; sanitation), <em>4. Economic &amp; demographic data</em> (real GDP, population, households) and <em>5. Budget</em>. <em>Country</em> and the <em>Analysis Period</em> are shared across Urban and Rural; the year-by-year sections are entered separately per area. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to auto-fill at the mean historical growth, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100% — you can set as many target years as you like. The budget is derived from the cost of new connections, and any cell can be overridden.
+              <strong>Data Inputs</strong> — In <em>Country, Area of Focus &amp; Currency</em>, select your country and the currency fills in automatically. In <em>2. Analysis Period</em>, set the key dates; then complete the year-by-year sections — <em>3. Service levels</em> (water &amp; sanitation), <em>4. Economic &amp; demographic data</em> (real GDP, population, households) and <em>5. Budget</em>. <em>Country</em> and the <em>Analysis Period</em> are shared across Urban and Rural; the year-by-year sections are entered separately per area. Fill the <span style={{ color: '#B45309', fontWeight: 600 }}>cream</span> historical cells; <span style={{ color: '#2563eb', fontWeight: 600 }}>blue</span> forecast cells are optional (leave them blank to fill in from the yearly growth rate, or type your own projection). To set a <strong>🎯 target</strong>, fill a whole future service-level column so it totals 100%; you can set as many target years as you like. The budget is derived from the cost of new service, and any cell can be overridden.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
@@ -671,6 +677,23 @@ function GFind({ items }: { items: string[] }) {
 
 // Contextual guide content keyed by sectionKey
 const contextualGuide: Record<string, { title: string; content: React.ReactNode; sources?: { name: string; url: string }[] }> = {
+  how_model_works: {
+    title: 'How the model works',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>You enter recent history and one or more targets. From these the tool builds two paths for each service level and compares them.</p>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Business-as-usual (BAU):</span> The tool grows household counts at their historical yearly rate to project what happens if nothing changes. Any blank years you leave are filled in smoothly from the yearly growth rate, between the values you did enter.
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Targets:</span> Where you set a target year (a service-level column that adds up to 100%), the tool moves service levels toward that target and interpolates between consecutive targets.
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Financing gap:</span> The extra money needed each year to reach the target instead of BAU. It is based on the cost of connecting new households, and that unit cost comes from each rung's technology mix.
+        </div>
+      </div>
+    ),
+  },
   country: {
     title: 'Country & Area of focus',
     content: 'Select the country and the area of focus for the analysis. The currency code sets the unit for all monetary inputs. Choosing a country will auto-fill its currency, but you can change it manually if needed. This section applies to the whole analysis and is shared across the Urban and Rural datasets.',
@@ -698,12 +721,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
         </div>
 
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Performance improvement start:</span> The year in which interventions start closing the service level gap.
-          <span style={gNote}>Note: This should be after the last year of historical data with a reasonable gap for the interventions to take effect. For example, if that year is 2026, the financing might not be received for a year, and it might take another year for the intervention's effects to start showing, so 2028 would be a reasonable start year for performance improvement.</span>
-        </div>
-
-        <div style={gFieldWrap}>
-          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the <b>3. Service levels</b> section — fill a full service-level column (all 5 rungs, summing to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like; the model interpolates between consecutive targets. There is no separate target-year field.
+          <span style={gFieldLbl}>Target years:</span> Targets are set directly in the <b>3. Service levels</b> section. Fill a service-level column (all 5 rungs add up to 100%) for any future year to make that year a target (marked 🎯). You can set as many targets as you like, and the model interpolates between consecutive targets. There is no separate target-year field.
         </div>
       </div>
     ),
@@ -761,7 +779,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
       <div>
         <p style={{ margin: '0 0 6px' }}>The water-supply and sanitation budgets, year by year — computed for you, with per-year overrides.</p>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you — historically from the cost of the new connections added each year (Safely-managed + Basic households × their unit cost), and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type into any cell to override that year — e.g. if you have actual government budget figures.
+          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you: historically from the cost of the new service added each year (households served × their unit cost, set by the technology mix), and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type into any cell to override that year, for example if you have actual government budget figures.
           <GFind items={[
             "Your country's Ministry of Finance (budget documents / execution reports), if overriding",
             "Your country's Ministry of Water Supply / Sanitation or equivalent sector ministry",
@@ -792,12 +810,12 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_unit_costs: {
     title: 'Water Supply — Unit Costs & Technical Parameters',
-    content: "Enter the capital cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average prices for individual technologies from a web search.",
+    content: "The capital cost per household for the safely-managed and basic service levels is calculated from the technology mixes below (the cost per household is the sum of each technology's share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average prices for individual technologies from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   san_unit_costs: {
     title: 'Sanitation — Unit Costs & Technical Parameters',
-    content: "Enter the sewerage cost per household for the safely-managed and basic service levels, built from the technology mixes below (weighted = Σ share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average costs for on-site solutions from a web search.",
+    content: "The sanitation cost per household for the safely-managed and basic service levels is calculated from the technology mixes below (the cost per household is the sum of each technology's share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average costs for on-site solutions from a web search.",
     sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   planned_investments: {
@@ -867,9 +885,9 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
 const guideKeysByTab: Record<number, string[]> = {
   // Data Inputs — includes the BAU data entry duplicated onto this tab. test2: targets & technical
   // params are folded into the table / the merged unit-cost section.
-  0: ['country', 'period', 'service_levels', 'econ_demo', 'budget', 'ws_unit_costs', 'san_unit_costs'],
+  0: ['how_model_works', 'country', 'period', 'service_levels', 'econ_demo', 'budget', 'ws_unit_costs', 'san_unit_costs'],
   // BAU Scenario
-  1: ['ws_unit_costs', 'san_unit_costs'],
+  1: ['how_model_works', 'ws_unit_costs', 'san_unit_costs'],
   // Intervention Design
   2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
 };
