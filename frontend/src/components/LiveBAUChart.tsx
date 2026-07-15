@@ -47,6 +47,22 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   const [constrained, setConstrained] = useState<{ avail: number; repl: number; cur: string } | null>(null);
   // Reference lines carry BOTH the absolute (count) and share value so they track the Y-axis unit toggle.
   const [targetLines, setTargetLines] = useState<{ y: number; yShare: number; label: string }[]>([]);
+  // On-chart target call-outs: one 🎯 chat-box per target year, anchored at the target point, showing
+  // that year's coverage and service gap. Closeable via ✕ (leaves a small reopen marker); the 🎯 Targets
+  // multi-select controls which are drawn (null = all visible, so new targets appear automatically).
+  const [targetPoints, setTargetPoints] = useState<any[]>([]);
+  const [closedFlags, setClosedFlags] = useState<Set<string>>(new Set());
+  const toggleFlag = (key: string, open: boolean) => setClosedFlags(prev => {
+    const n = new Set(prev); if (open) n.delete(key); else n.add(key); return n;
+  });
+  const [visibleTargets, setVisibleTargets] = useState<Set<number> | null>(null);
+  const [tgtDropOpen, setTgtDropOpen] = useState(false);
+  const isTargetVisible = (yr: number) => !visibleTargets || visibleTargets.has(yr);
+  const toggleTargetVisible = (yr: number, allYears: number[]) => setVisibleTargets(prev => {
+    const n = new Set(prev ?? allYears);          // null (all) -> materialize the full set first
+    if (n.has(yr)) n.delete(yr); else n.add(yr);
+    return n;
+  });
   // Y-axis unit: absolute household counts (millions) or share of total POPULATION (%).
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
   // Show/hide the per-year data-point dots on the chart.
@@ -65,18 +81,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   // explicitly, re-measuring on every width change via a ResizeObserver. useLayoutEffect measures
   // before paint so there is no zero-width first frame.
   useLayoutEffect(() => {
-    const timers: ReturnType<typeof setTimeout>[] = [];
-    const bump = () => setWinTick(t => t + 1);
-    const measure = () => {
-      if (chartRef.current) setWrapW(chartRef.current.clientWidth);
-      bump();
-      // recharts repositions its axis ticks a render cycle or two AFTER the width prop changes, so an
-      // immediate read can pick up stale tick coordinates — which leaves the financing-gap overlay
-      // mapped to the old scale (its bracket lands off the resized plot). Re-measure a couple of times
-      // as recharts settles so the overlay maps years to the FINAL tick positions.
-      timers.forEach(clearTimeout); timers.length = 0;
-      timers.push(setTimeout(bump, 60), setTimeout(bump, 260));
-    };
+    const measure = () => { if (chartRef.current) setWrapW(chartRef.current.clientWidth); setWinTick(t => t + 1); };
     measure();
     window.addEventListener('resize', measure);
     let ro: ResizeObserver | null = null;
@@ -84,15 +89,36 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
       ro = new ResizeObserver(() => measure());
       ro.observe(chartRef.current);
     }
-    return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', measure); if (ro) ro.disconnect(); };
+    return () => { window.removeEventListener('resize', measure); if (ro) ro.disconnect(); };
   }, []);
   const isShareNow = unitMode === 'share';
+  // recharts repositions its axis ticks a few frames AFTER the data / unit / width changes. A single
+  // measurement taken before that lands on a STALE scale — and, worse, it can equal the current (stale)
+  // overlay, so a "stop once stable" loop would quit early and leave the financing-gap bracket floating.
+  // So on every such change we open a short window (below) and re-measure each frame until it settles.
+  const settle = useRef(0);
+  useEffect(() => { settle.current = 32; setWinTick(t => t + 1); }, [data, unitMode, wrapW]);
   useLayoutEffect(() => {
-    const retry = () => { const h = setTimeout(() => setWinTick(t => t + 1), 120); return () => clearTimeout(h); };
+    let raf = 0;
+    const again = () => { raf = requestAnimationFrame(() => setWinTick(t => t + 1)); };
+    const inWindow = settle.current > 0;
+    if (settle.current > 0) settle.current -= 1;
+    // next: a fresh geometry to apply, null to hide, or undefined to keep the current one (mid-update).
+    const finish = (next: typeof overlay | undefined) => {
+      let moved = false;
+      if (next !== undefined) {
+        moved = (!!overlay) !== (!!next) ||
+          (!!overlay && !!next && (['left', 'top', 'width', 'height', 'xm', 'xb', 'ym', 'yb'] as const)
+            .some(k => Math.abs(overlay[k] - next[k]) >= 0.5));
+        if (moved) setOverlay(next);
+      }
+      if (inWindow || moved) again();   // keep re-measuring through the window, or while still moving
+      return () => cancelAnimationFrame(raf);
+    };
     const wrap = chartRef.current;
     const surface = wrap ? ([...wrap.querySelectorAll('svg.recharts-surface')] as SVGSVGElement[])
       .sort((a, b) => b.clientWidth - a.clientWidth)[0] : null;
-    if (!wrap || !surface || surface.clientWidth < 100) { setOverlay(null); return data.length ? retry() : undefined; }
+    if (!wrap || !surface || surface.clientWidth < 100) return finish(data.length ? undefined : null);
     const sR = surface.getBoundingClientRect();
     const wR = wrap.getBoundingClientRect();
     const xt: { yr: number; x: number }[] = [];
@@ -110,13 +136,14 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         if (!isNaN(v) && !isNaN(y)) yt.push({ v: isShareNow ? v / 100 : v, y });
       }
     });
-    if (xt.length < 2 || yt.length < 2 || sawPct !== isShareNow) { setOverlay(null); return data.length ? retry() : undefined; }
+    // ticks mid-update (wrong count, or %/count mismatch during a unit toggle) → keep the current overlay
+    if (xt.length < 2 || yt.length < 2 || sawPct !== isShareNow) return finish(undefined);
     const xa = xt[0], xz = xt[xt.length - 1];
     const ya = yt[0], yz = yt[yt.length - 1];
-    if (xz.yr === xa.yr || yz.v === ya.v) { setOverlay(null); return; }
+    if (xz.yr === xa.yr || yz.v === ya.v) return finish(undefined);
     const xm = (xz.x - xa.x) / (xz.yr - xa.yr), xb = xa.x - xm * xa.yr;
     const ym = (yz.y - ya.y) / (yz.v - ya.v), yb = ya.y - ym * ya.v;
-    setOverlay({ left: sR.left - wR.left, top: sR.top - wR.top, width: sR.width, height: sR.height, xm, xb, ym, yb });
+    return finish({ left: sR.left - wR.left, top: sR.top - wR.top, width: sR.width, height: sR.height, xm, xb, ym, yb });
   }, [data, unitMode, winTick]);
 
   const depKey = JSON.stringify(datasets) + '|' + sector;
@@ -203,12 +230,21 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           }
         });
         const tgtYears = [...tgtYearSet].sort((a, b) => a - b);
-        setTargetLines(tgtYears.map((yr: number) => {
+        // Per-target anchor + coverage payload for the on-chart call-outs (all additive across areas).
+        const points = tgtYears.map((yr: number) => {
           const ix = years.indexOf(yr);
-          const tot = ix >= 0 ? (total[ix] || 0) : 0;
-          const t = ix >= 0 ? Math.min(tot, tgt[ix]) : 0;
-          return { y: +t.toFixed(4), yShare: tot > 0 ? t / tot : 0, label: `Target (${yr})` };
-        }));
+          if (ix < 0) return null;
+          const tot = total[ix] || 0;
+          const t = Math.min(tot, tgt[ix]), b = Math.min(tot, bau[ix]);
+          return {
+            year: yr,
+            y: +t.toFixed(4), yShare: tot > 0 ? t / tot : 0,             // target point (callout anchor)
+            bauCov: tot > 0 ? b / tot : 0, tgtCov: tot > 0 ? t / tot : 0,
+            svcGap: Math.max(0, t - b),
+          };
+        }).filter(Boolean) as any[];
+        setTargetPoints(points);
+        setTargetLines(points.map((p: any) => ({ y: p.y, yShare: p.yShare, label: `Target (${p.year})` })));
 
         // Budget-constrained (frozen) detection.
         const availS = sum((res, i) => (secOf(res).bau_available || [])[i] || 0);
@@ -356,6 +392,109 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
     );
   };
 
+  // ── On-chart target call-outs ────────────────────────────────────────────────────────────────
+  const pct1 = (f: number) => (f * 100).toFixed(1) + '%';
+  const BUBBLE_W = 142, BUBBLE_H = 63;
+  // Collision-aware placement: each open call-out tries candidate spots (above/below the anchor, shifted
+  // sideways, stacked further out) and takes the first that doesn't overlap an already-placed box; if all
+  // collide it takes the least-overlapping one. Closed call-outs take no space.
+  const flagPlan = useMemo(() => {
+    if (!overlay) return null;
+    const chartW = overlay.width, chartH = overlay.height;
+    const placed: { x: number; y: number; w: number; h: number }[] = [];
+    const M = 6;
+    const clampR = (c: { x: number; y: number }, w: number, h: number) => ({
+      x: Math.max(4, Math.min(c.x, chartW - w - 4)),
+      y: Math.max(2, Math.min(c.y, chartH - h - 2)), w, h,
+    });
+    const collide = (r: any) => placed.some(p =>
+      r.x < p.x + p.w + M && p.x < r.x + r.w + M && r.y < p.y + p.h + M && p.y < r.y + r.h + M);
+    const place = (cands: { x: number; y: number }[], w: number, h: number) => {
+      let best: any = null, bestScore = Infinity;
+      for (const c of cands) {
+        const r = clampR(c, w, h);
+        if (!collide(r)) { placed.push(r); return r; }
+        let s = 0;
+        placed.forEach(p => {
+          const ox = Math.max(0, Math.min(r.x + r.w, p.x + p.w) - Math.max(r.x, p.x));
+          const oy = Math.max(0, Math.min(r.y + r.h, p.y + p.h) - Math.max(r.y, p.y));
+          s += ox * oy;
+        });
+        if (s < bestScore) { bestScore = s; best = r; }
+      }
+      placed.push(best);
+      return best;
+    };
+    const bubbles: Record<number, { x: number; y: number }> = {};
+    targetPoints.filter((p: any) => isTargetVisible(p.year)).forEach((p: any) => {
+      if (closedFlags.has(`t-${p.year}`)) return;
+      const cx = overlay.xm * p.year + overlay.xb;
+      const cy = overlay.ym * (isShareNow ? p.yShare : p.y) + overlay.yb;
+      const cands: { x: number; y: number }[] = [];
+      for (let lvl = 0; lvl < 4; lvl++) {
+        const yAbove = cy - BUBBLE_H - 12 - lvl * (BUBBLE_H + 10);
+        const yBelow = cy + 12 + lvl * (BUBBLE_H + 10);
+        for (const x of [cx - BUBBLE_W / 2, cx - BUBBLE_W - 10, cx + 10]) cands.push({ x, y: yAbove });
+        for (const x of [cx - BUBBLE_W / 2, cx - BUBBLE_W - 10, cx + 10]) cands.push({ x, y: yBelow });
+      }
+      const r = place(cands, BUBBLE_W, BUBBLE_H);
+      bubbles[p.year] = { x: r.x, y: r.y };
+    });
+    return { bubbles };
+  }, [overlay, targetPoints, visibleTargets, closedFlags, isShareNow]);
+
+  // TargetBubble: a chat-box call-out with a tail pointing at the target point, closeable via ✕ (a closed
+  // call-out collapses to a small 🎯 marker that reopens it on click).
+  const TargetBubble = (props: any) => {
+    const { cx, cy, point, box } = props;
+    if (cx == null || cy == null) return null;
+    const key = `t-${point.year}`;
+    if (closedFlags.has(key)) {
+      return (
+        <g onClick={() => toggleFlag(key, true)} style={{ cursor: 'pointer' }}>
+          <title>{`Reopen the Target ${point.year} call-out`}</title>
+          <circle cx={cx} cy={cy} r={8} fill="#fff" stroke="#16a34a" strokeWidth={1.5} />
+          <text x={cx} y={cy + 3.5} textAnchor="middle" fontSize={9}>🎯</text>
+        </g>
+      );
+    }
+    if (!box) return null;
+    const lines = [
+      `Target coverage: ${pct1(point.tgtCov)}`,
+      `BAU coverage: ${pct1(point.bauCov)}`,
+      `Service gap: ${sig3(point.svcGap)} M HH`,
+    ];
+    const w = BUBBLE_W, h = BUBBLE_H, lineH = 12;
+    const bx = box.x, by = box.y;
+    const tx = Math.max(bx + 12, Math.min(cx, bx + w - 12));
+    let connector: React.ReactNode;
+    if (by + h <= cy - 4) {          // box above the point → tail from the bottom edge
+      connector = <path d={`M ${tx - 6} ${by + h} L ${tx + 6} ${by + h} L ${cx} ${cy - 3} Z`} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />;
+    } else if (by >= cy + 4) {       // box below the point → tail from the top edge
+      connector = <path d={`M ${tx - 6} ${by} L ${tx + 6} ${by} L ${cx} ${cy + 3} Z`} fill="#ffffff" stroke="#16a34a" strokeWidth={1} />;
+    } else {                          // box beside the point → thin leader line to the nearest edge
+      const ex = cx < bx ? bx : bx + w;
+      connector = <line x1={cx} y1={cy} x2={ex} y2={Math.max(by + 6, Math.min(cy, by + h - 6))} stroke="#16a34a" strokeWidth={1.2} />;
+    }
+    return (
+      <g>
+        <circle cx={cx} cy={cy} r={3.5} fill="#16a34a" stroke="#fff" strokeWidth={1} />
+        <rect x={bx + 2} y={by + 2.5} width={w} height={h} rx={7} fill="#0f172a" opacity={0.16} />
+        {connector}
+        <rect x={bx} y={by} width={w} height={h} rx={7} fill="#ffffff" stroke="#16a34a" strokeWidth={1.4} />
+        <text x={bx + 9} y={by + 15} fontSize={10} fontWeight={700} fill="#15803d">🎯 Target {point.year}</text>
+        {lines.map((t, i) => (
+          <text key={i} x={bx + 9} y={by + 29 + i * lineH} fontSize={9} fill="#334155">{t}</text>
+        ))}
+        <g onClick={() => toggleFlag(key, false)} style={{ cursor: 'pointer' }}>
+          <title>Close</title>
+          <circle cx={bx + w - 11} cy={by + 11} r={7} fill="#fff" stroke="#cbd5e1" />
+          <text x={bx + w - 11} y={by + 14} textAnchor="middle" fontSize={9} fontWeight={700} fill="#64748b">✕</text>
+        </g>
+      </g>
+    );
+  };
+
   return (
     <div>
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
@@ -383,6 +522,11 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           </div>
         );
       })()}
+      {targetPoints.length > 0 && (
+        <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 6 }}>
+          🎯 Target call-outs are drawn on the chart. Click a call-out's ✕ to close it, or click its marker to reopen; use 🎯 Targets to choose which show.
+        </div>
+      )}
       {/* Toolbar: Y-axis unit toggle + per-chart exports */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
         <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
@@ -395,6 +539,33 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           ))}
         </div>
         <button onClick={() => setShowDots(d => !d)} style={{ ...toolBtn, fontWeight: 600, background: showDots ? '#eff6ff' : '#fff', color: showDots ? '#2563eb' : '#475569', borderColor: showDots ? '#93c5fd' : '#cbd5e1' }} title="Show or hide the per-year data-point dots">● Data points: {showDots ? 'on' : 'off'}</button>
+        {/* Multi-select: which target years' call-outs are drawn (declutters when there are many targets). */}
+        {targetPoints.length > 0 && (
+          <div style={{ position: 'relative' }}>
+            <button onClick={() => setTgtDropOpen(o => !o)} title="Choose which targets' call-outs are shown on the chart"
+              style={{ ...toolBtn, fontWeight: 600, background: tgtDropOpen ? '#f0fdf4' : '#fff', borderColor: '#86efac', color: '#15803d' }}>
+              🎯 Targets shown: {visibleTargets ? visibleTargets.size : targetPoints.length}/{targetPoints.length} ▾
+            </button>
+            {tgtDropOpen && (<>
+              <div style={{ position: 'fixed', inset: 0, zIndex: 40 }} onClick={() => setTgtDropOpen(false)} />
+              <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', padding: '8px 10px', minWidth: 180 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#475569', marginBottom: 6 }}>Show call-out for:</div>
+                {targetPoints.map((p: any) => (
+                  <label key={p.year} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11.5, padding: '3px 2px', cursor: 'pointer', color: '#334155' }}>
+                    <input type="checkbox" checked={isTargetVisible(p.year)}
+                      onChange={() => toggleTargetVisible(p.year, targetPoints.map((q: any) => q.year))}
+                      style={{ accentColor: '#16a34a' }} />
+                    🎯 Target {p.year}
+                  </label>
+                ))}
+                <div style={{ display: 'flex', gap: 6, marginTop: 6, borderTop: '1px solid #e2e8f0', paddingTop: 6 }}>
+                  <button onClick={() => setVisibleTargets(null)} style={{ ...toolBtn, padding: '2px 10px', fontSize: 10 }}>All</button>
+                  <button onClick={() => setVisibleTargets(new Set())} style={{ ...toolBtn, padding: '2px 10px', fontSize: 10 }}>None</button>
+                </div>
+              </div>
+            </>)}
+          </div>
+        )}
         <button onClick={exportPng} style={toolBtn} title="Download this graph as a PNG image">⤓ PNG</button>
         <button onClick={exportCsv} style={toolBtn} title="Download the data table as CSV">⤓ CSV</button>
       </div>
@@ -424,11 +595,19 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
             ))}
           </ComposedChart>
-        {/* Final-year financing-gap annotation, drawn above the chart. */}
-        {overlay && endAnno && (
+        {/* Overlay svg above the chart: the financing-gap bracket + the 🎯 target call-outs. The svg
+            itself ignores pointer events; only the call-out groups are clickable, so chart hover/tooltip
+            still works everywhere else. */}
+        {overlay && (endAnno || (flagPlan && targetPoints.length > 0)) && (
           <svg width={overlay.width} height={overlay.height}
             style={{ position: 'absolute', left: overlay.left, top: overlay.top, overflow: 'visible', pointerEvents: 'none', zIndex: 20 }}>
-            <GapAnnotation />
+            {endAnno && <GapAnnotation />}
+            {flagPlan && targetPoints.filter((p: any) => isTargetVisible(p.year)).map((p: any) => (
+              <g key={`tb-${p.year}`} style={{ pointerEvents: 'auto' }}>
+                <TargetBubble cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShareNow ? p.yShare : p.y) + overlay.yb}
+                  point={p} box={flagPlan.bubbles[p.year]} />
+              </g>
+            ))}
           </svg>
         )}
       </div>
