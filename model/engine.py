@@ -87,16 +87,23 @@ def _project_hh(arr, n):
 
 def _project_series(arr, n, fallback_growth=0.0):
     """test2 projection rule: HONOUR user-entered values (historical AND forecast) and fill only the
-    blanks. A value ≤ 0 (or missing) is 'blank' → carried forward from the prior year at the MEAN
-    historical year-on-year growth (the average of the leading contiguous run of real values). This
-    lets the user override any forecast year while empty cells auto-fill at average growth.
+    blanks (a value ≤ 0 or missing is 'blank'). Blanks are smoothed by the year-on-year growth rate:
 
-    Returns (series, mean_growth). The default Nepal payload supplies only historical values, so the
-    tail auto-fills exactly as `_project_hh` did — parity preserved."""
+      * INTERIOR blanks — those sitting between two entered values — are filled by GEOMETRIC
+        interpolation: a constant year-on-year growth rate is solved between the nearest entered
+        value before and the nearest entered value after, so the curve passes smoothly through both.
+      * TRAILING blanks (past the last entered value) and any LEADING blanks (before the first)
+        extrapolate at the MEAN historical growth (the average YoY of the leading contiguous run of
+        entered values), since there is no later anchor to interpolate toward.
+
+    Returns (series, mean_growth). The default Nepal payload supplies a contiguous historical run and
+    nothing after it, so there are no interior gaps and the tail extrapolates at mean growth exactly
+    as before — parity preserved."""
     a = np.array(arr, dtype=float) if arr else np.array([], dtype=float)
     out = np.zeros(n, dtype=float)
     k = min(len(a), n)
     out[:k] = a[:k]
+    anchors = [t for t in range(n) if out[t] > 0]        # indices the user actually supplied
     known = []
     for t in range(n):                       # leading contiguous run of real (>0) values = 'historical'
         if out[t] > 0:
@@ -105,9 +112,24 @@ def _project_series(arr, n, fallback_growth=0.0):
             break
     yoy = [known[i] / known[i - 1] - 1.0 for i in range(1, len(known)) if known[i - 1] > 0]
     g = float(np.mean(yoy)) if yoy else float(fallback_growth)
-    for t in range(1, n):
-        if out[t] <= 0:                      # blank → project from the prior year at mean growth
-            out[t] = out[t - 1] * (1.0 + g)
+    if not anchors:
+        return out, g
+    # 1) interior gaps: geometric interpolation between each consecutive pair of anchors.
+    for ai in range(len(anchors) - 1):
+        lo, hi = anchors[ai], anchors[ai + 1]
+        if hi - lo <= 1:
+            continue
+        v_lo, v_hi = out[lo], out[hi]
+        r = (v_hi / v_lo) ** (1.0 / (hi - lo)) - 1.0 if v_lo > 0 and v_hi > 0 else g
+        for j in range(1, hi - lo):
+            out[lo + j] = v_lo * (1.0 + r) ** j
+    # 2) trailing blanks after the last anchor → extrapolate forward at mean historical growth.
+    for t in range(anchors[-1] + 1, n):
+        out[t] = out[t - 1] * (1.0 + g)
+    # 3) leading blanks before the first anchor → back-fill at mean historical growth.
+    denom = 1.0 + g
+    for t in range(anchors[0] - 1, -1, -1):
+        out[t] = out[t + 1] / denom if denom != 0 else 0.0
     return out, g
 
 

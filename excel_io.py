@@ -16,10 +16,10 @@ cell is which, or which cells are inputs vs engine-derived. Values are stored in
 
 Editable windows (by year, matching InputPanel.tsx):
   * real GDP / population / households / budget overrides : ALL years — historical actuals are
-    required, forecast cells are optional (blank = auto-fill at mean historical growth, or the
-    connection-cost-derived budget)
+    required, forecast cells are optional (blank = auto-fill from the yearly growth rate, or the
+    new-service-cost-derived budget)
   * service-level shares : start year + baseline year (historical), plus any forecast year — a
-    full forecast column (all 5 rungs, Σ 100%) makes that year a 🎯 target
+    forecast column (all 5 rungs summing to 100%) makes that year a 🎯 target
 Everything else in the table is an engine projection and is written grey.
 """
 import io
@@ -45,7 +45,7 @@ def _layout(fe):
       ('input', key, label, section, field, kind, numfmt)        — editable series row
       ('calc', label, calckey, numfmt)                           — grey engine-computed row
 
-    kinds: 'proj' = editable all years, blank = auto-fill at mean historical growth;
+    kinds: 'proj' = editable all years, blank = auto-fill from the yearly growth rate;
            'ovr'  = editable all years, blank = model-computed budget (override semantics);
            'svc_tgt' = start & baseline years + any forecast year (full column = target)."""
     cc = fe.get('country_config', {}) or {}
@@ -54,12 +54,12 @@ def _layout(fe):
     cur = cc.get('currency', 'LCU')
     scope = (cc.get('area') or '').strip().capitalize() or 'Area'
     items = [
-        ('section', 'Service levels — Water supply (% HH) — fill a full forecast column (Σ 100%) to set a target year'),
+        ('section', 'Service levels: Water supply (% HH). Fill a forecast column (all 5 rungs add up to 100%) to set a target year'),
     ]
     for i in range(5):
         items.append(('input', f'water_service.serv{i+1}_ts', f'% {ws_names[i]}',
                       'water_service', f'serv{i+1}_ts', 'svc_tgt', '0.00%'))
-    items.append(('section', 'Service levels — Sanitation (% HH) — fill a full forecast column (Σ 100%) to set a target year'))
+    items.append(('section', 'Service levels: Sanitation (% HH). Fill a forecast column (all 5 rungs add up to 100%) to set a target year'))
     for i in range(5):
         items.append(('input', f'sanitation_service.sserv{i+1}_ts', f'% {sn_names[i]}',
                       'sanitation_service', f'sserv{i+1}_ts', 'svc_tgt', '0.00%'))
@@ -74,7 +74,7 @@ def _layout(fe):
         ('input', 'population.hh_ts', f'{scope} households (millions)', 'population', 'hh_ts', 'proj', '#,##0.000000'),
         ('calc', '→ Households used (millions)', 'hh_used', '#,##0.000'),
         ('calc', 'Avg HH size', 'hh_size', '0.00'),
-        ('section', f'Budget ({cur} millions, real / baseline prices) — derived from connection cost; fill any cell to override'),
+        ('section', f'Budget ({cur} millions, real / baseline prices): the cost of new service. Fill any cell to override'),
         ('input', 'bau.ws_expend_ts', 'WS budget — override', 'bau', 'ws_expend_ts', 'ovr', '#,##0.00'),
         ('calc', '→ WS budget used', 'ws_budget_used', '#,##0'),
         ('input', 'bau.san_expend_ts', 'SAN budget — override', 'bau', 'san_expend_ts', 'ovr', '#,##0.00'),
@@ -177,17 +177,17 @@ def build_template(fe: dict, results: dict = None) -> io.BytesIO:
     ws['B2'] = (f"{cc.get('country', '')} — {cc.get('area', '')}   |   currency: {cc.get('currency', 'LCU')}"
                 f"   |   budget mode: from_cost")
     ws['B2'].font = Font(color='475569')
-    ws['B3'] = ('Fill the CREAM cells (historical) and, optionally, the BLUE cells (forecast — leave blank '
-                'to auto-fill at the mean historical growth, or the model-computed budget). Grey cells are '
-                'auto-calculated — leave them alone. For service levels, fill a full forecast column '
-                '(all 5 rungs, Σ 100%) to set a target year (green column header). Enter percentages as shown (e.g. 5.00%). '
-                'Blanking a pre-filled cell keeps its current value — type 0 to clear an override or target cell.')
+    ws['B3'] = ('Fill the CREAM cells (historical) and, optionally, the BLUE cells (forecast). Leave a blue cell '
+                'blank to fill it in from the yearly growth rate, or the model-computed budget. Grey cells are '
+                'auto-calculated, so leave them alone. For service levels, fill a forecast column '
+                '(all 5 rungs add up to 100%) to set a target year (green column header). Enter percentages as shown (e.g. 5.00%). '
+                'Blanking a pre-filled cell keeps its current value; type 0 to clear an override or target cell.')
     ws['B3'].font = Font(italic=True, color='B45309')
     # Hidden span stamp (col A is hidden): the parser refuses a file whose analysis period no longer
     # matches the inputs — the grey engine-path cells would otherwise land in the wrong years.
     ws['A2'] = f'span:{start}:{baseline}:{end}'
     # Colour legend swatches
-    legend = [(3, EDIT_FILL, 'Historical input'), (7, FCST_FILL, 'Forecast — blank = auto-fill'),
+    legend = [(3, EDIT_FILL, 'Historical input'), (7, FCST_FILL, 'Forecast (blank = auto-fill)'),
               (12, LOCK_FILL, 'Auto-calculated'), (16, TGT_FILL, '🎯 Target-year column')]
     for col, fill, label in legend:
         ws.cell(4, col).fill = fill
@@ -329,7 +329,7 @@ def parse_template(file_bytes: bytes, fe: dict):
                 continue
             v = ws.cell(rr, col).value
             if v is None or v == '' or isinstance(v, bool):
-                continue                       # blank = keep the existing value (auto-fill at mean growth)
+                continue                       # blank = keep the existing value (auto-fill from the yearly growth rate)
             try:
                 fv = float(v)
             except (TypeError, ValueError):

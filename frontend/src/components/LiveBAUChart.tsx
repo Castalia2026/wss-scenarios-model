@@ -18,14 +18,15 @@ import { toPng } from 'html-to-image';
  * live in the data table below the chart. Animations snap (no tween).
  */
 
-// Round to 3 significant figures, then format with thousands separators (no scientific notation).
+// Round to 3 significant figures. toPrecision avoids the float artefacts that dividing by a tiny
+// power of ten produced (e.g. 117 / 1e-5 = 11699999.999999998).
 function round3(v: number): number {
   if (!isFinite(v) || v === 0) return 0;
-  const m = Math.pow(10, 2 - Math.floor(Math.log10(Math.abs(v))));
-  return Math.round(v * m) / m;
+  return Number(v.toPrecision(3));
 }
+// Format with thousands separators, at most 2 decimals (no scientific notation).
 function sig3(v: number): string {
-  return round3(v).toLocaleString('en-US', { maximumFractionDigits: 20 });
+  return round3(v).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 // Money in the engine is carried in MILLIONS; display large money in BILLIONS (÷1000) to 3 sig figs,
 // so a financing gap like 254,000 M reads "254 B" instead of a six-digit number.
@@ -56,11 +57,34 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   // rendered axis ticks: both axes are linear in (year, value), so two ticks fix each mapping.
   const [overlay, setOverlay] = useState<{ left: number; top: number; width: number; height: number;
     xm: number; xb: number; ym: number; yb: number } | null>(null);
-  const [winTick, setWinTick] = useState(0);          // bump on window resize to re-measure
-  useEffect(() => {
-    const onResize = () => setWinTick(t => t + 1);
-    window.addEventListener('resize', onResize);
-    return () => window.removeEventListener('resize', onResize);
+  const [winTick, setWinTick] = useState(0);          // bump to re-measure the overlay geometry
+  const [wrapW, setWrapW] = useState(0);              // measured chart width — drives the chart explicitly
+  // recharts' ResponsiveContainer does not reliably re-fit when the side Guide panel opens/closes
+  // (it changes the chart's width with no window 'resize'), leaving the chart and its financing-gap
+  // overlay pinned to a stale width. We instead measure the wrapper ourselves and size the chart
+  // explicitly, re-measuring on every width change via a ResizeObserver. useLayoutEffect measures
+  // before paint so there is no zero-width first frame.
+  useLayoutEffect(() => {
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const bump = () => setWinTick(t => t + 1);
+    const measure = () => {
+      if (chartRef.current) setWrapW(chartRef.current.clientWidth);
+      bump();
+      // recharts repositions its axis ticks a render cycle or two AFTER the width prop changes, so an
+      // immediate read can pick up stale tick coordinates — which leaves the financing-gap overlay
+      // mapped to the old scale (its bracket lands off the resized plot). Re-measure a couple of times
+      // as recharts settles so the overlay maps years to the FINAL tick positions.
+      timers.forEach(clearTimeout); timers.length = 0;
+      timers.push(setTimeout(bump, 60), setTimeout(bump, 260));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined' && chartRef.current) {
+      ro = new ResizeObserver(() => measure());
+      ro.observe(chartRef.current);
+    }
+    return () => { timers.forEach(clearTimeout); window.removeEventListener('resize', measure); if (ro) ro.disconnect(); };
   }, []);
   const isShareNow = unitMode === 'share';
   useLayoutEffect(() => {
@@ -115,11 +139,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         const tgt = sum((res, i) => secOf(res).target_hh[0][i]);
         const finGapSeries = sum((res, i) => (secOf(res).financing_gap || [])[i] || 0);
 
-        // Performance-improvement start year: the target only diverges from BAU from here on. test2:
-        // no as-is lag — performance improvement begins the year after the last historical (baseline) year.
         const per = datasets[0]?.period || {};
         const baseYr = per.baseline_year ?? years[0];
-        const perfStart = baseYr + 1;
         const rows = years.map((y: number, i: number) => {
           const tot = +total[i].toFixed(4);
           // Safely-managed can never exceed total households — clamp both BAU and target for display.
@@ -129,9 +150,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
             year: y,
             'Total households': tot,
             'Households with safely managed (BAU)': bauC,
-            // Split so the pre-performance-start portion draws dotted and the rest solid (two <Line>s below).
-            'Target (before performance start)': y <= perfStart ? tgtC : null,
-            'Target (safely managed)': y >= perfStart ? tgtC : null,
+            'Target (safely managed)': tgtC,
           };
         });
         setData(rows);
@@ -241,7 +260,6 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         year: row.year,
         'Total households': tot > 0 ? 1 : 0,
         'Households with safely managed (BAU)': div(row['Households with safely managed (BAU)']),
-        'Target (before performance start)': div(row['Target (before performance start)']),
         'Target (safely managed)': div(row['Target (safely managed)']),
       };
     });
@@ -344,7 +362,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} - BAU vs Target (live calculation engine)
       </h3>
       <div style={{ fontSize: 10, color: '#065f46', background: '#d1fae5', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Live engine output, validated against the reference Excel workbook.{datasets.length > 1 ? ' National = Urban + Rural (summed).' : ' Edits on the Data Inputs / Test Harness tabs recompute this chart.'}
+        Live engine output.{datasets.length > 1 ? ' National = Urban + Rural (summed).' : ' Edits on the Data Inputs tab recompute this chart.'}
       </div>
       {constrained && (
         <div style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px', marginBottom: 8, lineHeight: 1.5 }}>
@@ -381,8 +399,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         <button onClick={exportCsv} style={toolBtn} title="Download the data table as CSV">⤓ CSV</button>
       </div>
       <div ref={chartRef} style={{ position: 'relative' }}>
-        <ResponsiveContainer width="100%" height={380}>
-          <ComposedChart data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
+        <ComposedChart width={Math.max(1, wrapW)} height={380} data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
             <XAxis dataKey="year" tick={{ fontSize: 10 }} />
             <YAxis tick={{ fontSize: 10 }} domain={isShare ? [0, 1] : undefined}
@@ -397,8 +414,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
               <LabelList content={endpointLabel} />
             </Area>
             <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="8 4" isAnimationActive={false} />
-            {/* Target trajectory: dotted before the performance-improvement start year, solid from it on */}
-            <Line type="monotone" dataKey="Target (before performance start)" stroke="#16a34a" strokeWidth={2} dot={false} legendType="plainline" strokeDasharray="2 3" connectNulls={false} isAnimationActive={false} />
+            {/* Target trajectory: one solid line across all years */}
             <Line type="monotone" dataKey="Target (safely managed)" stroke="#16a34a" strokeWidth={3} dot={showDots ? { r: 1.8 } : false} legendType="plainline" connectNulls={false} isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Line>
@@ -408,7 +424,6 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
             ))}
           </ComposedChart>
-        </ResponsiveContainer>
         {/* Final-year financing-gap annotation, drawn above the chart. */}
         {overlay && endAnno && (
           <svg width={overlay.width} height={overlay.height}
