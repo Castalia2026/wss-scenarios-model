@@ -3,8 +3,18 @@ import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
 import LiveBAUChart from './components/LiveBAUChart';
-import TestHarness from './components/TestHarness';
 import { fetchDefaults, runCalculation } from './api';
+
+// The BAU view stacks two charts with identical elements: Safely managed (rung 0) then Basic (rung 1).
+function BAUChartPair(props: { inputsList: any[]; sector: 'water' | 'sanitation'; scopeLabel?: string }) {
+  return (
+    <>
+      <LiveBAUChart {...props} rung={0} />
+      <div style={{ height: 1, background: '#e2e8f0', margin: '28px 0 20px' }} />
+      <LiveBAUChart {...props} rung={1} />
+    </>
+  );
+}
 
 export default function App() {
   const [inputs, setInputs] = useState<any>(null);
@@ -186,10 +196,10 @@ export default function App() {
     if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
   }
 
-  // Test Harness is hidden in this build. Data Inputs and BAU are active; the rest are greyed out
-  // until the intervention engine is ported and validated.
+  // Data Inputs, BAU and Intervention Design are active; Results Dashboard and Export stay greyed out
+  // until they are wired to live intervention output.
   const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
-  const disabledTabs = new Set([2, 3, 4]);
+  const disabledTabs = new Set([3, 4]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -409,21 +419,21 @@ export default function App() {
                   ))}
                 </div>
                 {bauChartScope === 'national' ? (
-                  <LiveBAUChart inputsList={[inputs, altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="National" />
+                  <BAUChartPair inputsList={[inputs, altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="National" />
                 ) : bauChartScope === 'urban' ? (
-                  <LiveBAUChart inputsList={[inputs]} sector={sectorTab} scopeLabel="Urban" />
+                  <BAUChartPair inputsList={[inputs]} sector={sectorTab} scopeLabel="Urban" />
                 ) : (
-                  <LiveBAUChart inputsList={[altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="Rural" />
+                  <BAUChartPair inputsList={[altInputs['rural'] ?? inputs]} sector={sectorTab} scopeLabel="Rural" />
                 )}
               </>
             ) : (
-              <LiveBAUChart inputsList={[activeInputs]} sector={sectorTab}
+              <BAUChartPair inputsList={[activeInputs]} sector={sectorTab}
                 scopeLabel={inputScope === 'national' ? 'National' : inputScope === 'rural' ? 'Rural' : 'Urban'} />
             )}
           </div>
         </>)}
         {activeTab === 2 && inputs && (
-          <InterventionPanel inputs={activeInputs} onChange={handleSetActiveInputs} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={inputScope} chartScope={chartScope} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InterventionPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={inputScope} chartScope={chartScope} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
         )}
         {/* Guide panel — tabs 0, 1, 2 */}
         {activeTab <= 2 && (
@@ -445,9 +455,6 @@ export default function App() {
 
         {activeTab === 3 && (
           <ResultsDashboard geoScope={chartScope} scenarios={scenarios} inputs={inputs} />
-        )}
-        {activeTab === 5 && inputs && (
-          <TestHarness inputs={activeInputs} onChange={handleSetActiveInputs} />
         )}
         {activeTab === 4 && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px' }}>
@@ -573,7 +580,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
               <strong>BAU Scenario</strong> — Pick Water Supply or Sanitation, then work down the sections: <em>Unit Costs &amp; Technical Parameters</em> (enter technology prices as nominal, with a price index that converts them to real). These fields are shared with the Data Inputs tab. The BAU graph on the right updates live as you type.
             </li>
             <li style={{ marginBottom: 6 }}>
-              <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, budget execution, and microfinance for sanitation. Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
+              <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, tariff reform, and microfinance (with a self-finance carve-out and a means-based grant inside it). Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
             </li>
             <li style={{ marginBottom: 6 }}>
               <strong>Results Dashboard</strong> — Compare BAU and intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap.
@@ -777,11 +784,14 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: '5. Budget',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The water-supply and sanitation budgets, year by year — computed for you, with per-year overrides.</p>
+        <p style={{ margin: '0 0 6px' }}>Two budgets per sector, year by year — computed for you, with per-year overrides.</p>
         <div style={gFieldWrap}>
-          <span style={gFieldLbl}>WS / SAN budget (millions, real):</span> Computed for you: historically from the cost of the new service added each year (households served × their unit cost, set by the technology mix), and for forecast years from the average historical budget-to-GDP ratio × real GDP. The placeholder in each cell shows the model value; type into any cell to override that year, for example if you have actual government budget figures.
+          <span style={gFieldLbl}>Executed budget (millions, real):</span> The capital that actually gets put to work building new service — households served × their unit cost (set by the technology mix). Historically from the cost of new service; for forecast years from the average historical budget-to-GDP ratio × real GDP. This is what drives the BAU. Override any year with your own figure.
+        </div>
+        <div style={gFieldWrap}>
+          <span style={gFieldLbl}>Allocated budget (millions, real):</span> The capital budget on paper (e.g. the government's allocation) — a manual input, normally larger than what actually gets put to work. Its historical default implies ≈77% budget execution, and its forecast is the mean historical (allocated ÷ executed) ratio × the executed-budget forecast. The ratio <b>executed budget ÷ allocated</b> is the <b>budget execution</b> that the Budget-execution intervention improves toward 100%.
           <GFind items={[
-            "Your country's Ministry of Finance (budget documents / execution reports), if overriding",
+            "Your country's Ministry of Finance (budget documents / execution reports) for the allocated budget",
             "Your country's Ministry of Water Supply / Sanitation or equivalent sector ministry",
           ]} />
         </div>
@@ -810,13 +820,25 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_unit_costs: {
     title: 'Water Supply — Unit Costs & Technical Parameters',
-    content: "The capital cost per household for the safely-managed and basic service levels is calculated from the technology mixes below (the cost per household is the sum of each technology's share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average prices for individual technologies from a web search.",
-    sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The capital cost per household is built from <strong>two technology mixes</strong> — one for <strong>safely-managed</strong> and one for <strong>basic</strong>. For each technology set its share of connections and its cost per household; the model uses each table's share-weighted total (Σ share × cost).</p>
+        <p style={{ margin: '0 0 6px' }}>For water the two rungs use <strong>different</strong> technologies. Safely-managed is delivered by on-premises improved sources (piped into the dwelling, a tubewell or protected well on the plot, …) that are available when needed and free from contamination. Basic is delivered by shared or communal supplies — piped to the yard or a neighbour, a public tap/standpipe, a communal well or a water kiosk — which are improved but cannot meet the safely-managed criteria.</p>
+        <p style={{ margin: 0 }}>Enter costs as nominal prices for the price-index year (real = nominal × index ÷ 100), in real terms at the base-year level. Use the utility's connection costs and average technology prices.</p>
+      </div>
+    ),
+    sources: [{ name: 'WHO/UNICEF JMP service ladders', url: 'https://washdata.org/monitoring/drinking-water' }, { name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   san_unit_costs: {
     title: 'Sanitation — Unit Costs & Technical Parameters',
-    content: "The sanitation cost per household for the safely-managed and basic service levels is calculated from the technology mixes below (the cost per household is the sum of each technology's share × cost). All costs should be in real terms at the base-year price level. Use the utility's connection costs, and average costs for on-site solutions from a web search.",
-    sources: [{ name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>The cost per household is built from <strong>two technology mixes</strong> — safely-managed and basic. Unlike water, for sanitation both tables list the <strong>same</strong> technologies; the model uses each table's share-weighted total, and the two default to equal costs.</p>
+        <p style={{ margin: '0 0 6px' }}>Sanitation can reach different service levels with the <strong>same technology</strong> because the level is set by service <em>attributes</em> — <strong>sharing</strong>, <strong>emptying</strong>, and <strong>treatment</strong> — not the hardware. An identical flush-to-septic-tank toilet is Limited if shared, Basic if emptied but discharged locally (or the fate is unknown), and Safely managed if contained and never emptied, buried on site, or emptied and treated off-site. That is why the two tables share the same technologies; the panel beneath them on the page walks through the four cases.</p>
+        <p style={{ margin: 0 }}>Enter costs as nominal prices for the price-index year (real = nominal × index ÷ 100). Because the hardware is the same, the two tables often match; raise the safely-managed table to reflect containment, safe emptying and off-site treatment.</p>
+      </div>
+    ),
+    sources: [{ name: 'WHO/UNICEF JMP service ladders', url: 'https://washdata.org/monitoring/sanitation' }, { name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
   },
   planned_investments: {
     title: 'Planned Investments',
@@ -843,14 +865,21 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: 'Water Supply Interventions',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The available water supply interventions are collection efficiency, NRW reduction, capital efficiency, tariff reform, borrowing, and budget execution improvement.</p>
+        <p style={{ margin: '0 0 6px' }}>The available water supply interventions are collection efficiency, NRW reduction, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, tariff reform, and microfinance (which contains a self-finance carve-out and a means-based grant).</p>
         <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on (this adds it to the graph). Click <strong>▾ Show</strong> on the right of its row to open the parameter dropdown, fill in the fields, then click <strong>▴ Hide</strong> to collapse it again. Ticking and the dropdown are independent — you can review parameters without enabling the intervention, and switching it off does not collapse the panel.</p>
         <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
           <li><strong>Collection efficiency:</strong> set the start/target years and the current and target collection ratios (revenue collected ÷ revenue billed).</li>
           <li><strong>NRW reduction:</strong> set current and target non-revenue water. The target cannot go below 3%, as even the best utilities globally achieve only 3–5%. Allow a few years' lag before benefits appear.</li>
-          <li><strong>Capital efficiency:</strong> the % reduction in unit capital costs from better procurement and project management (typically 10–30%).</li>
-          <li><strong>Tariff reform:</strong> set the affordability ceiling and the O&amp;M cost-recovery target to reach.</li>
-          <li><strong>Borrowing:</strong> set the loan terms (DSCR, grace period, tenor, interest rate) used to raise upfront finance against future cashflow.</li>
+          <li><strong>Budget execution improvement:</strong> budget execution = executed budget ÷ allocated budget — the share of the allocated capital budget that actually gets spent on new service (unit cost × new households). The current value is auto-calculated from your history (or override it); the intervention raises it toward a target of up to 100%, so more of the allocated budget builds new service and the financing gap shrinks.</li>
+          <li><strong>Capex efficiency (unit cost):</strong> discounts the safely-managed connection cost — e.g. through better procurement or standardised designs. Set the start/target years and the current and target efficiency; the discount ramps up from 0 at the start year to (target − current) by the target year and then holds, so the same budget builds more connections and the financing gap shrinks. (This is distinct from budget execution above, which spends more of the allocated budget; this makes each connection cheaper.)</li>
+          <li><strong>Optimised technology selection:</strong> re-model the safely-managed technology mix (pre-filled from the BAU mix). Re-weight the shares or re-cost the technologies; the new weighted connection cost applies from the start year onward, so a cheaper mix stretches the budget further. Use “↺ Reset to current BAU mix” to start over; a mix identical to BAU has no effect.</li>
+          <li><strong>Tariff reform:</strong> set the start and target year, the volume sold, and the current and target tariff — the tariff rises linearly to the target and the extra revenue (volume × tariff rise) funds new service.</li>
+          <li><strong>Microfinance:</strong> finances a connection loan for gap households. Set the <em>connection fee</em> (defaults to the safely-managed capex), the income distribution (5 brackets), the share of the gap in each bracket, the willingness-to-pay % of income, and the real loan rate/tenor; a household connects if its income can service the loan. It also contains:
+            <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+              <li><strong>Self-finance carve-out:</strong> the share of the gap that pays upfront from savings (richest-bracket-first). They'd connect anyway, so they're isolated out and excluded from the microfinance impact, leaving BAU unchanged.</li>
+              <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one, resizing repayment to what they can afford (cheapest buy-downs funded first).</li>
+            </ul>
+          </li>
         </ul>
       </div>
     ),
@@ -859,12 +888,15 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: 'Sanitation Interventions',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The available sanitation interventions are collection efficiency, capital efficiency, tariff reform, borrowing, budget execution improvement, and microfinance for on-site sanitation.</p>
+        <p style={{ margin: '0 0 6px' }}>The available sanitation interventions are collection efficiency, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, NRW-linked sanitation revenue, tariff reform, and microfinance (which contains a self-finance carve-out and a means-based grant).</p>
         <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on, then click <strong>▾ Show</strong> to open its parameter dropdown, fill in the fields, and click <strong>▴ Hide</strong> to collapse. The checkbox (which drives the graph) and the Show/Hide dropdown work independently.</p>
         <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
           <li><strong>Collection efficiency:</strong> uses the same ratios as water supply — enter the sewer tariff as a % of the water tariff.</li>
-          <li><strong>Capital efficiency, tariff reform, borrowing:</strong> entered the same way as on the water supply side.</li>
-          <li><strong>Microfinance:</strong> for households investing in their own on-site sanitation.</li>
+          <li><strong>Budget execution improvement:</strong> budget execution = executed budget ÷ allocated budget (the share of the allocated capital budget that actually gets spent on new service); auto-calculated, raised toward up to 100% by the intervention.</li>
+          <li><strong>Capex efficiency (unit cost) &amp; optimised technology selection:</strong> entered the same way as on the water supply side — both discount the safely-managed connection cost so the same budget builds more service. Capex efficiency ramps a discount up from 0 at the start year to (target − current) by the target year; optimised technology selection applies the weighted cost of a re-modelled technology mix from the start year.</li>
+          <li><strong>NRW-linked sanitation revenue:</strong> links to the <em>Water Supply → NRW reduction</em> lever. The physical water that lever recovers returns to the sewer as wastewater; set the return-to-sewer ratio, the sewer charge (per m³) and the collection rate, and the collected revenue funds new safely-managed sanitation connections. It has no effect unless NRW reduction is switched on in the water supply interventions.</li>
+          <li><strong>Tariff reform:</strong> entered the same way as on the water supply side.</li>
+          <li><strong>Microfinance (with self-finance carve-out &amp; means-based grant):</strong> entered the same way as on the water supply side — a connection loan serves gap households who can service it, the self-finance share who'd pay upfront are isolated out, and a grant pool buys the loan down for those who can't service a full one.</li>
         </ul>
       </div>
     ),
@@ -873,9 +905,13 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: 'Custom Interventions',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>Add interventions not covered by the standard set — for example donor grants, climate finance, or PPP contributions.</p>
-        <p style={{ margin: '0 0 6px' }}>Click <strong>+ Add Custom Intervention</strong>, name it, then choose its <strong>Sector</strong> and <strong>Type</strong> from the two dropdowns (▾). A new intervention defaults to the sector currently selected by the Water Supply / Sanitation toggle above; change it to Sanitation or Both if needed.</p>
-        <p style={{ margin: 0 }}>The <strong>Type</strong> dropdown sets which fields appear: <em>Fixed annual amount</em> (a constant yearly sum), <em>Revenue stream</em> (a starting amount that grows each year), or <em>Per-household subsidy</em> (an amount per household connected).</p>
+        <p style={{ margin: '0 0 6px' }}>Add interventions not covered by the standard set — for example biogas/compost sales, resource recovery, or a technology that lowers connection costs. Custom interventions <strong>affect the calculation</strong> and appear on the impact graph.</p>
+        <p style={{ margin: '0 0 6px' }}>Click <strong>+ Add Custom Intervention</strong>, tick its box to switch it on, name it, then choose its <strong>Sector</strong> (Water, Sanitation or Both) and <strong>Type</strong> from the two dropdowns (▾). A new intervention defaults to the sector currently selected by the Water Supply / Sanitation toggle above. It is forced off in the BAU baseline, so it never moves the counterfactual.</p>
+        <p style={{ margin: 0 }}>The <strong>Type</strong> dropdown sets which fields appear:</p>
+        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
+          <li><strong>New revenue source</strong> — you invest a <em>cost to implement</em> (spread over a number of years from the start time) to produce an <em>output</em> (with its own unit, start year, yearly quantity and value per unit). The net of the output's value minus the cost is added to that sector's capex to build more safely-managed connections.</li>
+          <li><strong>Cost reduction</strong> — from the start year it cuts the safely-managed connection cost per household by a percentage or a flat amount, so the same budget reaches more households.</li>
+        </ul>
       </div>
     ),
   },

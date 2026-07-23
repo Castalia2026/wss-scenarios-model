@@ -82,8 +82,8 @@ export function BAUForecastChart({ sector = 'water', geoScope = 'urban' }: { sec
 }
 
 // ─── Intervention Impact Charts ───
-export interface IntvActive { collectionNrw: boolean; capital: boolean; tariff: boolean; borrowing: boolean }
-const ALL_ACTIVE: IntvActive = { collectionNrw: true, capital: true, tariff: true, borrowing: true };
+export interface IntvActive { collectionNrw: boolean; capital: boolean; tariff: boolean }
+const ALL_ACTIVE: IntvActive = { collectionNrw: true, capital: true, tariff: true };
 
 function makeIntvData(sector: 'water' | 'sanitation', geoScope: string, active: IntvActive) {
   const f = SCOPE_FACTORS[geoScope] || SCOPE_FACTORS.urban;
@@ -92,7 +92,6 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string, active: 
   const ceSlope = sector === 'water' ? 0.025 : 0.015;
   const capSlope = sector === 'water' ? 0.018 : 0.012;
   const tarSlope = sector === 'water' ? 0.012 : 0.008;
-  const borSlope = sector === 'water' ? 0.008 : 0.005;
   const tgtStart = 2027;                                   // performance improvement begins
   const tgtEnd = allYears[allYears.length - 1];            // target reaches 100% (total HHs) here
   return allYears.map((y) => {
@@ -104,7 +103,6 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string, active: 
     const ce  = active.collectionNrw ? intv * ceSlope  * f.tgt : 0;
     const cap = active.capital       ? intv * capSlope * f.tgt : 0;
     const tar = active.tariff        ? intv * tarSlope * f.tgt : 0;
-    const bor = active.borrowing     ? intv * borSlope * f.tgt : 0;
     // Target ramps from the BAU line at tgtStart up to the Total-households line (100%) at tgtEnd
     const tFrac = y <= tgtStart ? 0 : Math.min(1, (y - tgtStart) / (tgtEnd - tgtStart));
     return {
@@ -114,7 +112,6 @@ function makeIntvData(sector: 'water' | 'sanitation', geoScope: string, active: 
       'Collection & NRW': +ce.toFixed(3),
       'Capital efficiency': +cap.toFixed(3),
       'Tariff increase': +tar.toFixed(3),
-      'Borrowing': +bor.toFixed(3),
       'Target': +(bauHH + tFrac * (totalHH - bauHH)).toFixed(2),
     };
   });
@@ -125,7 +122,6 @@ const INTV_COLORS = {
   'Collection & NRW': '#0ea5e9', // sky blue
   'Capital efficiency': '#6366f1', // indigo
   'Tariff increase': '#f59e0b',   // amber
-  'Borrowing': '#ec4899',         // pink
 };
 
 export function InterventionImpactChart({ sector = 'water', geoScope = 'urban', active = ALL_ACTIVE }: { sector?: 'water' | 'sanitation'; geoScope?: string; active?: IntvActive }) {
@@ -162,8 +158,6 @@ export function InterventionImpactChart({ sector = 'water', geoScope = 'urban', 
             name="Increased efficiency in capital expenditure" />}
           {active.tariff && <Area type="monotone" dataKey="Tariff increase" stackId="1" fill={INTV_COLORS['Tariff increase']} stroke={INTV_COLORS['Tariff increase']} fillOpacity={0.75} legendType="rect"
             name="Tariff increase" />}
-          {active.borrowing && <Area type="monotone" dataKey="Borrowing" stackId="1" fill={INTV_COLORS['Borrowing']} stroke={INTV_COLORS['Borrowing']} fillOpacity={0.75} legendType="rect"
-            name="Borrow against future cashflow" />}
           {/* Total HHs dashed line — line legend */}
           <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={false} legendType="plainline"
             strokeDasharray="8 4" name="Total households" />

@@ -11,9 +11,8 @@ const ruralWater = years.map(y => ({
   year: y,
   BAU: 0.15 + (y - 2025) * 0.008,
   'Collection & NRW': Math.max(0, (y - 2028) * 0.005),
-  'Capital Efficiency': Math.max(0, (y - 2033) * 0.004),
+  'Budget execution': Math.max(0, (y - 2033) * 0.004),
   'Tariff Reform': Math.max(0, (y - 2028) * 0.002),
-  Borrowing: Math.max(0, (y - 2036) * 0.003),
   Target: 0.15 + (y - 2025) * 0.025,
 }));
 
@@ -21,9 +20,8 @@ const urbanWater = years.map(y => ({
   year: y,
   BAU: 0.49 + (y - 2025) * 0.021,
   'Collection & NRW': Math.max(0, (y - 2028) * 0.008),
-  'Capital Efficiency': Math.max(0, (y - 2033) * 0.006),
+  'Budget execution': Math.max(0, (y - 2033) * 0.006),
   'Tariff Reform': Math.max(0, (y - 2028) * 0.003),
-  Borrowing: Math.max(0, (y - 2036) * 0.005),
   Target: 0.49 + (y - 2025) * 0.067,
 }));
 
@@ -31,9 +29,8 @@ const nationalWater = years.map((y, i) => ({
   year: y,
   BAU: ruralWater[i].BAU * 0.6 + urbanWater[i].BAU * 0.4,
   'Collection & NRW': ruralWater[i]['Collection & NRW'] * 0.6 + urbanWater[i]['Collection & NRW'] * 0.4,
-  'Capital Efficiency': ruralWater[i]['Capital Efficiency'] * 0.6 + urbanWater[i]['Capital Efficiency'] * 0.4,
+  'Budget execution': ruralWater[i]['Budget execution'] * 0.6 + urbanWater[i]['Budget execution'] * 0.4,
   'Tariff Reform': ruralWater[i]['Tariff Reform'] * 0.6 + urbanWater[i]['Tariff Reform'] * 0.4,
-  Borrowing: ruralWater[i].Borrowing * 0.6 + urbanWater[i].Borrowing * 0.4,
   Target: ruralWater[i].Target * 0.6 + urbanWater[i].Target * 0.4,
 }));
 
@@ -46,10 +43,10 @@ const financingData = years.map(y => ({
 
 const COLORS = {
   bau: '#64748b', target: '#2563eb', ce_nrw: '#10b981', capeff: '#f59e0b',
-  tariff: '#8b5cf6', loan: '#ec4899', inv_need: '#ef4444', bau_inv: '#64748b',
+  tariff: '#8b5cf6', inv_need: '#ef4444', bau_inv: '#64748b',
 };
 
-interface LayerActive { ceNrw: boolean; capeff: boolean; tariff: boolean; borrowing: boolean }
+interface LayerActive { ceNrw: boolean; capeff: boolean; tariff: boolean }
 function MockChart({ data, title, active }: { data: any[]; title: string; active: LayerActive }) {
   return (
     <div style={{ marginBottom: 28 }}>
@@ -63,9 +60,8 @@ function MockChart({ data, title, active }: { data: any[]; title: string; active
           <Legend wrapperStyle={{ fontSize: 10 }} />
           <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} legendType="rect" />
           {active.ceNrw && <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />}
-          {active.capeff && <Area type="monotone" dataKey="Capital Efficiency" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />}
+          {active.capeff && <Area type="monotone" dataKey="Budget execution" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />}
           {active.tariff && <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} legendType="rect" />}
-          {active.borrowing && <Area type="monotone" dataKey="Borrowing" stackId="1" fill={COLORS.loan} stroke={COLORS.loan} fillOpacity={0.6} legendType="rect" />}
           <Line type="monotone" dataKey="Target" stroke={COLORS.target} strokeWidth={2.5} dot={false} strokeDasharray="6 3" legendType="plainline" />
         </ComposedChart>
       </ResponsiveContainer>
@@ -92,10 +88,8 @@ const interventionImpactData = [
   { name: 'Service Gap',          value: 0.69,  fill: '#ef4444' },
   { name: 'Collection Efficiency', value: 0.05,  fill: '#10b981' },
   { name: 'NRW Reduction',        value: 0.29,  fill: '#10b981' },
-  { name: 'Capital Efficiency',   value: 0.19,  fill: '#10b981' },
+  { name: 'Budget execution',   value: 0.19,  fill: '#10b981' },
   { name: 'Tariff Reform',        value: 0.09,  fill: '#10b981' },
-  { name: 'Borrowing',            value: 0.06,  fill: '#10b981' },
-  { name: 'Budget Execution',     value: 0.03,  fill: '#10b981' },
   { name: 'Remaining Gap',        value: -0.02, fill: '#f59e0b' },
 ];
 
@@ -120,14 +114,13 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
     geoScope === 'urban' ? 'urban' : geoScope === 'rural' ? 'rural' : 'national'
   );
   const [activeIntv, setActiveIntv] = useState<Record<string, boolean>>({
-    'Collection Efficiency': true, 'NRW Reduction': true, 'Capital Efficiency': true,
-    'Tariff Reform': true, 'Borrowing': true, 'Budget Execution': true,
+    'Collection Efficiency': true, 'NRW Reduction': true, 'Budget execution': true,
+    'Tariff Reform': true,
   });
   const layerActive = {
     ceNrw: !!(activeIntv['Collection Efficiency'] || activeIntv['NRW Reduction']),
-    capeff: !!activeIntv['Capital Efficiency'],
+    capeff: !!activeIntv['Budget execution'],
     tariff: !!activeIntv['Tariff Reform'],
-    borrowing: !!activeIntv['Borrowing'],
   };
   return (
     <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
@@ -250,7 +243,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props)
         <div style={{ background: '#f0f4ff', padding: '10px 12px', borderRadius: 8, marginBottom: 14, border: '1px solid #c7d2fe' }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 8 }}>Toggle interventions</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {['Collection Efficiency', 'NRW Reduction', 'Capital Efficiency', 'Tariff Reform', 'Borrowing', 'Budget Execution'].map(name => (
+            {['Collection Efficiency', 'NRW Reduction', 'Budget execution', 'Tariff Reform'].map(name => (
               <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', padding: '5px 8px', background: '#fff', borderRadius: 5, border: '1px solid #e0e7ff' }}>
                 <input type="checkbox" checked={!!activeIntv[name]} onChange={e => setActiveIntv(p => ({ ...p, [name]: e.target.checked }))} style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
                 <span>{name}</span>

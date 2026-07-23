@@ -1,6 +1,46 @@
 import React, { useState, useRef } from 'react';
 import { downloadTemplate, importTemplate } from '../api';
 
+// Explains why sanitation's safely-managed and basic rungs share ONE technology mix: the JMP service
+// level is set by service attributes (sharing, emptying, treatment), not the technology. Shown under
+// the sanitation technology mix — the same identical flush/pour-flush to septic tank lands at four
+// different service levels depending only on circumstance.
+function SanServiceLevelExplainer() {
+  const rows: [string, string, string, string][] = [
+    ['A', 'Shares the toilet with a neighbouring household', 'Limited', '#b45309'],
+    ['B', 'Own toilet; septic tank emptied but the contents discharged locally (drain, field, water body), or the fate is unknown', 'Basic', '#0369a1'],
+    ['C', 'Own toilet; tank is contained and has never been emptied, or was emptied with the sludge buried on site', 'Safely managed — disposed in situ', '#15803d'],
+    ['D', 'Own toilet; tank emptied by a service provider and the sludge delivered to a treatment plant and treated', 'Safely managed — emptied & treated', '#15803d'],
+  ];
+  return (
+    <div style={{ gridColumn: '1 / -1', marginTop: 8, border: '1px solid #bfdbfe', borderRadius: 8, background: '#f8fbff', padding: '10px 12px' }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>Why safely-managed and basic share one technology mix</div>
+      <div style={{ fontSize: 11, color: '#475569', lineHeight: 1.5, marginBottom: 8 }}>
+        Sanitation has no technology-based cap: the same facility can land at limited, basic or safely-managed depending on service attributes — <b>sharing</b>, <b>emptying</b> and <b>treatment</b> — not the hardware. Below, four households with the <i>identical</i> flush / pour-flush to septic tank:
+      </div>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+          <thead><tr style={{ color: '#64748b', textAlign: 'left' }}>
+            <th style={{ padding: '3px 6px' }}>HH</th><th style={{ padding: '3px 6px' }}>Circumstance</th><th style={{ padding: '3px 6px' }}>Service level</th>
+          </tr></thead>
+          <tbody>
+            {rows.map(([hh, circ, level, color]) => (
+              <tr key={hh} style={{ borderTop: '1px solid #e5e7eb' }}>
+                <td style={{ padding: '4px 6px', fontWeight: 700, color: '#334155', verticalAlign: 'top' }}>{hh}</td>
+                <td style={{ padding: '4px 6px', color: '#475569' }}>{circ}</td>
+                <td style={{ padding: '4px 6px', fontWeight: 600, color, whiteSpace: 'nowrap' }}>{level}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div style={{ fontSize: 10.5, color: '#64748b', marginTop: 6, lineHeight: 1.5 }}>
+        The technology is identical in all four cases — only the service attributes differ. That is why the safely-managed and basic tables above list the same technologies; any gap between the two tables' costs reflects the added safe-management steps (containment, emptying, treatment).
+      </div>
+    </div>
+  );
+}
+
 function Section({ title, children, defaultOpen = false, cols = 3, sectionKey, onFocus }: { title: string; children: React.ReactNode; defaultOpen?: boolean; cols?: number; sectionKey?: string; onFocus?: (key: string) => void }) {
   const [open, setOpen] = useState(defaultOpen);
   // Responsive columns: fields size to a min track and the column count adapts to the available
@@ -268,58 +308,45 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
     onChange({ ...inputs, toggles: { ...inputs.toggles, [field]: value } });
   };
 
-  // Technology-mix editor (unit-cost sections): Σ(share × cost) is WRITTEN THROUGH to the weighted
-  // engine cost field — the same mechanism (and the same shared arrays) as the Test Harness tab.
-  const setCostMix = (section: string, rung: string, engineField: string, arr: any[]) => {
+  // Technology-mix editor (unit-cost sections): TWO tables per sector, one per rung. Σ(share × cost) is
+  // written through to that rung's weighted engine cost field. WATER uses different technologies for the
+  // two rungs; SANITATION uses the same technologies in both (service level is attribute-driven).
+  const setCostMix = (section: string, mixKey: string, engineField: string, arr: any[]) => {
     const weighted = arr.reduce((a: number, t: any) => a + (+t.share || 0) * (+t.cost || 0), 0);
-    onChange({ ...inputs, [section]: { ...inputs[section], [rung + '_tech_mix']: arr, [engineField]: weighted } });
+    onChange({ ...inputs, [section]: { ...inputs[section], [mixKey]: arr, [engineField]: weighted } });
   };
-  // Editing the DIRECT unit-cost field ALSO rescales that rung's technology mix so its weighted cost
-  // equals the entered value (shares preserved). Without this, the direct field and the tech-mix
-  // calculator can silently disagree — a later tech-mix edit would recompute the weighted from stale
-  // rows and clobber the number the user just typed here. Keeping them in sync prevents that.
-  const setUnitCost = (section: string, engineField: string, rung: string, value: number) => {
-    const mix: any[] = inputs[section]?.[rung + '_tech_mix'] || [];
-    const cur = mix.reduce((a: number, t: any) => a + (+t.share || 0) * (+t.cost || 0), 0);
-    const next: any = { ...inputs[section], [engineField]: value };
-    if (mix.length) {
-      next[rung + '_tech_mix'] = cur > 0
-        ? mix.map((t: any) => ({ ...t, cost: (+t.cost || 0) * (value / cur) }))   // preserve shares, scale to new weighted
-        : mix.map((t: any) => ({ ...t, cost: value }));                            // degenerate (weighted 0): flat cost
-    }
-    onChange({ ...inputs, [section]: next });
-  };
-  const renderCostMix = (section: string, rung: string, engineField: string, title: string) => {
-    const m: any[] = inputs[section]?.[rung + '_tech_mix'] || [];
+  const renderCostMix = (section: string, mixKey: string, engineField: string, title: string) => {
+    const m: any[] = (inputs[section]?.[mixKey] || []).filter((t: any) => t && typeof t === 'object');
     if (!m.length) return null;
     const shareSum = m.reduce((a: number, t: any) => a + (+t.share || 0), 0);
     const weighted = m.reduce((a: number, t: any) => a + (+t.share || 0) * (+t.cost || 0), 0);
     const ok = Math.abs(shareSum - 1) < 0.001;
     const cellStyle: React.CSSProperties = { padding: '4px 6px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, color: '#3A4452', outline: 'none' };
+    const upd = (i: number, patch: any) => setCostMix(section, mixKey, engineField, m.map((x: any, j: number) => j === i ? { ...x, ...patch } : x));
     return (
-      <div style={{ gridColumn: '1 / -1' }}>
+      <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
         <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', margin: '4px 0 2px' }}>{title} — technology mix</div>
         <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
           <thead><tr style={{ color: '#64748b' }}><th style={{ textAlign: 'left', padding: '2px 6px' }}>technology</th><th>share %</th><th>cost/HH</th><th></th></tr></thead>
           <tbody>
             {m.map((t: any, i: number) => (
               <tr key={i}>
-                <td><input type="text" style={{ ...cellStyle, width: 170 }} value={t.name || ''}
-                  onChange={e => setCostMix(section, rung, engineField, m.map((x: any, j: number) => j === i ? { ...x, name: e.target.value } : x))} /></td>
-                <td><input type="number" style={{ ...cellStyle, width: 64 }} value={Math.round((+t.share || 0) * 1e6) / 1e4}
-                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setCostMix(section, rung, engineField, m.map((x: any, j: number) => j === i ? { ...x, share: v / 100 } : x)); }} /></td>
-                <td><input type="number" style={{ ...cellStyle, width: 96 }} value={+t.cost || 0}
-                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) setCostMix(section, rung, engineField, m.map((x: any, j: number) => j === i ? { ...x, cost: v } : x)); }} /></td>
-                <td><button onClick={() => { if (m.length > 1) setCostMix(section, rung, engineField, m.filter((_: any, j: number) => j !== i)); }}
+                <td><input type="text" style={{ ...cellStyle, width: 188 }} value={t.name || ''}
+                  onChange={e => upd(i, { name: e.target.value })} /></td>
+                <td><input type="number" style={{ ...cellStyle, width: 62 }} value={Math.round((+t.share || 0) * 1e6) / 1e4}
+                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { share: v / 100 }); }} /></td>
+                <td><input type="number" style={{ ...cellStyle, width: 96 }} value={Math.round(+t.cost || 0)}
+                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { cost: v }); }} /></td>
+                <td><button onClick={() => { if (m.length > 1) setCostMix(section, mixKey, engineField, m.filter((_: any, j: number) => j !== i)); }}
                   style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>✕</button></td>
               </tr>
             ))}
           </tbody>
         </table>
-        <button onClick={() => setCostMix(section, rung, engineField, [...m, { name: 'New technology', share: 0, cost: 0 }])}
+        <button onClick={() => setCostMix(section, mixKey, engineField, [...m, { name: 'New technology', share: 0, cost: 0 }])}
           style={{ margin: '3px 0', padding: '3px 9px', fontSize: 11, border: '1px dashed #0073A8', background: '#fff', color: '#0073A8', borderRadius: 5, cursor: 'pointer' }}>+ Add technology</button>
         <div style={{ fontSize: 10.5, color: ok ? '#0073A8' : '#b91c1c' }}>
-          Shares add up to {(shareSum * 100).toFixed(2)}%{ok ? '' : ' (they must total 100%)'}. Calculated {title} cost per household: <b>{Math.round(weighted).toLocaleString()} {CUR}</b>, used by the model.
+          Shares add up to {(shareSum * 100).toFixed(2)}%{ok ? '' : ' (they must total 100%)'}. Weighted {title} cost per household: <b>{Math.round(weighted).toLocaleString()} {CUR}</b>, used by the model.
         </div>
       </div>
     );
@@ -350,7 +377,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   const baseYr = inputs.period.baseline_year;
   const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const scopeLower = scopeLabel.toLowerCase();
-  // test2: the WSS budget is derived from the cost of new connections (historical) and the mean
+  // test2: the WSS budget is derived from the cost of new service (historical) and the mean
   // historical budget/GDP ratio × real GDP (forecast); any cell can be overridden in the table.
 
   // CAGR helper: (end/start)^(1/n) - 1
@@ -415,16 +442,14 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           <SubHead text="Water Supply" />
           <Toggle label="Collection efficiency" checked={inputs.toggles.ws_collection_enabled} onChange={v => toggleIntv('ws_collection_enabled', v)} />
           <Toggle label="NRW reduction" checked={inputs.toggles.ws_nrw_enabled} onChange={v => toggleIntv('ws_nrw_enabled', v)} />
-          <Toggle label="Capital expenditure efficiency" checked={inputs.toggles.ws_capital_efficiency_enabled} onChange={v => toggleIntv('ws_capital_efficiency_enabled', v)} />
+          {/* One "Budget execution improvement" lever (internally keyed ws_capital_efficiency_enabled — the
+              live capex-efficiency wiring). The old separate ws_budget_execution_enabled stub is removed. */}
+          <Toggle label="Budget execution improvement" checked={inputs.toggles.ws_capital_efficiency_enabled} onChange={v => toggleIntv('ws_capital_efficiency_enabled', v)} />
           <Toggle label="Tariff increase" checked={inputs.toggles.ws_tariff_enabled} onChange={v => toggleIntv('ws_tariff_enabled', v)} />
-          <Toggle label="Borrowing against future cashflow" checked={inputs.toggles.ws_borrowing_enabled} onChange={v => toggleIntv('ws_borrowing_enabled', v)} />
-          <Toggle label="Budget execution improvement" checked={inputs.toggles.ws_budget_execution_enabled} onChange={v => toggleIntv('ws_budget_execution_enabled', v)} />
           <SubHead text="Sanitation" />
           <Toggle label="Collection efficiency" checked={inputs.toggles.san_collection_enabled} onChange={v => toggleIntv('san_collection_enabled', v)} />
-          <Toggle label="Capital expenditure efficiency" checked={inputs.toggles.san_capital_efficiency_enabled} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} />
+          <Toggle label="Budget execution improvement" checked={inputs.toggles.san_capital_efficiency_enabled} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} />
           <Toggle label="Tariff increase" checked={inputs.toggles.san_tariff_enabled} onChange={v => toggleIntv('san_tariff_enabled', v)} />
-          <Toggle label="Borrowing against future cashflow" checked={inputs.toggles.san_borrowing_enabled} onChange={v => toggleIntv('san_borrowing_enabled', v)} />
-          <Toggle label="Budget execution improvement" checked={inputs.toggles.san_budget_execution_enabled} onChange={v => toggleIntv('san_budget_execution_enabled', v)} />
         </Section>
       </>}
 
@@ -560,13 +585,13 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           });
           // Budget cell (from_cost): the model-computed budget shows as a PLACEHOLDER; type to OVERRIDE that
           // year (stored in the bau expenditure series). Historical = cream, forecast = blue.
-          const budgetCostCell = (ovField: string, sector: 'water_supply' | 'sanitation', idx: number) => {
+          const budgetCostCell = (ovField: string, sector: 'water_supply' | 'sanitation', idx: number, placeholderField: string) => {
             const ov = (inputs.bau?.[ovField] || [])[idx] ?? 0;
             const forecast = years[idx] > baseYr2;
-            const computed = secRes(sector, 'allocated_capex', idx);
+            const computed = secRes(sector, placeholderField, idx);
             return <input type="number" value={ov > 0 ? Math.round(ov * 100) / 100 : ''}
               placeholder={computed != null ? String(Math.round(computed)) : ''}
-              title={ov > 0 ? 'Your override for this year' : 'Model-computed budget (connection cost history / GDP ratio forecast) — type to override'}
+              title={ov > 0 ? 'Your override for this year' : 'Model-computed value — type to override'}
               onChange={e => { const v = parseFloat(e.target.value); const a = [...(inputs.bau?.[ovField] || [])]; while (a.length <= idx) a.push(0); a[idx] = isNaN(v) ? 0 : v; onChange({ ...inputs, bau: { ...inputs.bau, [ovField]: a } }); }}
               style={{ ...inputBase, width: 64, ...(forecast ? BLUE : CREAM) }} />;
           };
@@ -733,10 +758,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             }) },
           ];
           const budgetRows: YRow[] = [
-            { label: 'WS budget', tip: 'Water supply budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('ws_expend_ts', 'water_supply', i)) },
-            projRow('→ WS budget used', 'Auto-fill: the water budget the model uses each year.', (i) => secRes('water_supply', 'allocated_capex', i), false),
-            { label: 'SAN budget', tip: 'Sanitation budget. Historical = cost of new connections (Safely-managed + Basic); forecast = mean historical budget/GDP × real GDP. The placeholder shows the model value — type to override that year.', cells: years.map((_: number, i: number) => budgetCostCell('san_expend_ts', 'sanitation', i)) },
-            projRow('→ SAN budget used', 'Auto-fill: the sanitation budget the model uses each year.', (i) => secRes('sanitation', 'allocated_capex', i), false),
+            { label: 'WS executed budget', tip: 'Water supply capital that actually gets put to work building new service = new households × unit cost (set by the technology mix). Historical = cost of new service; forecast = mean historical budget/GDP × real GDP. Placeholder shows the model value — type to override.', cells: years.map((_: number, i: number) => budgetCostCell('ws_expend_ts', 'water_supply', i, 'budget_used')) },
+            { label: 'WS allocated budget', tip: 'Water supply capital budget ALLOCATED on paper (e.g. government budget) — a manual input, normally larger than the budget actually put to work. Historical default ≈ 77% budget execution; forecast = mean historical (allocated ÷ executed) × the executed-budget forecast. Budget execution = executed budget ÷ allocated.', cells: years.map((_: number, i: number) => budgetCostCell('ws_alloc_ts', 'water_supply', i, 'budget_allocated')) },
+            { label: 'SAN executed budget', tip: 'Sanitation capital that actually gets put to work building new service = new households × unit cost. Historical = cost of new service; forecast = mean historical budget/GDP × real GDP. Placeholder shows the model value — type to override.', cells: years.map((_: number, i: number) => budgetCostCell('san_expend_ts', 'sanitation', i, 'budget_used')) },
+            { label: 'SAN allocated budget', tip: 'Sanitation capital budget ALLOCATED on paper — a manual input, normally larger than the budget actually put to work. Historical default ≈ 77% budget execution; forecast = mean historical (allocated ÷ executed) × the executed-budget forecast. Budget execution = executed budget ÷ allocated.', cells: years.map((_: number, i: number) => budgetCostCell('san_alloc_ts', 'sanitation', i, 'budget_allocated')) },
           ];
           return (
             <>
@@ -756,7 +781,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
 
               <Section title="5. Budget" sectionKey="budget" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 4 }}>
-                  💰 <b>The budget comes from the cost of new service:</b> new households served × the unit cost of their service (set by the technology mix). Type any cell to override that year.
+                  💰 <b>Two budgets per sector.</b> <b>Executed budget</b> = capital that actually gets put to work building service (new households × unit cost) — this drives the BAU. <b>Allocated budget</b> = the capital budget on paper (a manual input, normally larger). Their ratio is the <b>budget execution</b> (executed budget ÷ allocated budget) that the Budget-execution intervention improves. Type any cell to override that year; blanks fill from the model.
                 </div>
                 <YearTable rows={budgetRows} years={years} baseYr2={baseYr2} />
               </Section>
@@ -783,7 +808,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       <Section title={`6. ${scopeLabel} Water Supply — Unit Costs & Technical Parameters`} cols={2} sectionKey="ws_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Unit costs (nominal → real)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
-          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ws[0]}</b> and <b>{ws[1]}</b> weighted costs, built from the technology mixes.
+          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ws[0]}</b> and <b>{ws[1]}</b> weighted costs, built from the technology mixes below.
         </div>
         <F label="Nominal price year" value={inputs.water_costs.price_index_year ?? inputs.period.baseline_year} onChange={v => u('water_costs','price_index_year',v)} tip="The year the nominal technology prices are quoted in." />
         <F label="Price index (base = 100)" value={inputs.water_costs.price_index ?? 100} onChange={v => u('water_costs','price_index',v)} step={1} min={0} max={100000} tip="Real price = nominal × price index ÷ 100. Leave at 100 for no adjustment; change it and every technology price rescales accordingly." />
@@ -792,10 +817,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         ); })()}
         <SubHead text="Distribution network cost per HH (nominal)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
-          Enter each rung's technology mix below. The cost per household is calculated from the mix and shown beneath it.
+          Two technology mixes — for water, {ws[0].toLowerCase()} and {ws[1].toLowerCase()} use different technologies (safely-managed = on-premises improved sources; basic = shared / communal supplies). The weighted cost per household is shown beneath each table.
         </div>
-        {renderCostMix('water_costs', 'sm', 'network_cost_per_hh_serv1', ws[0])}
-        {renderCostMix('water_costs', 'basic', 'network_cost_per_hh_serv2', ws[1])}
+        {renderCostMix('water_costs', 'sm_tech_mix', 'network_cost_per_hh_serv1', ws[0])}
+        {renderCostMix('water_costs', 'basic_tech_mix', 'network_cost_per_hh_serv2', ws[1])}
         <SubHead text="Technical parameters" />
         <F label="Useful life of assets" value={inputs.technical.ws_asset_life} onChange={v => u('technical','ws_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets — drives the replacement (depreciation) capex." />
         <F label="% water sold to non-household" value={inputs.technical.ws_non_hh_pct || 0} onChange={v => u('technical','ws_non_hh_pct',v)} isPercent unit="%" tip="Share of water sold to non-household customers (commercial, industrial, institutional) — scales the total capex above the household capex." />
@@ -810,7 +835,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       <Section title={`6. ${scopeLabel} Sanitation — Unit Costs & Technical Parameters`} cols={2} sectionKey="san_unit_costs" onFocus={onSectionFocus}>
         <SubHead text="Unit costs (nominal → real)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#475569', padding: '4px 8px', background: '#f0f9ff', borderRadius: 4, border: '1px solid #bae6fd' }}>
-          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ss[0]}</b> and <b>{ss[1]}</b> weighted costs, built from the technology mixes.
+          Enter technology costs as <b>nominal</b> prices for the price-index year below. The model uses the <b>real</b> price = nominal × price index ÷ 100. The engine consumes the <b>{ss[0]}</b> and <b>{ss[1]}</b> weighted costs, built from the technology mixes below.
         </div>
         <F label="Nominal price year" value={inputs.sanitation_costs.price_index_year ?? inputs.period.baseline_year} onChange={v => u('sanitation_costs','price_index_year',v)} tip="The year the nominal technology prices are quoted in." />
         <F label="Price index (base = 100)" value={inputs.sanitation_costs.price_index ?? 100} onChange={v => u('sanitation_costs','price_index',v)} step={1} min={0} max={100000} tip="Real price = nominal × price index ÷ 100. Leave at 100 for no adjustment; change it and every technology price rescales accordingly." />
@@ -819,10 +844,11 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         ); })()}
         <SubHead text="Sanitation cost per HH (nominal)" />
         <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
-          Enter each rung's technology mix below. The cost per household is calculated from the mix and shown beneath it.
+          Two tables using the <b>same</b> technologies — for sanitation the service level is set by service attributes (sharing, emptying, treatment), not the technology (see the panel below). Costs default equal; raise the {ss[0].toLowerCase()} table if it adds safe emptying/treatment.
         </div>
-        {renderCostMix('sanitation_costs', 'sm', 'sewer_cost_per_hh_sserv1', ss[0])}
-        {renderCostMix('sanitation_costs', 'basic', 'sewer_cost_per_hh_sserv2', ss[1])}
+        {renderCostMix('sanitation_costs', 'sm_tech_mix', 'sewer_cost_per_hh_sserv1', ss[0])}
+        {renderCostMix('sanitation_costs', 'basic_tech_mix', 'sewer_cost_per_hh_sserv2', ss[1])}
+        <SanServiceLevelExplainer />
         <SubHead text="Technical parameters" />
         <F label="Useful life of assets" value={inputs.technical.san_asset_life} onChange={v => u('technical','san_asset_life',v)} unit="yrs" min={5} max={100} tip="Expected useful life of infrastructure assets — drives the replacement (depreciation) capex." />
         <F label="% wastewater from non-household" value={inputs.technical.san_non_hh_pct || 0} onChange={v => u('technical','san_non_hh_pct',v)} isPercent unit="%" tip="Share of wastewater from non-household sources (commercial, industrial, institutional) — scales the total capex above the household capex." />
@@ -856,8 +882,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="Physical losses as % of NRW" value={inputs.water_interventions.nrw_physical_loss_pct || 0} onChange={v => u('water_interventions','nrw_physical_loss_pct',v)} isPercent unit="%" tip="Physical losses as share of total NRW; commercial + physical must sum to 100%" />
         <F label="Capex unit cost NRW reduction (USD)" value={inputs.water_interventions.nrw_capex_unit_cost_usd} onChange={v => u('water_interventions','nrw_capex_unit_cost_usd',v)} step={10} unit="USD" min={0} max={10000} tip="Cost to reduce NRW by one unit (USD per m3/day)" />
         <F label="Lag between Capex and improvement" value={inputs.water_interventions.nrw_lag_years} onChange={v => u('water_interventions','nrw_lag_years',v)} unit="yrs" min={0} max={5} tip="Years between NRW investment and realized improvement" />
-        <F label="Year of maintenance capex" value={inputs.water_interventions.nrw_maintenance_capex_year || 0} onChange={v => u('water_interventions','nrw_maintenance_capex_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year when maintenance capital expenditure occurs" />
-        <F label={`Maintenance capex (${CUR} mill)`} value={inputs.water_interventions.nrw_maintenance_capex || 0} onChange={v => u('water_interventions','nrw_maintenance_capex',v)} step={10} unit={`${CUR} M`} min={0} max={1000000} tip="Maintenance capital expenditure amount" />
 
         <SubHead text="Capital efficiency" />
         <F label="Start year" value={inputs.water_interventions.capeff_start_year} onChange={v => u('water_interventions','capeff_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year capital efficiency gains begin; must be after baseline" />
@@ -872,16 +896,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="Current operating expenditure" value={inputs.water_interventions.tariff_op_expenditure || 0} onChange={v => u('water_interventions','tariff_op_expenditure',v)} step={1000000} unit={CUR} min={0} max={10000000} tip="Annual operating expenditure" />
         <F label="Current O&M recovery ratio (calculated)" value={(inputs.water_interventions.tariff_op_revenue && inputs.water_interventions.tariff_op_expenditure) ? inputs.water_interventions.tariff_op_revenue / inputs.water_interventions.tariff_op_expenditure : 0} onChange={() => {}} fieldType="computed" step={0.01} min={0} max={10} tip="Current ratio of operating revenue to operating expenditure (live calculated: revenue / expenditure)" />
         <F label="O&M cost recovery target" value={inputs.water_interventions.tariff_om_recovery_target} onChange={v => u('water_interventions','tariff_om_recovery_target',v)} step={0.1} min={0} max={10} tip="Target ratio of operating revenue to operating expenditure" />
-
-        <SubHead text="Borrowing against future cashflow" />
-        <F label="Start year" value={inputs.water_interventions.loan_start_year} onChange={v => u('water_interventions','loan_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year borrowing begins; must be after baseline" />
-        <F label="End year" value={inputs.water_interventions.loan_end_year} onChange={v => u('water_interventions','loan_end_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year borrowing ends; must be after start year" />
-        <F label="Avg cost per water produced" value={inputs.water_interventions.loan_avg_cost} onChange={v => u('water_interventions','loan_avg_cost',v)} step={0.1} min={0} max={10000} tip="Average cost per unit of water produced (per m3)" />
-        <F label="DSCR surplus" value={inputs.water_interventions.loan_dscr} onChange={v => u('water_interventions','loan_dscr',v)} step={0.1} min={0} max={10} tip="Debt service coverage ratio target for loan eligibility" />
-        <F label="Repayment grace period" value={inputs.water_interventions.loan_grace_years} onChange={v => u('water_interventions','loan_grace_years',v)} unit="yrs" min={0} max={100} tip="Number of years before loan repayment begins" />
-        <F label="Tenor" value={inputs.water_interventions.loan_tenor} onChange={v => u('water_interventions','loan_tenor',v)} unit="yrs" min={0} max={100} tip="Total loan repayment period in years" />
-        <F label="Interest rate" value={inputs.water_interventions.loan_interest_rate} onChange={v => u('water_interventions','loan_interest_rate',v)} isPercent unit="%" tip="Annual interest rate on borrowed funds" />
-        <F label="Year of investment" value={inputs.water_interventions.loan_investment_year || 0} onChange={v => u('water_interventions','loan_investment_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Specific year in which loan proceeds are invested" />
 
         <SubHead text="Budget execution improvement" />
         <F label="Start year" value={inputs.water_interventions.budget_exec_start_year || 0} onChange={v => u('water_interventions','budget_exec_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year budget execution improvement begins" />
@@ -909,16 +923,6 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         <F label="Current operating expenditure" value={inputs.sanitation_interventions.tariff_op_expenditure || 0} onChange={v => u('sanitation_interventions','tariff_op_expenditure',v)} step={1000000} unit={CUR} min={0} max={10000000} tip="Annual sanitation operating expenditure" />
         <F label="Current O&M recovery ratio (calculated)" value={(inputs.sanitation_interventions.tariff_op_revenue && inputs.sanitation_interventions.tariff_op_expenditure) ? inputs.sanitation_interventions.tariff_op_revenue / inputs.sanitation_interventions.tariff_op_expenditure : 0} onChange={() => {}} fieldType="computed" step={0.01} min={0} max={10} tip="Current ratio of operating revenue to operating expenditure (live calculated: revenue / expenditure)" />
         <F label="O&M recovery target" value={inputs.sanitation_interventions.tariff_om_recovery_target} onChange={v => u('sanitation_interventions','tariff_om_recovery_target',v)} step={0.1} min={0} max={10} tip="Target ratio of operating revenue to operating expenditure" />
-
-        <SubHead text="Borrowing against future cashflow" />
-        <F label="Start year" value={inputs.sanitation_interventions.loan_start_year} onChange={v => u('sanitation_interventions','loan_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year borrowing begins; must be after baseline" />
-        <F label="End year" value={inputs.sanitation_interventions.loan_end_year} onChange={v => u('sanitation_interventions','loan_end_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year borrowing ends; must be after start year" />
-        <F label="Avg cost per wastewater billed" value={inputs.sanitation_interventions.loan_avg_cost} onChange={v => u('sanitation_interventions','loan_avg_cost',v)} step={0.1} min={0} max={10000} tip="Average cost per unit of wastewater billed (per m3)" />
-        <F label="DSCR surplus" value={inputs.sanitation_interventions.loan_dscr} onChange={v => u('sanitation_interventions','loan_dscr',v)} step={0.1} min={0} max={10} tip="Debt service coverage ratio target for loan eligibility" />
-        <F label="Repayment grace period" value={inputs.sanitation_interventions.loan_grace_years} onChange={v => u('sanitation_interventions','loan_grace_years',v)} unit="yrs" min={0} max={100} tip="Number of years before loan repayment begins" />
-        <F label="Tenor" value={inputs.sanitation_interventions.loan_tenor} onChange={v => u('sanitation_interventions','loan_tenor',v)} unit="yrs" min={0} max={100} tip="Total loan repayment period in years" />
-        <F label="Interest rate" value={inputs.sanitation_interventions.loan_interest_rate} onChange={v => u('sanitation_interventions','loan_interest_rate',v)} isPercent unit="%" tip="Annual interest rate on borrowed funds" />
-        <F label="Year of investment" value={inputs.sanitation_interventions.loan_investment_year || 0} onChange={v => u('sanitation_interventions','loan_investment_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Specific year in which loan proceeds are invested" />
 
         <SubHead text="Budget execution improvement" />
         <F label="Start year" value={inputs.sanitation_interventions.budget_exec_start_year || 0} onChange={v => u('sanitation_interventions','budget_exec_start_year',v)} min={inputs.period.baseline_year + 1} max={inputs.period.forecast_end_year} tip="Year budget execution improvement begins" />

@@ -10,7 +10,7 @@ row-by-row mapping and the OPEN QUESTIONS / assumptions list.
 """
 
 import numpy as np
-from .inputs import ModelInputs
+from .inputs import ModelInputs, InterventionToggles
 from .water_supply import calculate_water_supply
 from .sanitation import calculate_sanitation
 
@@ -219,12 +219,67 @@ def _ui_aliases(sec):
     sec['service_gap'] = sec['household_gap']          # target SM - BAU SM (per year, floored at 0)
     sec['investment_need'] = sec['total_investment_need']
     sec['bau_investment'] = sec['bau_available']
-    # 'financing_gap' already matches; 'adjusted_financing_gap' (post-intervention) not yet modelled
+    # 'financing_gap' already matches (pure BAU). 'adjusted_financing_gap' = the post-intervention gap
+    # from the scenario pass, so downstream (Results) can compare BAU vs intervention.
+    if 'scenario_financing_gap' in sec:
+        sec['adjusted_financing_gap'] = sec['scenario_financing_gap']
     return sec
+
+
+def _sector_with_scenario(calc_fn, bau_inputs, scn_inputs, ctx, any_toggle_on, bau_kwargs=None, scn_kwargs=None):
+    """Run a sector's calculation as TWO independent passes and merge them.
+
+    BAU pass (`bau_inputs`, every intervention toggle forced OFF) is the canonical business-as-usual
+    counterfactual: its `bau_hh` / `target_hh` / `financing_gap` are what the BAU tab shows and CANNOT
+    move when an intervention is toggled on or its parameters change. The SCENARIO pass (`scn_inputs`,
+    the user's actual toggles) is a separate calculation; its safely-managed path and financing gap are
+    attached under `scenario_*` for the intervention chart. When no toggle is on the scenario is, by
+    definition, the BAU, so we skip the redundant second pass.
+
+    `bau_kwargs` / `scn_kwargs` pass PER-PASS extra arguments to `calc_fn` (used to feed sanitation the
+    water-NRW recovered volume: 0 in the BAU pass, the water scenario volume in the scenario pass)."""
+    bau = calc_fn(bau_inputs, ctx, **(bau_kwargs or {}))
+    scn = calc_fn(scn_inputs, ctx, **(scn_kwargs or {})) if any_toggle_on else bau
+    bau['scenario_hh'] = scn['bau_hh']                                  # SM path WITH interventions
+    bau['scenario_financing_gap'] = scn['financing_gap']
+    bau['scenario_total_investment_need'] = scn['total_investment_need']
+    bau['scenario_collection_cash'] = scn['collection_cash']            # collection-efficiency revenue (scenario)
+    bau['scenario_tariff_cash'] = scn['tariff_cash']                    # tariff-reform revenue (scenario)
+    bau['scenario_nrw_net'] = scn.get('nrw_net', [])                    # NRW money ledger (scenario)
+    bau['scenario_nrw_upgrade_hh'] = scn.get('nrw_upgrade_hh', [])      # NRW basic→SM upgrades (scenario)
+    bau['scenario_selffinance_upgrade_hh'] = scn.get('selffinance_upgrade_hh', [])  # self-financed connections (scenario)
+    bau['scenario_mf_upgrade_hh'] = scn.get('mf_upgrade_hh', [])        # microfinance-alone SM connections (scenario)
+    bau['scenario_grant_upgrade_hh'] = scn.get('grant_upgrade_hh', [])  # grant-enabled SM connections (scenario)
+    bau['scenario_grant_spend'] = scn.get('grant_spend', [])            # means-based grant spend (scenario)
+    bau['scenario_mf_loan_volume'] = scn.get('mf_loan_volume', [])      # microfinance loan volume mobilised (scenario)
+    bau['scenario_nrw_recovered_phys_vol'] = scn.get('nrw_recovered_phys_vol', [])  # water: recovered physical vol (scenario)
+    bau['scenario_nrw_link_cash'] = scn.get('nrw_link_cash', [])        # sanitation: water-NRW-linked sewer revenue (scenario)
+    return _ui_aliases(bau)
 
 
 def calculate(inputs: ModelInputs) -> dict:
     ctx = build_context(inputs)
+    # ── BAU and interventions are SEPARATE calculations. The business-as-usual path must be a fixed
+    #    counterfactual, so the BAU pass forces every intervention toggle OFF; changing an intervention
+    #    (e.g. capital efficiency, NRW) can then never move the BAU curve. The scenario pass applies the
+    #    user's toggles and is returned alongside as scenario_* (see _sector_with_scenario). ──
+    bau_toggles = inputs.toggles.model_copy(update={f: False for f in InterventionToggles.model_fields})
+    # BAU pass also drops every custom intervention, so custom levers can't move the counterfactual either.
+    bau_inputs = inputs.model_copy(update={'toggles': bau_toggles, 'custom_interventions': []})
+    customs = getattr(inputs, 'custom_interventions', None) or []
+    any_toggle_on = (any(getattr(inputs.toggles, f, False) for f in InterventionToggles.model_fields)
+                     or any(getattr(c, 'enabled', False) for c in customs))
+    # Water is computed FIRST (both passes) so sanitation can consume the physical water the water NRW lever
+    # recovers. The recovered volume is 0 in the water BAU pass (NRW off) and the water scenario value in the
+    # scenario pass; each is threaded into the MATCHING sanitation pass, so the sanitation BAU stays a pure
+    # counterfactual (0 recovered) and only its scenario sees the water-NRW-linked sewer revenue.
+    water = _sector_with_scenario(calculate_water_supply, bau_inputs, inputs, ctx, any_toggle_on)
+    nrw_vol_bau = water.get('nrw_recovered_phys_vol', [])
+    nrw_vol_scn = water.get('scenario_nrw_recovered_phys_vol', nrw_vol_bau)
+    sanitation = _sector_with_scenario(
+        calculate_sanitation, bau_inputs, inputs, ctx, any_toggle_on,
+        bau_kwargs={'nrw_recovered_vol': nrw_vol_bau},
+        scn_kwargs={'nrw_recovered_vol': nrw_vol_scn})
     return {
         'years': ctx['years'].tolist(),
         'end_asis_year': ctx['end_asis_year'],
@@ -239,6 +294,6 @@ def calculate(inputs: ModelInputs) -> dict:
         'exchange_rate': ctx['exchange_rate'].tolist(),
         'inflation_local': ctx['inflation_local'].tolist(),
         'inflation_us': ctx['inflation_us'].tolist(),
-        'water_supply': _ui_aliases(calculate_water_supply(inputs, ctx)),
-        'sanitation': _ui_aliases(calculate_sanitation(inputs, ctx)),
+        'water_supply': water,
+        'sanitation': sanitation,
     }

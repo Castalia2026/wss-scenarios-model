@@ -279,6 +279,11 @@ class WSSBudgetInputs(BaseModel):
     san_budget_direct: List[float] = []
     ws_budget_direct_ongoing: float = 0.05
     san_budget_direct_ongoing: float = 0.05
+    # ALLOCATED capital budget (manual input, bigger than what's actually used/spent on service). Blank
+    # years default to used ÷ 0.8 (history) and mean(allocated÷used) × used-forecast (forecast); capex
+    # efficiency = used ÷ allocated. Per-year overrides, same shape as *_budget_direct.
+    ws_budget_allocated: List[float] = []
+    san_budget_allocated: List[float] = []
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -316,40 +321,95 @@ class WaterInterventionInputs(BaseModel):
     ce_target_year: int = 2031
     ce_current_ratio: float = 0.83
     ce_target_ratio: float = 0.98
-    ce_water_sold_mld: float = 240.0
+    ce_water_sold_mld: float = 240.0         # volume of water sold at ce_start_year (the anchor year)
     ce_current_tariff: float = 32.0          # local currency per m3
+    # Volume grows each forecast year off the ce_start_year value. None → scale with population
+    # (the default); a number → fixed compound real growth rate (e.g. 0.03 = 3%/yr).
+    ce_vol_growth: Optional[float] = None
 
-    # NRW reduction (#119-#126)
+    # NRW reduction (#119-#126) — reduce non-revenue water; the recovered PHYSICAL water upgrades basic
+    # households to safely-managed (capped at the SM target), and a money ledger nets the water's value
+    # against the cost of fixing → drawn from / added to the connection budget.
     nrw_start_year: int = 2028
     nrw_target_year: int = 2034
     nrw_current_pct: float = 0.40
     nrw_target_pct: float = 0.15
-    nrw_treatment_cost_pct_capex: float = 0.40   # #123 water treatment cost as % of total capex
-    nrw_physical_loss_pct: float = 0.50          # #124 physical losses as % of total NRW
-    nrw_lag_years: int = 1                       # #125
-    nrw_capex_unit_cost_usd: float = 510.0       # #126 USD(2023) per m3/day of NRW reduced
+    nrw_treatment_cost_pct_capex: float = 0.40   # #123 water treatment cost as % of total capex (BAU adder)
+    nrw_physical_loss_pct: float = 0.50          # #124 physical losses as % of total NRW (only physical → new water)
+    nrw_lag_years: int = 1                       # #125 (kept; not applied by the simplified lever)
+    nrw_capex_unit_cost_usd: float = 510.0       # #126 USD(2023) per m3/day (legacy; superseded by the local unit below)
+    # test2 simplified NRW lever inputs:
+    nrw_system_input_vol: float = 146.0          # total water produced at nrw_start_year, MLD (million litres/day)
+    # System volume grows off the NRW start year. None → scale with population (default); a number →
+    # fixed compound real growth (same options as ce_vol_growth).
+    nrw_vol_growth: Optional[float] = None
+    nrw_water_per_upgrade: float = 100.0         # extra water for a basic→SM upgrade, m³ / household / year
+    nrw_capex_unit_cost_local: float = 73_809.0  # "cost of fixing" — local currency per m³/day of NRW recovered
+    nrw_value_basis: str = 'tariff'              # value the recovered water at 'tariff' or 'production' cost
+    nrw_tariff: float = 32.0                      # water tariff, local currency per m³ (value if basis='tariff')
+    nrw_production_cost: float = 20.0             # avoided production cost, local currency per m³ (if basis='production')
 
-    # Increased capital-expenditure efficiency (#127-#128)
+    # Increased capital-expenditure efficiency (#127-#128).
+    # test2 redefinition: capex efficiency = capital that becomes new service ÷ allocated capital budget
+    # ("budget used ÷ budget"). The baseline is AUTO-computed from history (engine returns it); the
+    # intervention ramps it from the baseline up to `capeff_target_pct` (≤1.0) between start & target year.
+    # `capeff_current_pct` > 0 overrides the auto baseline (for what-if). `capeff_gains_pct` is the old
+    # unit-cost-reduction knob, kept for back-compat but no longer used.
     capeff_start_year: int = 2027
     capeff_gains_pct: float = 0.20
+    capeff_target_year: int = 2035
+    capeff_target_pct: float = 1.00          # target execution efficiency (≤ 1.0)
+    capeff_current_pct: float = 0.0          # 0 → use the auto-calculated baseline
 
-    # Tariff increase (#129-#135)
+    # ── Capex efficiency (test2, unit-cost discount) — DISTINCT from capeff above (which is budget
+    # execution = used ÷ allocated). This DISCOUNTS the safely-managed CONNECTION COST, ramping the
+    # discount UP from BAU: 0 at costeff_start_year, growing linearly to (costeff_target_pct −
+    # costeff_current_pct) by costeff_target_year, then held. Applied via the engine's cost_factor hook
+    # (forecast only), so the same budget builds more connections. Toggle ws_costeff_enabled.
+    costeff_start_year: int = 2027
+    costeff_target_year: int = 2035
+    costeff_current_pct: float = 0.0         # current capex efficiency (discount baseline = the BAU point)
+    costeff_target_pct: float = 0.0          # target capex efficiency (discount reached by the target year)
+
+    # ── Optimised technology selection (test2) — a re-modelled safely-managed technology MIX that changes
+    # the SM connection cost from techmix_start_year onward (STEP change, no ramp). The frontend edits the
+    # per-technology mix; the adapter collapses it to techmix_sm_cost = the new REAL weighted SM connection
+    # cost (0 → no change / keep the BAU cost). Applied via the same cost_factor hook. Toggle ws_techmix_enabled.
+    techmix_start_year: int = 2027
+    techmix_sm_cost: float = 0.0             # new real weighted SM connection cost (0 → keep the BAU cost)
+
+    # Tariff reform (#129-#135) — simplified: raise the tariff linearly from current→target over
+    # start→target year; the extra revenue (volume × tariff rise) is recycled into capex for new service.
     tariff_start_year: int = 2028
     tariff_target_year: int = 2033
-    tariff_monthly_income_bottom20: float = 10_904.0   # local currency / person / month
-    tariff_max_pct_income_water: float = 0.05
-    tariff_op_revenue: float = 1_169_262_000.0
-    tariff_op_expenditure: float = 954_612_000.0
-    tariff_om_recovery_target: float = 1.50
+    tariff_volume_mld: float = 240.0         # volume of water sold at tariff_start_year (scales with population)
+    tariff_current: float = 32.0             # current average tariff, local currency per m3
+    tariff_target: float = 40.0              # target average tariff, local currency per m3
 
-    # Borrow against future cashflow (#136-#142)
-    loan_start_year: int = 2036
-    loan_end_year: int = 2040
-    loan_dscr: float = 1.2
-    loan_grace_years: int = 4
-    loan_tenor: int = 12
-    loan_interest_rate: float = 0.067
-    loan_investment_years: int = 4
+    # ── Microfinance + means-based grant (affordability lever) ──────────────────────────────────────
+    # Households in the safely-managed service gap that the budget can't reach are financed by a CONNECTION
+    # LOAN. A share `mf_partial_share` of gap HH pay part (`mf_upfront_payable_ratio`) of the upfront fee, so
+    # their loan principal is reduced; the rest finance the whole SM connection cost. A household affords the
+    # loan if its annual capacity (12 × its income bracket's monthly income × `mf_pct_income`) covers the level
+    # annuity (REAL rate, tenor) → microfinance connects it. Those who can only service a smaller loan get a
+    # MEANS-BASED GRANT that buys the principal down to the affordable level; the one-time `grant_total` pool
+    # (local-currency millions) funds the cheapest grants first. `mf_takeup_rate` is the annual take-up among
+    # eligible gap HH. `mf_gap_shares` splits the SM gap across the 5 income brackets (low→high, Σ≈1).
+    mf_connection_fee: float = 0.0        # capital cost of a connection financed by the loan; 0 → use the SM
+                                          # new-service cost (cost_sm), the same capex the rest of the model uses
+    mf_start_year: int = 2028
+    mf_end_year: int = 2040
+    mf_pct_income: float = 0.05           # max share of monthly income this service's loan repayment may take
+    mf_interest_rate: float = 0.10        # REAL annual interest rate on the connection loan
+    mf_tenor: int = 10                    # loan tenor, years
+    mf_partial_share: float = 0.0         # share of gap HH who can pay part of the upfront fee (s_p)
+    mf_upfront_payable_ratio: float = 0.0 # fraction of the upfront fee those partial-payers cover (u)
+    mf_takeup_rate: float = 0.5           # share of eligible (loan-needing) gap HH who take up the loan
+    mf_gap_shares: List[float] = [0.40, 0.30, 0.15, 0.10, 0.05]  # SM-gap split across the 5 income brackets
+    mf_selffinance_share: float = 0.0     # share of the SM gap that can pay the connection upfront (self-finance);
+                                          # peeled off richest-bracket-first, connected as their own band, and
+                                          # EXCLUDED from the microfinance/grant loan pool (they don't need a loan)
+    grant_total: float = 0.0              # means-based grant pool, local-currency MILLIONS (one-time)
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -362,39 +422,120 @@ class SanitationInterventionInputs(BaseModel):
     ce_wastewater_collected_pct: float = 0.80    # #145
     ce_sewer_tariff_pct_water: float = 0.50      # #146 sewer tariff as % of water tariff
 
-    # Increased capital-expenditure efficiency (#147-#148)
+    # Increased capital-expenditure efficiency (#147-#148). test2: same "budget used ÷ budget" execution
+    # model as water — auto baseline (engine-computed), ramped to capeff_target_pct over start→target year.
     capeff_start_year: int = 2027
     capeff_gains_pct: float = 0.20
+    capeff_target_year: int = 2035
+    capeff_target_pct: float = 1.00
+    capeff_current_pct: float = 0.0
 
-    # Tariff increase (#149-#151)
+    # Capex efficiency (unit-cost discount) — same mechanic as water (see WaterInterventionInputs): discount
+    # the SM connection cost, ramping the discount up from BAU 0 → (target − current) over start→target year.
+    # Toggle san_costeff_enabled.
+    costeff_start_year: int = 2027
+    costeff_target_year: int = 2035
+    costeff_current_pct: float = 0.0
+    costeff_target_pct: float = 0.0
+
+    # Optimised technology selection — new weighted SM connection cost from techmix_start_year (step change).
+    # techmix_sm_cost is the new real weighted SM cost (0 → keep the BAU cost). Toggle san_techmix_enabled.
+    techmix_start_year: int = 2027
+    techmix_sm_cost: float = 0.0
+
+    # ── NRW-linked sanitation revenue (test2, cross-sector) — the PHYSICAL water recovered by the WATER
+    # NRW-reduction lever returns to the sewer as wastewater the sanitation utility can charge for. Revenue
+    # per year = recovered_water(M m³/yr) × return_ratio × sewer_charge(LC/m³) × collection_rate, folded into
+    # sanitation capex (extra_cash) to build more safely-managed sanitation connections. Zero unless BOTH the
+    # water NRW lever and this lever are on (the recovered volume is 0 when water NRW is off). Toggle
+    # san_nrw_link_enabled. The recovered volume is LINKED from the water NRW lever, not re-entered here.
+    nrw_link_return_ratio: float = 0.80     # fraction of recovered water returning to the sewer as wastewater
+    nrw_link_sewer_charge: float = 16.0     # sanitation charge per m³ of wastewater (LC/m³) → revenue
+    nrw_link_collection_rate: float = 0.80  # fraction of that billed sanitation revenue actually collected
+
+    # Tariff reform (#149-#151) — simplified: raise the sewer tariff linearly from current→target over
+    # start→target year; the extra revenue (volume × tariff rise) is recycled into capex for new service.
     tariff_start_year: int = 2028
     tariff_target_year: int = 2033
-    tariff_max_pct_income_san: float = 0.05
+    tariff_volume_mld: float = 120.0         # volume of wastewater billed at tariff_start_year (scales with population)
+    tariff_current: float = 16.0             # current average sewer tariff, local currency per m3
+    tariff_target: float = 24.0              # target average sewer tariff, local currency per m3
 
-    # Borrow against future cashflow (#152-#160)
-    loan_start_year: int = 2036
-    loan_end_year: int = 2040
-    loan_avg_cost_per_ww_billed: float = 0.0     # #154 local currency per m3
-    loan_dscr: float = 1.2
-    loan_grace_years: int = 4
-    loan_tenor: int = 12
-    loan_interest_rate: float = 0.067
-    loan_investment_years: int = 3
-    loan_cap: float = 12_500.0                   # #160 loan reduction cap, local currency mn
+    # ── Microfinance + means-based grant (affordability lever) — see WaterInterventionInputs for the full
+    #    mechanic. Sanitation runs it independently with its own willingness-to-pay %, loan terms, gap split
+    #    and grant pool; the connection cost is the sanitation SM new-service cost. ──
+    mf_connection_fee: float = 0.0        # capital cost of a connection financed by the loan; 0 → use the SM
+                                          # new-service cost (cost_sm), the same capex the rest of the model uses
+    mf_start_year: int = 2028
+    mf_end_year: int = 2040
+    mf_pct_income: float = 0.05           # max share of monthly income this service's loan repayment may take
+    mf_interest_rate: float = 0.10        # REAL annual interest rate on the connection loan
+    mf_tenor: int = 10                    # loan tenor, years
+    mf_partial_share: float = 0.0         # share of gap HH who can pay part of the upfront fee (s_p)
+    mf_upfront_payable_ratio: float = 0.0 # fraction of the upfront fee those partial-payers cover (u)
+    mf_takeup_rate: float = 0.5           # share of eligible (loan-needing) gap HH who take up the loan
+    mf_gap_shares: List[float] = [0.40, 0.30, 0.15, 0.10, 0.05]  # SM-gap split across the 5 income brackets
+    mf_selffinance_share: float = 0.0     # share of the SM gap that can pay the connection upfront (self-finance);
+                                          # peeled off richest-bracket-first, connected as their own band, and
+                                          # EXCLUDED from the microfinance/grant loan pool (they don't need a loan)
+    grant_total: float = 0.0              # means-based grant pool, local-currency MILLIONS (one-time)
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# Microfinance for on-site sanitation  (contract #161-#168)
+# Income distribution (test2 affordability data) — feeds the microfinance + grant lever
 # ──────────────────────────────────────────────────────────────────────────
-class MicrofinanceInputs(BaseModel):
-    start_year: int = 2028                  # #161
-    end_year: int = 2040                    # #162
-    collection_emptying_cost: float = 6_000.0   # #163 local currency
-    emptying_frequency_years: float = 3.2       # #164
-    pct_no_treatment: float = 0.6451            # #165 % HHs with sewer/on-site but no treatment
-    max_pct_income: float = 0.05                # #166 max % income spent on sanitation
-    low_percentile: float = 0.05                # #167 min-income percentile that can afford MF
-    high_percentile: float = 0.20               # #168 top percentile benefiting from MF
+class IncomeBracket(BaseModel):
+    income_monthly: float = 0.0   # household monthly income, local currency, base-year real (held constant real)
+    hh_share: float = 0.0         # share of all households in this bracket (fraction, Σ≈1)
+
+
+class IncomeDistribution(BaseModel):
+    """Five income brackets (quintiles), CONSTANT real over the forecast. Each bracket's monthly income sets
+    how much a household can put toward a connection loan (income × the lever's `mf_pct_income`), which decides
+    whether microfinance alone connects it or a means-based grant is needed."""
+    brackets: List[IncomeBracket] = [
+        IncomeBracket(income_monthly=6_000.0,  hh_share=0.20),
+        IncomeBracket(income_monthly=10_904.0, hh_share=0.20),
+        IncomeBracket(income_monthly=16_000.0, hh_share=0.20),
+        IncomeBracket(income_monthly=24_000.0, hh_share=0.20),
+        IncomeBracket(income_monthly=45_000.0, hh_share=0.20),
+    ]
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Custom interventions (test2) — user-defined levers that ACTUALLY affect the model, for either sector.
+# ──────────────────────────────────────────────────────────────────────────
+class CustomIntervention(BaseModel):
+    """A user-defined intervention that drives the calculation (both sectors). Two types:
+
+    'new_revenue'   — invest `implement_cost` (total, spread evenly over `cost_years` from `start_year`)
+                      to produce `output_quantity` of `output_unit` each year from `output_start_year`,
+                      each unit worth `output_value`. The NET (revenue − cost) per year folds into that
+                      sector's capex (like the tariff/NRW cash levers) to build more safely-managed HH.
+    'cost_reduction'— from `start_year`, cut the safely-managed connection cost per HH by `cost_effect`
+                      (a fraction when `cost_effect_mode`='pct', a flat currency amount when 'flat').
+
+    `sector` routes it ('water' | 'sanitation' | 'both'); `enabled` gates it and is forced OFF in the BAU
+    pass (the engine clears the whole list), so the BAU counterfactual never moves. Money fields are in
+    ACTUAL currency (the engine scales revenue/cost to the model's millions)."""
+    name: str = 'Custom intervention'
+    enabled: bool = True
+    sector: str = 'both'                     # 'water' | 'sanitation' | 'both'
+    intervention_type: str = 'new_revenue'   # 'new_revenue' | 'cost_reduction'
+    color: str = '#9333ea'
+    start_year: int = 2028
+    end_year: int = 2040                     # kept for compatibility; the two types below use start_year timing
+    # New revenue source
+    implement_cost: float = 0.0     # total cost to implement (currency), spread evenly over cost_years
+    cost_years: int = 1             # number of years the implementation cost is spread over, from start_year
+    output_unit: str = 'unit'       # label for the output (e.g. m³, kWh, tonnes)
+    output_start_year: int = 2028   # first year output (and its revenue) is produced, through the forecast end
+    output_quantity: float = 0.0    # output produced per year, in output_unit
+    output_value: float = 0.0       # value per unit of output (currency/unit)
+    # Cost reduction
+    outputs_affected: str = 'sm'    # which cost it reduces (only the safely-managed connection cost drives the forecast)
+    cost_effect_mode: str = 'pct'   # 'pct' (fraction off) | 'flat' (currency amount off the per-HH cost)
+    cost_effect: float = 0.0        # the % (fraction) or flat amount
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -406,13 +547,24 @@ class InterventionToggles(BaseModel):
     ws_nrw_enabled: bool = True
     ws_capital_efficiency_enabled: bool = True
     ws_tariff_enabled: bool = True
-    ws_borrowing_enabled: bool = True
+    # test2 cost-side levers (default False so a payload that predates them stays OFF, not silently on):
+    # ws_costeff_enabled = capex efficiency (unit-cost discount); ws_techmix_enabled = optimised technology.
+    ws_costeff_enabled: bool = False
+    ws_techmix_enabled: bool = False
+    # One affordability intervention: loan-financed SM connections. It carries a self-finance carve-out
+    # (`mf_selffinance_share` isolates the BAU-anyway HH who'd pay upfront) and a means-based grant sub-lever
+    # (`grant_total` buys the loan down for HH who can't service it). No separate self-finance/grant toggles.
+    ws_microfinance_enabled: bool = True
     # Sanitation
     san_collection_efficiency_enabled: bool = True
     san_capital_efficiency_enabled: bool = True
     san_tariff_enabled: bool = True
-    san_borrowing_enabled: bool = True
     san_microfinance_enabled: bool = True
+    # test2 cost-side levers (default False, same rationale as the water pair above).
+    san_costeff_enabled: bool = False
+    san_techmix_enabled: bool = False
+    # NRW-linked sanitation revenue (needs the water NRW lever on to have any recovered volume to charge for).
+    san_nrw_link_enabled: bool = False
 
 
 # ──────────────────────────────────────────────────────────────────────────
@@ -435,5 +587,6 @@ class ModelInputs(BaseModel):
     technical: TechnicalInputs = TechnicalInputs()
     water_interventions: WaterInterventionInputs = WaterInterventionInputs()
     sanitation_interventions: SanitationInterventionInputs = SanitationInterventionInputs()
-    microfinance: MicrofinanceInputs = MicrofinanceInputs()
+    income_distribution: IncomeDistribution = IncomeDistribution()
     toggles: InterventionToggles = InterventionToggles()
+    custom_interventions: List[CustomIntervention] = []
