@@ -35,6 +35,97 @@ def cost_no_treatment(uc):
     return weighted_cost(uc.basic_technologies)
 
 
+def build_cost_factor(ctx, period, base_sm_cost, *,
+                      costeff_on=False, costeff_start=0, costeff_target_year=0,
+                      costeff_current=0.0, costeff_target=0.0,
+                      techmix_on=False, techmix_start=0, techmix_sm_cost=0.0):
+    """Per-year multiplier on the SM connection cost from the two cost-side interventions (test2), fed to
+    sector_bau's `cost_factor` hook. Both default to 1.0, so the BAU pass (toggles off) is untouched and
+    history (year ≤ baseline) is always left at 1.0 — only the forecast cost moves, preserving BAU parity.
+
+      • Capex efficiency (unit-cost discount): the discount ramps UP from BAU — 0 at costeff_start, linearly
+        to (costeff_target − costeff_current) by costeff_target_year, held after (flat before the start year).
+        factor = 1 − discount. The discount is capped at 95% so the connection cost stays positive.
+      • Optimised technology selection: a STEP change to the new weighted SM cost from techmix_start onward,
+        factor = techmix_sm_cost / base_sm_cost (no ramp; 0/absent new cost → no change).
+
+    The two levers compose by multiplication when both are on."""
+    years, n, by = ctx['years'], ctx['n'], period.baseline_year
+    cf = np.ones(n)
+    for t in range(n):
+        y = years[t]
+        if y <= by:
+            continue                                             # history untouched (BAU parity)
+        f = 1.0
+        if costeff_on and costeff_start and costeff_target > costeff_current:
+            if costeff_target_year and costeff_target_year > costeff_start:
+                if y >= costeff_target_year:
+                    eff = costeff_target
+                elif y >= costeff_start:
+                    eff = costeff_current + (costeff_target - costeff_current) * (y - costeff_start) / (costeff_target_year - costeff_start)
+                else:
+                    eff = costeff_current
+            else:
+                eff = costeff_target if y >= costeff_start else costeff_current
+            disc = min(max(0.0, eff - costeff_current), 0.95)    # ramp up from BAU; cap so cost stays > 0
+            f *= (1.0 - disc)
+        if techmix_on and techmix_start and techmix_sm_cost > 0 and base_sm_cost > 0 and y >= techmix_start:
+            f *= (techmix_sm_cost / base_sm_cost)                # step to the new mix's weighted SM cost
+        cf[t] = max(f, 1e-6)
+    return cf
+
+
+def custom_streams(ctx, period, base_sm_cost, customs, sector):
+    """Aggregate the enabled CUSTOM interventions that apply to `sector` ('water'|'sanitation') into a
+    (net_cash, cost_factor) pair for sector_bau. Returns (all-0.0, all-1.0) when nothing applies, so the
+    BAU pass (the engine clears the list) is untouched; history (year ≤ baseline) is never affected.
+
+      • 'new_revenue'   → per-year NET cash (revenue − spread implementation cost) in LC MILLIONS, added to
+        `avail`. cost = implement_cost/cost_years over [start, start+cost_years); revenue = quantity×value
+        from output_start_year on; both raw-currency, divided by 1e6 to reach the model's millions.
+      • 'cost_reduction'→ a per-year SM-cost multiplier from start_year: (1−effect) for 'pct', or
+        (cost−effect)/cost for 'flat'. Multiple reductions compose.
+
+    A custom with sector 'both' applies to both sectors."""
+    n, years, by = ctx['n'], ctx['years'], period.baseline_year
+    net_cash = np.zeros(n)
+    cf = np.ones(n)
+    for c in (customs or []):
+        if not bool(getattr(c, 'enabled', True)):
+            continue
+        csec = getattr(c, 'sector', 'both')
+        if csec not in (sector, 'both'):
+            continue
+        ctype = getattr(c, 'intervention_type', '')
+        if ctype == 'new_revenue':
+            start = int(getattr(c, 'start_year', 0) or 0)
+            cost_years = int(getattr(c, 'cost_years', 0) or 0)
+            annual_cost = (float(getattr(c, 'implement_cost', 0.0) or 0.0) / cost_years) if cost_years > 0 else 0.0
+            out_start = int(getattr(c, 'output_start_year', 0) or 0)
+            rev = float(getattr(c, 'output_quantity', 0.0) or 0.0) * float(getattr(c, 'output_value', 0.0) or 0.0)
+            for t in range(n):
+                y = years[t]
+                if y <= by:
+                    continue
+                cost_t = annual_cost if (start and start <= y < start + max(0, cost_years)) else 0.0
+                rev_t = rev if (out_start and y >= out_start) else 0.0
+                net_cash[t] += (rev_t - cost_t) / 1_000_000.0        # raw currency → LC millions
+        elif ctype == 'cost_reduction':
+            start = int(getattr(c, 'start_year', 0) or 0)
+            mode = getattr(c, 'cost_effect_mode', 'pct')
+            amt = float(getattr(c, 'cost_effect', 0.0) or 0.0)
+            for t in range(n):
+                y = years[t]
+                if y <= by or (start and y < start):
+                    continue
+                if mode == 'flat':
+                    f = ((base_sm_cost - amt) / base_sm_cost) if base_sm_cost > 0 else 1.0
+                else:
+                    f = 1.0 - amt
+                cf[t] *= max(1e-6, f)
+    return net_cash, cf
+
+
 def sector_full_budget(ctx, *, budget_pct, direct_series, direct_ongoing, mode):
     """The sector's FULL budget per year in real terms (millions).
 
@@ -65,11 +156,103 @@ def _planned_annual(planned_list, years, baseline_year, target2_year):
     return np.array([annual if int(y) > baseline_year else 0.0 for y in years], dtype=float)
 
 
+def _annuity_factors(r, n):
+    """(capital-recovery factor CRF, annuity present-value factor AF) for a real rate `r` over `n` years.
+    Level annuity = principal × CRF; the PV of paying `A` per year for `n` years = A × AF; CRF × AF = 1."""
+    if n <= 0:
+        return 0.0, 0.0
+    if r <= 0:
+        return 1.0 / n, float(n)
+    disc = (1.0 + r) ** (-n)
+    crf = r / (1.0 - disc)
+    af = (1.0 - disc) / r
+    return crf, af
+
+
+def affordability_close(bracket_gap, cost_sm, *, pct_income, interest, tenor, partial_share, upfront_payable_ratio,
+                        bracket_income_monthly, takeup, grant_enabled, grant_pool):
+    """Close part of a year's safely-managed gap with microfinance + a means-based grant. `bracket_gap` is
+    the per-income-bracket gap count (million HH) STILL needing a loan — i.e. after any self-financing
+    households have already been removed. Returns (mf_hh, grant_hh, grant_spend, mf_loan_volume): HH counts
+    in MILLIONS, money in local-currency MILLIONS.
+
+    Every household here is offered a connection loan. A share `partial_share` pay `upfront_payable_ratio` of
+    the upfront fee themselves (principal reduced by that amount); the rest borrow the whole SM connection
+    cost. A household can service its loan if its annual capacity A = 12 × its bracket's monthly income ×
+    `pct_income` ≥ the level annuity (real `interest`, `tenor`) → MICROFINANCE connects it. Otherwise a
+    MEANS-BASED GRANT buys the principal down so the reduced annuity = A (grant = principal − A × AF, in
+    present value). The one-time `grant_pool` funds the cheapest grants first to maximise connections;
+    microfinance is uncapped. `takeup` is the share of eligible households who take up the loan (applied to
+    each year's incremental gap; see sector_bau for how the gap increment is derived)."""
+    if not bracket_gap or pct_income <= 0 or tenor <= 0 or cost_sm <= 0 or takeup <= 0:
+        return 0.0, 0.0, 0.0, 0.0
+    crf, af = _annuity_factors(float(interest), int(tenor))
+    payer_types = [(max(0.0, partial_share),       cost_sm * (1.0 - upfront_payable_ratio)),   # partial-payers
+                   (max(0.0, 1.0 - partial_share), cost_sm)]                                    # full-financers
+    mf_hh = 0.0
+    mf_loan_volume = 0.0
+    grant_cells = []                                    # (grant_per_hh, hh_count_millions, principal)
+    for inc_m, n_full in zip(bracket_income_monthly, bracket_gap):
+        n_bracket = max(0.0, float(n_full)) * takeup
+        if n_bracket <= 0:
+            continue
+        cap = 12.0 * float(inc_m) * pct_income          # annual repayment capacity for THIS service
+        for share, principal in payer_types:
+            n_cell = n_bracket * share
+            if n_cell <= 0 or principal <= 0:
+                continue
+            annuity = principal * crf
+            if cap >= annuity:                          # can service the full loan → microfinance alone
+                mf_hh += n_cell
+                mf_loan_volume += n_cell * principal
+            elif cap > 0 and grant_enabled:             # needs a means-based grant to reach an affordable loan
+                grant_ph = principal - cap * af
+                if grant_ph > 0:
+                    grant_cells.append((grant_ph, n_cell, principal))
+                else:                                   # rounding: fully affordable after all
+                    mf_hh += n_cell
+                    mf_loan_volume += n_cell * principal
+            # else: cap == 0 (no income) or grant off → stays unserved
+    # Means-based grant: fund the CHEAPEST grants first, drawing down the one-time pool (max connections).
+    grant_hh = 0.0
+    grant_spend = 0.0
+    pool = float(grant_pool)
+    for grant_ph, n_cell, principal in sorted(grant_cells, key=lambda x: x[0]):
+        if pool <= 0:
+            break
+        cost_cell = grant_ph * n_cell                   # LC millions = (currency/HH) × (million HH)
+        if cost_cell <= pool:
+            grant_hh += n_cell; grant_spend += cost_cell; pool -= cost_cell
+            mf_loan_volume += n_cell * (principal - grant_ph)             # residual serviced loan
+        else:
+            frac = pool / cost_cell
+            grant_hh += n_cell * frac; grant_spend += pool
+            mf_loan_volume += n_cell * frac * (principal - grant_ph)
+            pool = 0.0
+    return mf_hh, grant_hh, grant_spend, mf_loan_volume
+
+
 def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_basic,
                full_budget, capex_pct, growth_capex_pct, planned_list, nonhh_pct, asset_life, capex_adder,
                hist_all_proportional, target_adjusted, execution_rate=1.0,
                targets=None, budget_source='pct_gdp', budget_override=None, gdp_real=None,
-               hist_series=None, first_year_idx=0):
+               hist_series=None, first_year_idx=0, cost_factor=None,
+               capeff_enabled=False, capeff_start=0, capeff_target_year=0,
+               capeff_target_pct=1.0, capeff_current_pct=0.0, allocated_series=None,
+               ce_enabled=False, ce_start=0, ce_target_year=0, ce_current_ratio=0.0,
+               ce_target_ratio=0.0, ce_volume_base_m3=0.0, ce_tariff=0.0,
+               ce_vol_anchor_year=0, ce_vol_growth=None,
+               tariff_enabled=False, tariff_start=0, tariff_target_year=0,
+               tariff_current=0.0, tariff_target=0.0, tariff_volume_base_m3=0.0,
+               nrw_enabled=False, nrw_start=0, nrw_target_year=0, nrw_current=0.0, nrw_target=0.0,
+               nrw_physical=0.5, nrw_vol_m3yr=0.0, nrw_vol_m3day=0.0, nrw_water_per_upgrade=0.0,
+               nrw_value_unit=0.0, nrw_capex_unit_m3day=0.0, nrw_vol_growth=None,
+               afford_enabled=False, grant_enabled=False, afford_start=0, afford_end=0,
+               afford_pct_income=0.0, afford_interest=0.0, afford_tenor=0, afford_partial_share=0.0,
+               afford_upfront_payable_ratio=0.0, afford_takeup=0.0, afford_gap_shares=None,
+               afford_bracket_income=None, afford_grant_total=0.0,
+               selffinance_enabled=False, selffinance_share=0.0, connection_fee=0.0,
+               extra_cash=None):
     """Shared 4a-4d core. All HH and money values are in MILLIONS; costs in actual currency.
 
     `full_budget` is the sector's FULL budget per year in real terms, from EITHER %GDP mode
@@ -91,6 +274,20 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     exec_rate = float(execution_rate)
     planned_annual = np.zeros(n)                                                     # planned investment removed from the model
     full_budget_in = full_budget                                                     # raw pct_gdp/direct budget (unused by from_cost)
+    # Per-year unit-cost factor: a cost-side intervention (e.g. capital efficiency) DISCOUNTS the connection
+    # cost from its start year, so cost varies by year. Defaults to all-1.0 → BAU pass is untouched. Only the
+    # forecast 4a/4d cost reads it; history & opening stock keep the base cost so BAU parity is preserved.
+    cf = np.ones(n) if cost_factor is None else np.asarray(cost_factor, dtype=float)
+    if cf.shape[0] < n:
+        cf = np.concatenate([cf, np.ones(n - cf.shape[0])])
+    cost_sm_t = cost_sm * cf[:n]
+    cost_basic_t = cost_basic * cf[:n]
+    # Extra per-year capex cash (LC millions) injected into `avail` — a caller-supplied revenue stream on
+    # top of the sector's own levers (used by sanitation for the water-NRW-linked sewer revenue). Defaults
+    # to all-0.0, so the BAU pass and every other sector are untouched. Only added in the forecast loop.
+    extra_cash_arr = np.zeros(n) if extra_cash is None else np.asarray(extra_cash, dtype=float)
+    if extra_cash_arr.shape[0] < n:
+        extra_cash_arr = np.concatenate([extra_cash_arr, np.zeros(n - extra_cash_arr.shape[0])])
     # Budget (capex_budget / bau_available / allocated / actual) is finalised AFTER the 4a history
     # block below — the 'from_cost' source derives the historical budget from the historical household
     # counts, which must be computed first. See "Budget finalisation" further down.
@@ -185,10 +382,158 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     else:
         full_budget = np.asarray(full_budget_in, dtype=float)
         capex_pct_eff, exec_eff = capex_pct, float(exec_rate)
-    capex_budget = active * full_budget * capex_pct_eff * exec_eff                    # capex actually spent
-    bau_available = capex_budget                                                      # BAU investment = the capex budget
-    allocated_capex = full_budget * capex_pct_eff                                     # display (all years)
-    actual_capex = allocated_capex * exec_eff
+    # "Budget used" = the capital that becomes service each year (the from_cost cost-of-service budget,
+    # or the user's per-year override). This is the DRIVER of the baseline BAU. capex_pct_eff/exec_eff
+    # are 1.0 in from_cost; in %GDP mode it is the capital share of the (executed) budget.
+    used_budget = full_budget * capex_pct_eff * exec_eff
+    # ── Capex efficiency (test2) = budget used ÷ budget allocated ──────────────────────────────────
+    # "Budget allocated" is a MANUAL input, bigger than what is actually used. Default = used ÷
+    # DEFAULT_CAPEX_EFF (efficiency starts below 100%). Its FORECAST = mean historical (allocated ÷ used)
+    # × the used-budget forecast for that year (the user's "average budget execution × used forecast").
+    # Per-year efficiency = used ÷ allocated; the BAU applies it, and the capex-efficiency intervention
+    # ramps it up to a target. bau_available = allocated × efficiency (baseline ⇒ = used, so BAU is
+    # unchanged; the intervention lets more of the allocated budget reach service).
+    DEFAULT_CAPEX_EFF = 0.80
+    alloc_in = np.asarray(allocated_series, dtype=float) if (allocated_series is not None and len(allocated_series)) else np.zeros(0)
+    def _alloc_entered(t):
+        return float(alloc_in[t]) if (t < len(alloc_in) and alloc_in[t] > 0) else 0.0
+    allocated = np.zeros(n)
+    for t in range(bi + 1):                                               # history: entered, else used ÷ default eff
+        a = _alloc_entered(t)
+        allocated[t] = a if a > 0 else (used_budget[t] / DEFAULT_CAPEX_EFF if used_budget[t] > 0 else 0.0)
+    exec_ratios = [allocated[t] / used_budget[t] for t in range(1, bi + 1) if used_budget[t] > 0 and allocated[t] > 0]
+    exec_ratio = float(np.mean(exec_ratios)) if exec_ratios else (1.0 / DEFAULT_CAPEX_EFF)   # mean allocated ÷ used
+    for t in range(bi + 1, n):                                            # forecast: entered, else ratio × used
+        a = _alloc_entered(t)
+        allocated[t] = a if a > 0 else exec_ratio * used_budget[t]
+    allocated_capex = allocated                                          # the allocated capital budget (all years)
+    actual_capex = used_budget                                          # what actually reaches service at baseline
+    e0_auto = float(np.clip(1.0 / exec_ratio, 0.0, 1.0)) if exec_ratio > 0 else 1.0   # baseline efficiency = used÷allocated
+    tgt = float(np.clip(capeff_target_pct or 1.0, 0.0, 1.0))
+    override = float(np.clip(capeff_current_pct, 0.0, 1.0)) if (capeff_current_pct and capeff_current_pct > 0) else 0.0
+    eff = np.ones(n)
+    for t in range(n):
+        if years[t] <= by:
+            continue                                                      # history: bau_available is 0 anyway
+        base = override if override > 0 else ((used_budget[t] / allocated[t]) if allocated[t] > 0 else 1.0)
+        e = base                                                          # baseline efficiency (also the BAU)
+        if capeff_enabled and capeff_start:
+            if capeff_target_year and capeff_target_year > capeff_start:
+                if years[t] >= capeff_target_year:
+                    e = tgt
+                elif years[t] >= capeff_start:
+                    e = base + (tgt - base) * (years[t] - capeff_start) / (capeff_target_year - capeff_start)
+            elif years[t] >= capeff_start:
+                e = tgt
+        eff[t] = float(np.clip(e, 0.0, 1.0))
+    capex_budget = active * allocated                                    # allocated capital budget (forecast-gated)
+    bau_available = capex_budget * eff                                   # effective capex that reaches service
+
+    # ── Collection efficiency (test2) ──────────────────────────────────────────────────────────────
+    # Better revenue COLLECTION (cash collected ÷ revenue billed) recovers billed-but-uncollected revenue
+    # and turns it into extra capital for new connections. The additional collected cash each forecast
+    # year = billed_volume × tariff × (collected_ratio[t] − baseline_ratio), where billed_volume GROWS
+    # with the connected customer base (prior-year SM+Basic households ÷ the baseline count) so the lever
+    # keeps paying off as coverage expands. 100% of that cash is added to the capex that funds new SM
+    # (folded into `avail` in the 4a loop below). Gated by ce_enabled → 0 in the BAU pass, so the BAU
+    # counterfactual is unchanged; only the scenario pass (toggle on) moves. The per-year band the UI shows
+    # is the marginal scenario SM this adds, attributed by the cumulative-pass diff in LiveInterventionChart.
+    ce_add_ratio = np.zeros(n)                       # collected-ratio uplift vs baseline, per year (≥0)
+    if ce_enabled and ce_target_ratio > ce_current_ratio and ce_start:
+        for t in range(n):
+            y = years[t]
+            if y <= by:
+                r = ce_current_ratio                 # history / baseline: no uplift
+            elif ce_target_year and ce_target_year > ce_start:
+                if y >= ce_target_year:
+                    r = ce_target_ratio
+                elif y >= ce_start:
+                    r = ce_current_ratio + (ce_target_ratio - ce_current_ratio) * (y - ce_start) / (ce_target_year - ce_start)
+                else:
+                    r = ce_current_ratio
+            else:
+                r = ce_target_ratio if y >= ce_start else ce_current_ratio
+            ce_add_ratio[t] = max(0.0, r - ce_current_ratio)
+    served_base = bau[0, bi] + bau[1, bi]            # baseline connected (SM+Basic) HHs = billed customer base
+    collection_cash = np.zeros(n)                    # additional collected revenue → capex, per forecast year
+
+    # Billed-volume grows off its anchor year. Default = scale with POPULATION (exogenous → no circular
+    # dependency on the connections it funds); or a fixed compound growth rate when the user supplies one.
+    population = ctx['population']
+    def _vol_factor(t, anchor_year, growth):
+        ai = int(np.clip((anchor_year or by) - msy, 0, n - 1))
+        if growth is not None:
+            return (1.0 + float(growth)) ** (years[t] - years[ai])
+        pa = population[ai]
+        return (population[t] / pa) if pa > 0 else 0.0
+
+    # ── Tariff reform (test2) ────────────────────────────────────────────────────────────────────────
+    # Raise the tariff linearly from `tariff_current` to `tariff_target` between tariff_start and
+    # tariff_target_year (flat before the start year, held at target after). The extra revenue each
+    # forecast year = billed_volume × (tariff[t] − tariff_current) is recycled 100% into capex for new
+    # service (folded into `avail` in the 4a loop). Gated by tariff_enabled → 0 in the BAU pass, so the
+    # BAU counterfactual is unchanged; only the scenario pass (toggle on) moves.
+    tariff_add = np.zeros(n)                          # tariff rise vs current, per year (≥0)
+    if tariff_enabled and tariff_target > tariff_current and tariff_start:
+        for t in range(n):
+            y = years[t]
+            if y <= by or y < tariff_start:
+                tr = tariff_current                  # history / before the reform: no rise
+            elif tariff_target_year and tariff_target_year > tariff_start:
+                if y >= tariff_target_year:
+                    tr = tariff_target
+                else:
+                    tr = tariff_current + (tariff_target - tariff_current) * (y - tariff_start) / (tariff_target_year - tariff_start)
+            else:
+                tr = tariff_target if y >= tariff_start else tariff_current
+            tariff_add[t] = max(0.0, tr - tariff_current)
+    tariff_cash = np.zeros(n)                         # additional tariff revenue → capex, per forecast year
+
+    # ── NRW reduction (test2) ───────────────────────────────────────────────────────────────────────
+    # Reduce non-revenue water from nrw_current → nrw_target over start→target year. The recovered
+    # PHYSICAL water (only leaks free up deliverable water; commercial losses are billing, not new water)
+    # upgrades basic households to safely-managed: new SM = recovered_physical ÷ water_per_upgrade. A money
+    # ledger nets the water's value (tariff OR avoided production cost, on ALL recovered water) against the
+    # cost of fixing (capex on the incremental capacity recovered each year + maintenance). The net folds
+    # into `avail` (can be negative → drawn from the BAU budget first; positive → funds new connections).
+    # Upgrades are added to SM in the 4a loop and capped at the SM target (so basic never drops below its
+    # target). Gated by nrw_enabled → all zero in the BAU pass.
+    nrw_reduction = np.zeros(n)                       # NRW percentage-points recovered vs current (≥0)
+    nrw_upgrade_cum = np.zeros(n)                     # cumulative basic→SM upgrades (million HH)
+    nrw_net = np.zeros(n)                             # money ledger: value − fixing cost, per year (millions)
+    nrw_recovered_phys = np.zeros(n)                  # recovered PHYSICAL (deliverable) water per year (M m³/yr) —
+                                                      # this is the water that becomes wastewater the sanitation
+                                                      # sector can charge for (see the san NRW-linked lever).
+    if nrw_enabled and nrw_current > nrw_target and nrw_start:
+        for t in range(n):
+            y = years[t]
+            if y <= by or y < nrw_start:
+                rate = nrw_current                   # history / before the programme: no reduction
+            elif nrw_target_year and nrw_target_year > nrw_start:
+                if y >= nrw_target_year:
+                    rate = nrw_target
+                else:
+                    rate = nrw_current + (nrw_target - nrw_current) * (y - nrw_start) / (nrw_target_year - nrw_start)
+            else:
+                rate = nrw_target if y >= nrw_start else nrw_current
+            nrw_reduction[t] = max(0.0, nrw_current - rate)
+        for t in range(n):
+            red = nrw_reduction[t]
+            # System input volume scales off the NRW start year — with POPULATION by default, or a fixed
+            # compound rate when nrw_vol_growth is set (same treatment as the collection-efficiency and
+            # tariff volumes), so a growing system recovers more water for the same NRW percentage.
+            vf = _vol_factor(t, nrw_start, nrw_vol_growth)
+            recovered_yr = red * nrw_vol_m3yr * vf                   # total recovered water (million m³/yr)
+            recovered_phys = nrw_physical * recovered_yr             # only physical losses → deliverable water
+            nrw_recovered_phys[t] = recovered_phys                   # exposed so sanitation can charge for it
+            nrw_upgrade_cum[t] = (recovered_phys / nrw_water_per_upgrade) if nrw_water_per_upgrade > 0 else 0.0
+            value = nrw_value_unit * recovered_yr                    # recurring value of the recovered water
+            # Fixing capex tracks the INCREMENTAL recovered capacity, which grows both as the losses are cut
+            # and as the system itself grows — holding the target on a bigger network keeps costing a little.
+            cap_now = red * nrw_vol_m3day * vf
+            cap_prev = (nrw_reduction[t - 1] * nrw_vol_m3day * _vol_factor(t - 1, nrw_start, nrw_vol_growth)) if t > 0 else 0.0
+            capex = nrw_capex_unit_m3day * max(0.0, cap_now - cap_prev) / 1_000_000.0   # millions
+            nrw_net[t] = value - capex
 
     # Forecast keeps a SELF-CONTAINED unadjusted series (sheet r36-40): each rung compounds from its
     # OWN prior unadjusted value (NOT the rescaled/adjusted prior), seeded at the baseline from the
@@ -206,6 +551,30 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     tgt_counts = [[total_hh[int(np.clip(ty - msy, 0, n - 1))] * sh[r] for r in range(5)] for ty, sh in tlist]
     last_tgt_year = tgt_years[-1] if tgt_years else eay
     last_shares = tlist[-1][1] if tlist else [0.0, 0.0, 0.0, 0.0, 0.0]
+
+    # Intervention SM ceiling (protects the basic target): interventions may CLOSE the SM gap but not
+    # overshoot it — the ceiling is the target-path SM count, CAGR'd from the baseline SM through the SM
+    # target boundaries. inf where there is nothing to protect (history / no targets). Only ever binds in
+    # the scenario pass; the BAU SM sits below the target, so the clamp is a no-op there (parity kept).
+    sm_cap = np.full(n, np.inf)
+    if tgt_years:
+        sm_pts = [(eay, bau[0, bi])] + list(zip(tgt_years, [tc[0] for tc in tgt_counts]))
+        for t in range(n):
+            y = years[t]
+            if y <= eay:
+                continue
+            if y >= last_tgt_year:
+                sm_cap[t] = total_hh[t] * last_shares[0]
+                continue
+            for k in range(1, len(sm_pts)):
+                y0, c0 = sm_pts[k - 1]; y1, c1 = sm_pts[k]
+                if y <= y1:
+                    if c0 > 0 and c1 > 0 and y1 > y0:
+                        g = (c1 / c0) ** (1.0 / (y1 - y0)) - 1.0
+                        sm_cap[t] = c0 * (1.0 + g) ** (y - y0)
+                    else:
+                        sm_cap[t] = c1
+                    break
 
     # 4c — opening asset stock (booked at the baseline year)
     opening_stock = (bau[0, bi] * cost_sm + bau[1, bi] * cost_basic) * (1.0 + nonhh_mult)
@@ -226,6 +595,16 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     # never depends on the target path — this fixes the cross-scenario circularity.
     bau_stock = np.zeros(n); bau_replacement = np.zeros(n)
 
+    # Microfinance + means-based grant (affordability lever): per-year SM connections and grant spend,
+    # accumulated after the loop. `grant_pool_left` is the running one-time grant budget (LC millions).
+    # `selffin_flow` = households that self-finance the connection upfront (own band, no loan, richest-first).
+    mf_flow = np.zeros(n); grant_flow = np.zeros(n); grant_spend_flow = np.zeros(n); mf_loan_flow = np.zeros(n)
+    selffin_flow = np.zeros(n)
+    grant_pool_left = float(afford_grant_total or 0.0)
+    afford_gap_shares = list(afford_gap_shares) if afford_gap_shares else []
+    afford_bracket_income = list(afford_bracket_income) if afford_bracket_income else []
+    selffin_share = float(np.clip(selffinance_share or 0.0, 0.0, 1.0))
+
     # History (start..baseline): target = BAU; the opening stock is booked at the baseline year.
     for t in range(bi + 1):
         tgt_unadj[:, t] = bau[:, t]; tgt[:, t] = bau[:, t]
@@ -235,6 +614,11 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
 
     unadj = [bau[r, bi] for r in range(5)]                              # forecast SM accumulates on the baseline count
     seg_cagr = None
+    # Affordability-lever SM accounting: `budget_sm` is SM from the budget + NRW only (no levers); the lever
+    # cumulatives accumulate on top. `gap_served_hw` = high-water mark of the budget gap already partitioned,
+    # so each year only the NEW gap is offered to self-finance / microfinance / grant (shares stay meaningful).
+    budget_sm = bau[0, bi]
+    selffin_cum = 0.0; mf_cum = 0.0; grant_cum = 0.0; gap_served_hw = 0.0
     for t in range(bi + 1, n):
         ff, pf = ctx['forecast_flag'][t], ctx['perf_flag'][t]
         prior_stock = stock[t - 1]
@@ -245,8 +629,65 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         # BAU replacement depreciates the BAU's OWN stock (baseline existing stock + BAU's own additions),
         # NOT the target-gap stock — so the BAU counterfactual is independent of the target path.
         bau_replacement[t] = bau_stock[t - 1] * depr if ff > 0 else 0.0
-        new_sm = max(0.0, bau_available[t] - bau_replacement[t]) * hh_share / cost_sm if cost_sm > 0 else 0.0
-        unadj[0] = unadj[0] + new_sm                                   # r34: prior unadj SM + increase
+        # Collection-efficiency cash: billed volume scales with population (or a fixed growth rate) off
+        # its anchor year — exogenous, so it grows with coverage without a circular dependency on the
+        # connections it funds.
+        if ce_add_ratio[t] > 0 and ff > 0:
+            collection_cash[t] = ce_volume_base_m3 * _vol_factor(t, ce_vol_anchor_year or ce_start, ce_vol_growth) * ce_tariff * ce_add_ratio[t]
+        # Tariff-reform cash: billed volume × tariff rise, on the same population-scaled volume base.
+        if tariff_add[t] > 0 and ff > 0:
+            tariff_cash[t] = tariff_volume_base_m3 * _vol_factor(t, tariff_start, None) * tariff_add[t]
+        # avail = capex budget + collection-efficiency cash + tariff-reform cash + NRW money ledger +
+        # extra caller cash (sanitation's water-NRW-linked sewer revenue). The NRW ledger is negative when
+        # fixing costs exceed the water's value that year (drawn from the BAU budget first) and positive
+        # later (surplus funds new connections). All the lever terms are 0 when their lever is off.
+        avail = bau_available[t] + collection_cash[t] + tariff_cash[t] + nrw_net[t] + extra_cash_arr[t]
+        new_sm = max(0.0, avail - bau_replacement[t]) * hh_share / cost_sm_t[t] if cost_sm_t[t] > 0 else 0.0
+        nrw_upg = nrw_upgrade_cum[t] - nrw_upgrade_cum[t - 1]          # water-enabled basic→SM upgrades this year
+        budget_sm = budget_sm + new_sm + nrw_upg                      # SM from the budget + NRW only (no levers)
+        if nrw_enabled:
+            budget_sm = min(budget_sm, sm_cap[t])                     # cap at the SM target → basic stays ≥ its target
+        # ── Microfinance affordability intervention (with self-finance carve-out + means-based grant) ──
+        # Addresses the gap the budget leaves (sm_cap − budget_sm). To keep the shares meaningful, only the
+        # INCREMENT of that gap beyond the high-water mark already partitioned (`new_gap`) is handled each year
+        # — otherwise re-drawing a share of the whole standing gap every year over-serves it. Of the new gap:
+        #   • `selffin_share` (richest bracket first) can pay the connection UPFRONT → these are ISOLATED as
+        #     BAU-anyway: excluded from the microfinance credit AND not added to SM (tracked only for reporting).
+        #   • the residual is offered connection loans of `principal = connection fee` (default = SM capex): a
+        #     household connects if it can service the loan (MICROFINANCE); if it can only service a smaller one,
+        #     the MEANS-BASED GRANT (`grant_total` pool) buys the principal down to what it can afford.
+        # Gated by afford_enabled → no effect in the BAU pass, so the BAU counterfactual is untouched.
+        loan_fee = connection_fee if connection_fee > 0 else cost_sm_t[t]
+        in_window = (not afford_start or afford_start <= years[t] <= afford_end)
+        if ff > 0 and np.isfinite(sm_cap[t]) and in_window and afford_enabled:
+            gap_target = max(0.0, sm_cap[t] - budget_sm)
+            new_gap = gap_target - gap_served_hw
+            if new_gap > 1e-15:
+                gap_served_hw = gap_target
+                bracket_gap = [new_gap * max(0.0, float(gs)) for gs in afford_gap_shares]
+                # Self-financers (isolated): the top `selffin_share` of the new gap, richest bracket first.
+                if selffin_share > 0:
+                    to_remove = new_gap * selffin_share
+                    for b in range(len(bracket_gap) - 1, -1, -1):      # richest (last) → poorest
+                        take = min(bracket_gap[b], to_remove)
+                        bracket_gap[b] -= take; selffin_flow[t] += take; to_remove -= take
+                        if to_remove <= 1e-15:
+                            break
+                    selffin_cum += selffin_flow[t]
+                # Microfinance + grant on the residual (loan-needing) new gap.
+                mf_hh, grant_hh, grant_spent, mf_loan = affordability_close(
+                    bracket_gap, loan_fee, pct_income=afford_pct_income, interest=afford_interest,
+                    tenor=afford_tenor, partial_share=afford_partial_share,
+                    upfront_payable_ratio=afford_upfront_payable_ratio,
+                    bracket_income_monthly=afford_bracket_income, takeup=afford_takeup,
+                    grant_enabled=grant_enabled, grant_pool=grant_pool_left)
+                mf_cum += mf_hh; grant_cum += grant_hh; grant_pool_left -= grant_spent
+                mf_flow[t] = mf_hh; grant_flow[t] = grant_hh
+                grant_spend_flow[t] = grant_spent; mf_loan_flow[t] = mf_loan
+        # Total SM = budget + microfinance/grant connections (self-financers are ISOLATED, not added). Capped at
+        # the SM target; the cap only engages when NRW or the lever is active so the pure-BAU pass is unchanged.
+        sm_total = budget_sm + mf_cum + grant_cum
+        unadj[0] = min(sm_total, sm_cap[t]) if (nrw_enabled or afford_enabled) else sm_total
         for r in range(1, 5):
             unadj[r] = unadj[r] * (1.0 + cagr[r])                      # r37-40: prior unadj × (1+CAGR)
         total_unadj = sum(unadj)                                       # r41
@@ -259,7 +700,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         # existing stock DEPRECIATES and the FULL capex budget is added each year — so an underfunded
         # sector (budget < replacement) sees the stock, and next year's replacement, DECLINE. Independent
         # of the target path (driven by bau_available / bau_replacement, not the target-gap stock).
-        bau_stock[t] = bau_stock[t - 1] - bau_replacement[t] + bau_available[t]
+        bau_stock[t] = bau_stock[t - 1] - bau_replacement[t] + avail
 
         # 4b — target path: = BAU through end-of-as-is, then piecewise CAGR through the ordered target
         # boundaries (test2: any number). Past the last target the target SHARES are held (counts scale
@@ -300,13 +741,20 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
 
         # 4d — investment need & financing gap (formulas UNCHANGED; only the BAU inputs differ)
         gap = max(0.0, tgt[0, t] - bau[0, t]); hh_gap[t] = gap
-        nc_hh = (gap * cost_sm + capex_adder) if gap > 0 else 0.0
+        nc_hh = (gap * cost_sm_t[t] + capex_adder) if gap > 0 else 0.0
         nc_total = nc_hh * (1.0 + nonhh_mult); new_capex_total[t] = nc_total
         booked = opening_stock if years[t] == by else 0.0
         stock[t] = booked + prior_stock + nc_total
         total_need[t] = (nc_total + replacement[t]) if (ff > 0 or pf > 0) else 0.0
-        shortfall = total_need[t] - bau_available[t]
+        shortfall = total_need[t] - avail          # collection-efficiency cash reduces the financing gap
         financing_gap[t] = shortfall if ((ff > 0 or pf > 0) and shortfall > 0) else 0.0
+
+    # Affordability lever running totals (cumulative over the forecast).
+    selffin_upgrade_cum = np.cumsum(selffin_flow)
+    mf_upgrade_cum = np.cumsum(mf_flow)
+    grant_upgrade_cum = np.cumsum(grant_flow)
+    grant_spend_cum = np.cumsum(grant_spend_flow)
+    mf_loan_cum = np.cumsum(mf_loan_flow)
 
     return {
         'rungs': RUNGS,
@@ -319,6 +767,21 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         'execution_rate': exec_eff,
         'planned_annual': planned_annual.tolist(),
         'bau_available': bau_available.tolist(),
+        'collection_cash': collection_cash.tolist(),   # collection-efficiency revenue folded into capex (scenario)
+        'tariff_cash': tariff_cash.tolist(),           # tariff-reform revenue folded into capex (scenario)
+        'nrw_net': nrw_net.tolist(),                   # NRW money ledger (value − fixing cost) folded into capex
+        'nrw_recovered_phys_vol': nrw_recovered_phys.tolist(),  # recovered physical water per year (M m³/yr) → wastewater
+        'nrw_link_cash': extra_cash_arr.tolist(),      # caller-injected extra capex cash (san water-NRW-linked revenue)
+        'nrw_upgrade_hh': nrw_upgrade_cum.tolist(),    # cumulative basic→SM upgrades from recovered water (M HH)
+        'selffinance_upgrade_hh': selffin_upgrade_cum.tolist(),  # cumulative self-financed SM connections (M HH)
+        'mf_upgrade_hh': mf_upgrade_cum.tolist(),      # cumulative microfinance-alone SM connections (M HH)
+        'grant_upgrade_hh': grant_upgrade_cum.tolist(),# cumulative grant-enabled SM connections (M HH)
+        'grant_spend': grant_spend_cum.tolist(),       # cumulative means-based grant spend (LC millions)
+        'mf_loan_volume': mf_loan_cum.tolist(),        # cumulative microfinance loan volume mobilised (LC millions)
+        'budget_used': used_budget.tolist(),           # capital that becomes service (drives baseline BAU)
+        'budget_allocated': allocated.tolist(),        # allocated capital budget (manual input, ≥ used)
+        'capex_efficiency_baseline': e0_auto,          # baseline efficiency = used ÷ allocated (=1/mean exec ratio)
+        'capex_efficiency': eff.tolist(),              # per-year efficiency actually applied
         'bau_hh': bau.tolist(),
         'target_hh': tgt.tolist(),
         'opening_stock': opening_stock,
@@ -344,6 +807,46 @@ def calculate_water_supply(inputs, ctx):
     nrw = inputs.water_interventions
     b = inputs.wss_budget
     cost_sm = cost_with_treatment(wc)
+    # ── Capital-efficiency intervention (toggle ws_capital_efficiency_enabled): capex efficiency =
+    # budget used ÷ budget (execution). sector_bau auto-computes the historical baseline and, when this
+    # toggle is on, ramps it to capeff_target_pct between capeff_start_year and capeff_target_year — the
+    # improved efficiency lets the same budget build more connections. Off (BAU pass) → baseline only. ──
+    tog = getattr(inputs, 'toggles', None)
+    capeff_on = bool(getattr(tog, 'ws_capital_efficiency_enabled', False)) if tog is not None else False
+    ce_on = bool(getattr(tog, 'ws_collection_efficiency_enabled', False)) if tog is not None else False
+    tariff_on = bool(getattr(tog, 'ws_tariff_enabled', False)) if tog is not None else False
+    nrw_on = bool(getattr(tog, 'ws_nrw_enabled', False)) if tog is not None else False
+    mf_on = bool(getattr(tog, 'ws_microfinance_enabled', False)) if tog is not None else False
+    # Two cost-side levers (test2) → a per-year SM cost factor via sector_bau's cost_factor hook. Both are
+    # gated by their own toggle, so the BAU pass (all toggles off) keeps cost_factor = 1.0 and is unchanged.
+    costeff_on = bool(getattr(tog, 'ws_costeff_enabled', False)) if tog is not None else False
+    techmix_on = bool(getattr(tog, 'ws_techmix_enabled', False)) if tog is not None else False
+    cost_factor = build_cost_factor(
+        ctx, inputs.period, cost_sm,
+        costeff_on=costeff_on,
+        costeff_start=int(getattr(nrw, 'costeff_start_year', 0) or 0),
+        costeff_target_year=int(getattr(nrw, 'costeff_target_year', 0) or 0),
+        costeff_current=float(getattr(nrw, 'costeff_current_pct', 0.0) or 0.0),
+        costeff_target=float(getattr(nrw, 'costeff_target_pct', 0.0) or 0.0),
+        techmix_on=techmix_on,
+        techmix_start=int(getattr(nrw, 'techmix_start_year', 0) or 0),
+        techmix_sm_cost=float(getattr(nrw, 'techmix_sm_cost', 0.0) or 0.0))
+    # Custom interventions (water + 'both'): new-revenue net cash → extra_cash; cost-reduction → cost factor.
+    cust_cash, cust_cf = custom_streams(ctx, inputs.period, cost_sm,
+                                        getattr(inputs, 'custom_interventions', None) or [], 'water')
+    cost_factor = cost_factor * cust_cf
+    bracket_income = [br.income_monthly for br in inputs.income_distribution.brackets]
+    # Billed volume base: MLD → million m³/yr (× days_in_year ÷ litres-per-m³). Grows with coverage in the loop.
+    _mld_to_m3 = inputs.constants.days_in_year / inputs.constants.cubic_meter_liters
+    ce_vol_base_m3 = float(getattr(nrw, 'ce_water_sold_mld', 0.0) or 0.0) * _mld_to_m3
+    tariff_vol_base_m3 = float(getattr(nrw, 'tariff_volume_mld', 0.0) or 0.0) * _mld_to_m3
+    # NRW: system input volume in million m³/yr (for value & upgrades) and m³/day (for the fixing capex).
+    nrw_sys_mld = float(getattr(nrw, 'nrw_system_input_vol', 0.0) or 0.0)
+    nrw_vol_m3yr = nrw_sys_mld * _mld_to_m3
+    nrw_vol_m3day = nrw_sys_mld * inputs.constants.thousand      # 1 MLD = 1000 m³/day
+    nrw_value_unit = (float(getattr(nrw, 'nrw_tariff', 0.0) or 0.0)
+                      if getattr(nrw, 'nrw_value_basis', 'tariff') == 'tariff'
+                      else float(getattr(nrw, 'nrw_production_cost', 0.0) or 0.0))
     # WATER adder (G168 × G173 × G174 × G175): cost × treatment%capex × current-NRW% × physical-loss%
     capex_adder = cost_sm * nrw.nrw_treatment_cost_pct_capex * nrw.nrw_current_pct * nrw.nrw_physical_loss_pct
     src = getattr(b, 'budget_source', None) or b.budget_input_mode
@@ -361,6 +864,8 @@ def calculate_water_supply(inputs, ctx):
         tgt2=[wt.target2_serv1, wt.target2_serv2, wt.target2_serv3, wt.target2_serv4, wt.target2_serv5],
         targets=_target_points(wt, inputs.period),
         cost_sm=cost_sm, cost_basic=cost_no_treatment(wc),
+        cost_factor=cost_factor,                               # test2: capex-efficiency + optimised-technology + custom cost cuts
+        extra_cash=cust_cash,                                  # custom new-revenue net cash → water capex
         full_budget=full_budget, capex_pct=ws_capex,
         growth_capex_pct=ws_capex,                             # water 4a uses the water CAPEX budget (I!326)
         hist_all_proportional=True,                            # water history I!143-147 = all-proportional
@@ -372,6 +877,63 @@ def calculate_water_supply(inputs, ctx):
         # actual spend, so execution is 1.0 (no double-count).
         execution_rate=(b.execution_rate if b.budget_input_mode == 'pct_gdp' else 1.0),
         budget_source=src, budget_override=b.ws_budget_direct, gdp_real=ctx['gdp_real_local'],
+        capeff_enabled=capeff_on,
+        capeff_start=int(getattr(nrw, 'capeff_start_year', 0) or 0),
+        capeff_target_year=int(getattr(nrw, 'capeff_target_year', 0) or 0),
+        capeff_target_pct=float(getattr(nrw, 'capeff_target_pct', 1.0) or 1.0),
+        capeff_current_pct=float(getattr(nrw, 'capeff_current_pct', 0.0) or 0.0),
+        allocated_series=getattr(b, 'ws_budget_allocated', None),
+        # Collection efficiency: ramp collected-ratio current→target, recovered revenue → capex.
+        ce_enabled=ce_on,
+        ce_start=int(getattr(nrw, 'ce_start_year', 0) or 0),
+        ce_target_year=int(getattr(nrw, 'ce_target_year', 0) or 0),
+        ce_current_ratio=float(getattr(nrw, 'ce_current_ratio', 0.0) or 0.0),
+        ce_target_ratio=float(getattr(nrw, 'ce_target_ratio', 0.0) or 0.0),
+        ce_volume_base_m3=ce_vol_base_m3,
+        ce_tariff=float(getattr(nrw, 'ce_current_tariff', 0.0) or 0.0),
+        # Volume anchor + growth: default anchor is the CE start year; growth None → scale with population.
+        ce_vol_anchor_year=int(getattr(nrw, 'ce_start_year', 0) or 0),
+        ce_vol_growth=(float(nrw.ce_vol_growth) if getattr(nrw, 'ce_vol_growth', None) is not None else None),
+        # Tariff reform: ramp tariff current→target, extra revenue → capex for new service.
+        tariff_enabled=tariff_on,
+        tariff_start=int(getattr(nrw, 'tariff_start_year', 0) or 0),
+        tariff_target_year=int(getattr(nrw, 'tariff_target_year', 0) or 0),
+        tariff_current=float(getattr(nrw, 'tariff_current', 0.0) or 0.0),
+        tariff_target=float(getattr(nrw, 'tariff_target', 0.0) or 0.0),
+        tariff_volume_base_m3=tariff_vol_base_m3,
+        # NRW reduction: recovered physical water → basic→SM upgrades (capped at target); money ledger
+        # (value − fixing cost) → avail. Water-only lever.
+        nrw_enabled=nrw_on,
+        nrw_start=int(getattr(nrw, 'nrw_start_year', 0) or 0),
+        nrw_target_year=int(getattr(nrw, 'nrw_target_year', 0) or 0),
+        nrw_current=float(getattr(nrw, 'nrw_current_pct', 0.0) or 0.0),
+        nrw_target=float(getattr(nrw, 'nrw_target_pct', 0.0) or 0.0),
+        nrw_physical=float(getattr(nrw, 'nrw_physical_loss_pct', 0.5) or 0.5),
+        nrw_vol_m3yr=nrw_vol_m3yr,
+        nrw_vol_m3day=nrw_vol_m3day,
+        nrw_water_per_upgrade=float(getattr(nrw, 'nrw_water_per_upgrade', 0.0) or 0.0),
+        nrw_value_unit=nrw_value_unit,
+        nrw_capex_unit_m3day=float(getattr(nrw, 'nrw_capex_unit_cost_local', 0.0) or 0.0),
+        nrw_vol_growth=(float(nrw.nrw_vol_growth) if getattr(nrw, 'nrw_vol_growth', None) is not None else None),
+        # Microfinance + means-based grant (affordability lever): finance affordable gap HH with connection
+        # loans (mf_on), and buy the loan down for those who can't service it in full (grant_on). Uses the
+        # global income distribution + this sector's willingness-to-pay %, loan terms, gap split and grant pool.
+        afford_enabled=mf_on,
+        grant_enabled=mf_on,
+        afford_start=int(getattr(nrw, 'mf_start_year', 0) or 0),
+        afford_end=int(getattr(nrw, 'mf_end_year', 0) or 0),
+        afford_pct_income=float(getattr(nrw, 'mf_pct_income', 0.0) or 0.0),
+        afford_interest=float(getattr(nrw, 'mf_interest_rate', 0.0) or 0.0),
+        afford_tenor=int(getattr(nrw, 'mf_tenor', 0) or 0),
+        afford_partial_share=float(getattr(nrw, 'mf_partial_share', 0.0) or 0.0),
+        afford_upfront_payable_ratio=float(getattr(nrw, 'mf_upfront_payable_ratio', 0.0) or 0.0),
+        afford_takeup=float(getattr(nrw, 'mf_takeup_rate', 0.0) or 0.0),
+        afford_gap_shares=list(getattr(nrw, 'mf_gap_shares', []) or []),
+        afford_bracket_income=bracket_income,
+        afford_grant_total=float(getattr(nrw, 'grant_total', 0.0) or 0.0),
+        selffinance_enabled=mf_on,
+        selffinance_share=float(getattr(nrw, 'mf_selffinance_share', 0.0) or 0.0),
+        connection_fee=float(getattr(nrw, 'mf_connection_fee', 0.0) or 0.0),
     )
     res['sector'] = 'water'
     return res

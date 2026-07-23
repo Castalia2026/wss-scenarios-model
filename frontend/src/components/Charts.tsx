@@ -11,7 +11,6 @@ const COLORS = {
   ce_nrw: '#10b981',
   capeff: '#f59e0b',
   tariff: '#8b5cf6',
-  loan: '#ec4899',
   microfinance: '#06b6d4',
   compare: '#f97316',
   inv_need: '#ef4444',

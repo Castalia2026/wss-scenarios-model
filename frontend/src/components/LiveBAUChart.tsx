@@ -34,16 +34,29 @@ function sigB(vMillions: number): string {
   return sig3(vMillions / 1000);
 }
 
-export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
-  { inputs?: any; inputsList?: any[]; sector: 'water' | 'sanitation'; scopeLabel?: string }) {
+export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, rung = 0 }:
+  { inputs?: any; inputsList?: any[]; sector: 'water' | 'sanitation'; scopeLabel?: string; rung?: number }) {
   const datasets = ((inputsList && inputsList.length) ? inputsList : (inputs ? [inputs] : [])).filter(Boolean);
+  // Which JMP rung this chart plots: 0 = Safely managed (the primary chart), 1 = Basic, … The Basic chart
+  // gets the SAME elements as SM (BAU area, Target line, reference lines, 🎯 call-outs, endpoint labels),
+  // but the MONEY financing gap / cumulative need / budget-constrained warning are SM-specific (the engine's
+  // financing_gap is the cost of closing the SM gap), so they are shown only on the rung-0 (SM) chart.
+  const ccx = datasets[0]?.country_config || {};
+  const rungNameRaw = (sector === 'water'
+    ? [ccx.ws_serv1_name, ccx.ws_serv2_name, ccx.ws_serv3_name, ccx.ws_serv4_name, ccx.ws_serv5_name]
+    : [ccx.san_serv1_name, ccx.san_serv2_name, ccx.san_serv3_name, ccx.san_serv4_name, ccx.san_serv5_name])[rung]
+    || ['Safely managed', 'Basic', 'Limited', 'Unimproved', 'No service'][rung] || 'Service';
+  const rungLabel = rungNameRaw.toLowerCase();          // e.g. "safely managed" | "basic"
+  const bauKey = `Households with ${rungLabel} (BAU)`;   // dataKey shared by the rows + the chart Area
+  const tgtKey = `Target (${rungLabel})`;
+  const showMoney = rung === 0;                          // financing gap etc. only apply to the SM chart
   const [data, setData] = useState<any[]>([]);
   const [tableRows, setTableRows] = useState<any[]>([]);
   const [endAnno, setEndAnno] = useState<{ year: number; bau: number; tgt: number; bauShare: number; tgtShare: number; gapHH: number; finGap: number | null; cur: string } | null>(null);
   const [summary, setSummary] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
   // Set when the BAU is budget-constrained (frozen): the capex budget is below the replacement need in
-  // every forecast year, so no new safely-managed connections are built and unit cost has no effect.
+  // every forecast year, so no new safely-managed service is built and unit cost has no effect.
   const [constrained, setConstrained] = useState<{ avail: number; repl: number; cur: string } | null>(null);
   // Reference lines carry BOTH the absolute (count) and share value so they track the Y-axis unit toggle.
   const [targetLines, setTargetLines] = useState<{ y: number; yShare: number; label: string }[]>([]);
@@ -162,9 +175,9 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           years.map((_: number, i: number) => resList.reduce((a, res) => a + (pick(res, i) || 0), 0));
         const total = sum((res, i) => res.total_hh[i]);
         const pop = sum((res, i) => res.population[i]);
-        const bau = sum((res, i) => secOf(res).bau_hh[0][i]);
-        const tgt = sum((res, i) => secOf(res).target_hh[0][i]);
-        const finGapSeries = sum((res, i) => (secOf(res).financing_gap || [])[i] || 0);
+        const bau = sum((res, i) => secOf(res).bau_hh[rung][i]);
+        const tgt = sum((res, i) => secOf(res).target_hh[rung][i]);
+        const finGapSeries = showMoney ? sum((res, i) => (secOf(res).financing_gap || [])[i] || 0) : years.map(() => 0);
 
         const per = datasets[0]?.period || {};
         const baseYr = per.baseline_year ?? years[0];
@@ -176,8 +189,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           return {
             year: y,
             'Total households': tot,
-            'Households with safely managed (BAU)': bauC,
-            'Target (safely managed)': tgtC,
+            [bauKey]: bauC,
+            [tgtKey]: tgtC,
           };
         });
         setData(rows);
@@ -191,7 +204,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           const b = Math.min(tot, bau[i]);
           const t = Math.min(tot, tgt[i]);
           const gapHH = Math.max(0, t - b);
-          return { year: y, total: tot, bau: b, tgt: t, gapHH, finGap: finGapSeries[i] ?? null };
+          return { year: y, total: tot, bau: b, tgt: t, gapHH, finGap: showMoney ? (finGapSeries[i] ?? null) : null };
         }).filter(Boolean) as any[];
         setTableRows(tblRows);
 
@@ -206,7 +219,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
           year: years[endIdx],
           bau: +bauEnd.toFixed(4), tgt: +tgtEnd.toFixed(4),
           bauShare: totEnd > 0 ? bauEnd / totEnd : 0, tgtShare: totEnd > 0 ? tgtEnd / totEnd : 0,
-          gapHH: Math.max(0, tgtEnd - bauEnd), finGap: finGapSeries[endIdx] ?? null, cur: cur0,
+          gapHH: Math.max(0, tgtEnd - bauEnd), finGap: showMoney ? (finGapSeries[endIdx] ?? null) : null, cur: cur0,
         });
 
         // test2: target years come from the service table — any forecast column whose 5 rung shares
@@ -250,7 +263,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         const availS = sum((res, i) => (secOf(res).bau_available || [])[i] || 0);
         const replS = sum((res, i) => (secOf(res).bau_replacement_capex || [])[i] || 0);
         const fcast = years.map((y: number, i: number) => (y > baseYr ? i : -1)).filter((i: number) => i >= 0);
-        const frozen = fcast.length > 0 && fcast.every((i: number) => availS[i] <= replS[i] + 1e-9);
+        const frozen = showMoney && fcast.length > 0 && fcast.every((i: number) => availS[i] <= replS[i] + 1e-9);
         const avgOf = (arr: number[]) => fcast.reduce((a: number, i: number) => a + (arr[i] || 0), 0) / fcast.length;
         setConstrained(frozen ? { avail: avgOf(availS), repl: avgOf(replS), cur: cur0 } : null);
 
@@ -260,12 +273,12 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         const tin = sum((res, i) => (secOf(res).total_investment_need || [])[i] || 0);
         let cumNeed = 0; years.forEach((y: number, i: number) => { if (y > baseYr) cumNeed += tin[i] || 0; });
         setSummary({
-          costSM: datasets.length === 1 ? secOf(base).cost_per_hh : null,
-          currency: cur0,
+          costSM: datasets.length === 1 ? secOf(base)[showMoney ? 'cost_per_hh' : 'cost_basic'] : null,
+          currency: cur0, rungLabel, showMoney,
           endline: years[endIdx], baseline: baseYr, firstForecast: baseYr + 1,
           bauCov: cov(bau), tgtCov: cov(tgt), bauPop: covPop(bau), tgtPop: covPop(tgt),
-          gapEnd: Math.max(0, tgtEnd - bauEnd), finGapEnd: finGapSeries[endIdx] ?? null,
-          cumNeed,
+          gapEnd: Math.max(0, tgtEnd - bauEnd), finGapEnd: showMoney ? (finGapSeries[endIdx] ?? null) : null,
+          cumNeed: showMoney ? cumNeed : null,
         });
         setError(null);
       }).catch(e => setError(String(e)));
@@ -295,11 +308,11 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
       return {
         year: row.year,
         'Total households': tot > 0 ? 1 : 0,
-        'Households with safely managed (BAU)': div(row['Households with safely managed (BAU)']),
-        'Target (safely managed)': div(row['Target (safely managed)']),
+        [bauKey]: div(row[bauKey]),
+        [tgtKey]: div(row[tgtKey]),
       };
     });
-  }, [data, isShare]);
+  }, [data, isShare, bauKey, tgtKey]);
 
   const fmtVal = (v: any) => isShare ? ((+(v ?? 0)) * 100).toFixed(1) + '%' : sig3(+(v ?? 0)) + 'M';
   const fmtLabel = (v: any) => isShare ? ((+(v ?? 0)) * 100).toFixed(0) + '%' : sig3(+(v ?? 0)) + 'M';
@@ -312,15 +325,18 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
     return <text x={x} y={y - 7} textAnchor="middle" fontSize={9} fontWeight={700} fill="#0c4a6e">{fmtLabel(value)}</text>;
   };
 
-  const fileBase = `${(scopeLabel ? scopeLabel + '_' : '')}${sector}_bau`;
+  const fileBase = `${(scopeLabel ? scopeLabel + '_' : '')}${sector}_${rungLabel.replace(/\s+/g, '')}_bau`;
 
   // CSV of the data table (forecast years).
   const exportCsv = () => {
     if (!tableRows.length) return;
-    const header = ['Year', 'Total households (M)', 'Safely managed BAU (M)', 'Target safely managed (M)', 'Households in gap (M)', 'Financing gap (B ' + (endAnno?.cur || 'LCU') + '/yr)'];
+    const header = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Households in gap (M)'];
+    if (showMoney) header.push('Financing gap (B ' + (endAnno?.cur || 'LCU') + '/yr)');
     const lines = [header.join(',')];
     tableRows.forEach((r: any) => {
-      lines.push([r.year, round3(r.total), round3(r.bau), round3(r.tgt), round3(r.gapHH), r.finGap == null ? '' : round3(r.finGap / 1000)].join(','));
+      const row: any[] = [r.year, round3(r.total), round3(r.bau), round3(r.tgt), round3(r.gapHH)];
+      if (showMoney) row.push(r.finGap == null ? '' : round3(r.finGap / 1000));
+      lines.push(row.join(','));
     });
     const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -498,14 +514,14 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
   return (
     <div>
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-        {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} - BAU vs Target (live calculation engine)
+        {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — {rungNameRaw}: BAU vs Target (live calculation engine)
       </h3>
       <div style={{ fontSize: 10, color: '#065f46', background: '#d1fae5', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Live engine output.{datasets.length > 1 ? ' National = Urban + Rural (summed).' : ' Edits on the Data Inputs tab recompute this chart.'}
       </div>
       {constrained && (
         <div style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 4, padding: '6px 10px', marginBottom: 8, lineHeight: 1.5 }}>
-          ⚠ <b>Budget-constrained BAU.</b> The BAU capex budget (~{sigB(constrained.avail)} B {constrained.cur}/yr) is below the replacement need (~{sigB(constrained.repl)} B {constrained.cur}/yr), so no new safely-managed connections are built and <b>unit cost has no effect</b> on this curve. Raise the {sectorLabel.toLowerCase()} budget above the replacement need to move it.
+          ⚠ <b>Budget-constrained BAU.</b> The BAU capex budget (~{sigB(constrained.avail)} B {constrained.cur}/yr) is below the replacement need (~{sigB(constrained.repl)} B {constrained.cur}/yr), so no new safely-managed service is built and <b>unit cost has no effect</b> on this curve. Raise the {sectorLabel.toLowerCase()} budget above the replacement need to move it.
         </div>
       )}
       {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
@@ -516,8 +532,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         return (
           <div style={{ marginBottom: 12 }}>
             <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #2563eb', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55 }}>
-              <b>Summary.</b> Under business-as-usual, safely-managed {sectorLabel.toLowerCase()} reaches <b>{pct(summary.bauPop)}</b> of the population by {summary.endline}, against a target of <b>{pct(summary.tgtPop)}</b> — a shortfall of <b>{sig3(summary.gapEnd)} M households</b>. The annual financing gap at {summary.endline} is <b>{money(summary.finGapEnd)}/yr</b>; meeting the target needs <b>{sigB(summary.cumNeed)} B {cur}</b> cumulatively ({summary.firstForecast}–{summary.endline}).
-              {summary.costSM != null && <> Weighted safely-managed cost per household: <b>{sig3(summary.costSM)} {cur}</b>.</>}
+              <b>Summary.</b> Under business-as-usual, {summary.rungLabel} {sectorLabel.toLowerCase()} reaches <b>{pct(summary.bauPop)}</b> of the population by {summary.endline}, against a target of <b>{pct(summary.tgtPop)}</b>{summary.gapEnd > 0.0005 ? <> — a shortfall of <b>{sig3(summary.gapEnd)} M households</b></> : null}.{summary.showMoney && <> The annual financing gap at {summary.endline} is <b>{money(summary.finGapEnd)}/yr</b>; meeting the target needs <b>{sigB(summary.cumNeed)} B {cur}</b> cumulatively ({summary.firstForecast}–{summary.endline}).</>}
+              {summary.costSM != null && <> Weighted {summary.rungLabel} cost per household: <b>{sig3(summary.costSM)} {cur}</b>.</>}
             </div>
           </div>
         );
@@ -581,12 +597,12 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
               labelFormatter={(label: any) => (per0.baseline_year != null && label === per0.baseline_year) ? `${label} — last historical year` : String(label)}
               contentStyle={{ fontSize: 11 }} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
-            <Area type="monotone" dataKey="Households with safely managed (BAU)" fill="#7dd3fc" stroke="#0ea5e9" fillOpacity={0.55} dot={showDots ? { r: 1.8 } : false} legendType="rect" isAnimationActive={false}>
+            <Area type="monotone" dataKey={bauKey} fill={rung === 0 ? '#7dd3fc' : '#fcd34d'} stroke={rung === 0 ? '#0ea5e9' : '#f59e0b'} fillOpacity={0.55} dot={showDots ? { r: 1.8 } : false} legendType="rect" isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Area>
             <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="8 4" isAnimationActive={false} />
             {/* Target trajectory: one solid line across all years */}
-            <Line type="monotone" dataKey="Target (safely managed)" stroke="#16a34a" strokeWidth={3} dot={showDots ? { r: 1.8 } : false} legendType="plainline" connectNulls={false} isAnimationActive={false}>
+            <Line type="monotone" dataKey={tgtKey} stroke="#16a34a" strokeWidth={3} dot={showDots ? { r: 1.8 } : false} legendType="plainline" connectNulls={false} isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Line>
             {/* Horizontal reference line at each target's safely-managed level */}
@@ -601,7 +617,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
         {overlay && (endAnno || (flagPlan && targetPoints.length > 0)) && (
           <svg width={overlay.width} height={overlay.height}
             style={{ position: 'absolute', left: overlay.left, top: overlay.top, overflow: 'visible', pointerEvents: 'none', zIndex: 20 }}>
-            {endAnno && <GapAnnotation />}
+            {endAnno && endAnno.gapHH > 1e-4 && <GapAnnotation />}
             {flagPlan && targetPoints.filter((p: any) => isTargetVisible(p.year)).map((p: any) => (
               <g key={`tb-${p.year}`} style={{ pointerEvents: 'auto' }}>
                 <TargetBubble cx={overlay.xm * p.year + overlay.xb} cy={overlay.ym * (isShareNow ? p.yShare : p.y) + overlay.yb}
@@ -620,7 +636,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, width: '100%' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', color: '#334155' }}>
-                  {['Year', 'Total households (M)', 'Safely managed — BAU (M)', 'Target (M)', 'Households in gap (M)', `Financing gap (B ${endAnno?.cur || 'LCU'}/yr)`].map((h, i) => (
+                  {['Year', 'Total households (M)', `${rungNameRaw} — BAU (M)`, 'Target (M)', 'Households in gap (M)', ...(showMoney ? [`Financing gap (B ${endAnno?.cur || 'LCU'}/yr)`] : [])].map((h, i) => (
                     <th key={i} style={{ padding: '5px 10px', textAlign: i === 0 ? 'left' : 'right', fontWeight: 700, whiteSpace: 'nowrap', position: i === 0 ? 'sticky' : undefined, left: i === 0 ? 0 : undefined, background: '#f1f5f9' }}>{h}</th>
                   ))}
                 </tr>
@@ -630,10 +646,10 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel }:
                   <tr key={r.year} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
                     <td style={{ padding: '4px 10px', fontWeight: 600, color: '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff' }}>{r.year}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right' }}>{sig3(r.total)}</td>
-                    <td style={{ padding: '4px 10px', textAlign: 'right', color: '#0369a1' }}>{sig3(r.bau)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', color: rung === 0 ? '#0369a1' : '#b45309' }}>{sig3(r.bau)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#15803d' }}>{sig3(r.tgt)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b45309', fontWeight: 600 }}>{sig3(r.gapHH)}</td>
-                    <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b91c1c' }}>{r.finGap == null ? '—' : sigB(r.finGap)}</td>
+                    {showMoney && <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b91c1c' }}>{r.finGap == null ? '—' : sigB(r.finGap)}</td>}
                   </tr>
                 ))}
               </tbody>

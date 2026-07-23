@@ -74,11 +74,15 @@ def _layout(fe):
         ('input', 'population.hh_ts', f'{scope} households (millions)', 'population', 'hh_ts', 'proj', '#,##0.000000'),
         ('calc', '→ Households used (millions)', 'hh_used', '#,##0.000'),
         ('calc', 'Avg HH size', 'hh_size', '0.00'),
-        ('section', f'Budget ({cur} millions, real / baseline prices): the cost of new service. Fill any cell to override'),
-        ('input', 'bau.ws_expend_ts', 'WS budget — override', 'bau', 'ws_expend_ts', 'ovr', '#,##0.00'),
-        ('calc', '→ WS budget used', 'ws_budget_used', '#,##0'),
-        ('input', 'bau.san_expend_ts', 'SAN budget — override', 'bau', 'san_expend_ts', 'ovr', '#,##0.00'),
-        ('calc', '→ SAN budget used', 'san_budget_used', '#,##0'),
+        ('section', f'Budget ({cur} millions, real / baseline prices): executed budget = cost of new service; allocated budget = the budget on paper (normally larger). Fill any cell to override'),
+        ('input', 'bau.ws_expend_ts', 'WS executed budget — override', 'bau', 'ws_expend_ts', 'ovr', '#,##0.00'),
+        ('calc', '→ WS executed budget', 'ws_budget_used', '#,##0'),
+        ('input', 'bau.ws_alloc_ts', 'WS allocated budget — override', 'bau', 'ws_alloc_ts', 'ovr', '#,##0.00'),
+        ('calc', '→ WS allocated budget', 'ws_budget_alloc', '#,##0'),
+        ('input', 'bau.san_expend_ts', 'SAN executed budget — override', 'bau', 'san_expend_ts', 'ovr', '#,##0.00'),
+        ('calc', '→ SAN executed budget', 'san_budget_used', '#,##0'),
+        ('input', 'bau.san_alloc_ts', 'SAN allocated budget — override', 'bau', 'san_alloc_ts', 'ovr', '#,##0.00'),
+        ('calc', '→ SAN allocated budget', 'san_budget_alloc', '#,##0'),
     ]
     return items
 
@@ -128,8 +132,10 @@ def _calc_rows(results, n):
         'pop_used': pop, 'pop_growth': growth(pop),
         'hh_used': hh,
         'hh_size': [(pop[i] / hh[i]) if (pop[i] and hh[i]) else None for i in range(n)],
-        'ws_budget_used': arr((results.get('water_supply') or {}).get('allocated_capex')),
-        'san_budget_used': arr((results.get('sanitation') or {}).get('allocated_capex')),
+        'ws_budget_used': arr((results.get('water_supply') or {}).get('budget_used')),
+        'ws_budget_alloc': arr((results.get('water_supply') or {}).get('budget_allocated')),
+        'san_budget_used': arr((results.get('sanitation') or {}).get('budget_used')),
+        'san_budget_alloc': arr((results.get('sanitation') or {}).get('budget_allocated')),
     }
 
 

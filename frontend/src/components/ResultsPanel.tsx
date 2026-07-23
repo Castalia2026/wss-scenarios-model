@@ -54,9 +54,8 @@ export default function ResultsPanel({ results, inputs, compareResults, compareN
 
   const interventionSeries = [
     { name: 'Collection & NRW', data: interventions.collection_nrw?.cumulative_hh || interventions.collection_efficiency?.cumulative_hh || [], color: COLORS.ce_nrw },
-    { name: 'Capital Efficiency', data: interventions.capital_efficiency.cumulative_hh, color: COLORS.capeff },
+    { name: 'Budget execution', data: interventions.capital_efficiency.cumulative_hh, color: COLORS.capeff },
     { name: 'Tariff Increase', data: interventions.tariff.cumulative_hh, color: COLORS.tariff },
-    { name: 'Borrowing', data: interventions.borrowing.cumulative_hh, color: COLORS.loan },
   ];
   if (activeTab === 'sanitation' && interventions.microfinance) {
     interventionSeries.push({ name: 'Microfinance', data: interventions.microfinance.cumulative_hh, color: COLORS.microfinance });

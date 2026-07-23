@@ -122,10 +122,7 @@ that the current UI does not fully collect (it simplified to per-service-level +
 | 132 | Max % income on water | % | `tariff_max_pct_income_water` |
 | 133-134 | Operating revenue / expenditure | LCU | `tariff_op_revenue` / `tariff_op_expenditure` |
 | 135 | O&M cost-recovery target ratio | % | `tariff_om_recovery_target` |
-| 136-137 | Borrow start / end year | yr | `loan_start_year` / `loan_end_year` |
-| 138 | DSCR surplus | x | `loan_dscr` |
-| 139-141 | Grace / tenor / interest rate | yr,yr,% | `loan_grace_years` / `loan_tenor` / `loan_interest_rate` |
-| 142 | Years of investment | yr | `loan_investment_years` |
+| 136-142 | ~~Borrow against future cashflow (start/end year, DSCR, grace, tenor, interest, years of investment)~~ | — | **Removed in test2** — the borrowing intervention was dropped (no engine logic); the `loan_*` fields and `ws_borrowing_enabled` toggle no longer exist. |
 
 ## 10. Sanitation interventions
 | # | Parameter | Unit | Schema (`sanitation_interventions.`) |
@@ -136,12 +133,7 @@ that the current UI does not fully collect (it simplified to per-service-level +
 | 147-148 | Capex-efficiency start / gains | yr / % | `capeff_start_year` / `capeff_gains_pct` |
 | 149-150 | Tariff start / target year | yr | `tariff_start_year` / `tariff_target_year` |
 | 151 | Max % income on sanitation | % | `tariff_max_pct_income_san` |
-| 152-153 | Borrow start / end year | yr | `loan_start_year` / `loan_end_year` |
-| 154 | Avg cost per wastewater billed | LCU/m³ | `loan_avg_cost_per_ww_billed` |
-| 155 | DSCR surplus | x | `loan_dscr` |
-| 156-158 | Grace / tenor / interest rate | yr,yr,% | `loan_grace_years` / `loan_tenor` / `loan_interest_rate` |
-| 159 | Years of investment | yr | `loan_investment_years` |
-| 160 | Loan reduction cap | LCU mn | `loan_cap` |
+| 152-160 | ~~Borrow against future cashflow (start/end year, avg cost/ww billed, DSCR, grace, tenor, interest, years of investment, loan cap)~~ | — | **Removed in test2** — the borrowing intervention was dropped (no engine logic); the `loan_*` fields and `san_borrowing_enabled` toggle no longer exist. |
 
 ## 11. Microfinance (sanitation) (161-168)
 | # | Parameter | Unit | Schema (`sanitation_interventions.`) |
@@ -162,7 +154,6 @@ that the current UI does not fully collect (it simplified to per-service-level +
 - `macro.inflation_nepal` → `macro.inflation_local`
 - `macro.wash_budget_pct_gdp` (single) → `macro.ws_budget_pct_gdp` + `macro.san_budget_pct_gdp`
 - `water_interventions.tariff_kukl_op_revenue/expenditure` → `tariff_op_revenue/expenditure`
-- `loan_avg_cost_per_water` → keep; UI's `loan_avg_cost` must map to it; `loan_investment_year` → `loan_investment_years`
 - `technical.ws_non_hh_pct_of_hh` → `ws_non_hh_pct` (and sanitation equivalent)
 
 ### Add to schema + UI (in contract, missing in UI)
