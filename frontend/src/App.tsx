@@ -839,9 +839,9 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: 'Water Supply — Unit Costs & Technical Parameters',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The capital cost per household is built from <strong>two technology mixes</strong> — one for <strong>safely-managed</strong> and one for <strong>basic</strong>. For each technology set its share of connections and its cost per household; the model uses each table's share-weighted total (Σ share × cost).</p>
+        <p style={{ margin: '0 0 6px' }}>The capital cost per household is built from <strong>two technology mixes</strong> — one for <strong>safely-managed</strong> and one for <strong>basic</strong>. For each technology set its share of the mix and its cost per household; the model uses each table's share-weighted total (Σ share × cost).</p>
         <p style={{ margin: '0 0 6px' }}>For water the two rungs use <strong>different</strong> technologies. Safely-managed is delivered by on-premises improved sources (piped into the dwelling, a tubewell or protected well on the plot, …) that are available when needed and free from contamination. Basic is delivered by shared or communal supplies — piped to the yard or a neighbour, a public tap/standpipe, a communal well or a water kiosk — which are improved but cannot meet the safely-managed criteria.</p>
-        <p style={{ margin: 0 }}>Enter costs as nominal prices for the price-index year (real = nominal × index ÷ 100), in real terms at the base-year level. Use the utility's connection costs and average technology prices.</p>
+        <p style={{ margin: 0 }}>Enter costs as nominal prices for the price-index year (real = nominal × index ÷ 100), in real terms at the base-year level. Use the utility's service costs and average technology prices.</p>
       </div>
     ),
     sources: [{ name: 'WHO/UNICEF JMP service ladders', url: 'https://washdata.org/monitoring/drinking-water' }, { name: 'IBNET benchmarks', url: 'https://www.ib-net.org/' }],
@@ -894,15 +894,15 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_nrw: {
     title: 'Water · NRW reduction',
-    content: "Cuts non-revenue water from its current to its target level (target ≥ 3% — even the best utilities reach only 3–5%; allow a few years' lag). Only the physical (leak) share of NRW frees up deliverable water, which upgrades basic households to safely-managed; the commercial share counts toward revenue only. Split NRW into commercial vs physical losses (they must total 100%). Value the recovered water either as tariff revenue from sales or as avoided production cost; the value net of the fixing capex flows into the budget.",
+    content: "Cuts non-revenue water from its current level toward a target. Set the target at the economically optimal level of NRW — the point where the cost of further reduction outweighs the benefit; ~20% is a typical benchmark (chasing very low NRW rarely pays off). Allow a few years' lag before benefits appear. Only the physical (leak) share of NRW frees up deliverable water, which upgrades basic households to safely-managed service; the commercial share counts toward revenue only. Split NRW into commercial vs physical losses (they must total 100%). Value the recovered water either as tariff revenue from sales or as avoided production cost; the value net of the fixing capex flows into the budget.",
   },
   ws_budget_exec: {
     title: 'Water · Budget execution improvement',
-    content: 'Budget execution = executed budget ÷ allocated budget — the share of the allocated capital budget actually spent on new service (unit cost × new households). The current value is auto-calculated from your budget history; the intervention raises it toward a target of up to 100%, so more of the allocated budget builds new service and the financing gap shrinks. Distinct from capex efficiency, which makes each connection cheaper.',
+    content: 'Budget execution = executed budget ÷ allocated budget — the share of the allocated capital budget actually spent on new service (unit cost × new households). The current value is auto-calculated from your budget history; the intervention raises it toward a target of up to 100%, so more of the allocated budget builds new service and the financing gap shrinks. Distinct from capex efficiency, which makes each unit of service cheaper.',
   },
   ws_capex_eff: {
     title: 'Water · Capex efficiency (unit cost)',
-    content: 'Discounts the safely-managed connection cost — e.g. through better procurement or standardised designs. Set the start/target years and the current and target efficiency; the discount ramps up from 0 at the start year to (target − current) by the target year, then holds. Distinct from budget execution (which spends more of the allocated budget); this makes each connection cheaper.',
+    content: 'Discounts the safely-managed service cost — e.g. through better procurement or standardised designs. Enter one capex-efficiency improvement figure (how much cheaper each new service becomes, e.g. 20%); the discount ramps from 0 at the start year to that level by the target year, then holds. Distinct from budget execution (which spends more of the allocated budget); this makes each unit of service cheaper.',
   },
   ws_techmix: {
     title: 'Water · Optimised technology selection',
@@ -910,15 +910,15 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_tariff: {
     title: 'Water · Tariff reform',
-    content: 'Raises the tariff linearly from current to target over the start→target years; the extra revenue (billed volume × tariff rise) funds new service. The optional affordability cap holds the billable tariff so the average household bill stays within a chosen % of income (using the shared income distribution) — any rise beyond that ceiling earns no extra revenue.',
+    content: 'Raises the tariff linearly from current to target over the start→target years; the extra revenue (billed volume × tariff rise) funds new service.',
   },
   ws_microfinance: {
     title: 'Water · Microfinance',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>Finances a connection loan for gap households. Set the <em>connection fee</em> (defaults to the safely-managed capex), the income distribution (5 brackets), the gap share per bracket, the willingness-to-pay % of income, and the real loan rate/tenor — a household connects if its income can service the loan. It also contains:</p>
+        <p style={{ margin: '0 0 6px' }}>Finances a loan for <em>gap households</em> — those without safely-managed water service — so they can pay for service over time. Enter the <em>loan amount</em> (the per-household service cost; starts blank), the income distribution (5 brackets), the gap share per bracket, the willingness-to-pay % of income, and the real loan rate/tenor — a household gains service if its income can service the loan. It also contains:</p>
         <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
-          <li><strong>Self-finance carve-out:</strong> the share of the gap that pays upfront from savings (richest-bracket-first). They'd connect anyway, so they're isolated out and excluded from the microfinance impact, leaving BAU unchanged.</li>
+          <li><strong>Self-finance carve-out:</strong> the share of the gap that pays upfront from savings (richest-bracket-first). They'd gain service anyway, so they're isolated out and excluded from the microfinance impact, leaving BAU unchanged.</li>
           <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one, resizing repayment to what they can afford (cheapest buy-downs funded first).</li>
         </ul>
       </div>
@@ -944,7 +944,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   san_capex_eff: {
     title: 'Sanitation · Capex efficiency (unit cost)',
-    content: 'Discounts the safely-managed sanitation connection cost. The discount ramps from 0 at the start year to (target − current) by the target year, then holds, so the same budget builds more service. Distinct from budget execution, which spends more of the allocated budget.',
+    content: 'Discounts the safely-managed sanitation service cost. Enter one capex-efficiency improvement figure (e.g. 20%); the discount ramps from 0 at the start year to that level by the target year, then holds, so the same budget provides more service. Distinct from budget execution, which spends more of the allocated budget.',
   },
   san_techmix: {
     title: 'Sanitation · Optimised technology selection',
@@ -952,19 +952,19 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   san_nrw_link: {
     title: 'Sanitation · NRW-linked revenue',
-    content: 'Links to the Water Supply → NRW reduction lever. The physical water that lever recovers returns to the sewer as wastewater the utility can charge for; set the return-to-sewer ratio, the sewer charge (per m³) and the collection rate, and the collected revenue funds new safely-managed sanitation connections. It has no effect unless NRW reduction is switched on in the water supply interventions.',
+    content: 'Links to the Water Supply → NRW reduction lever. The physical water that lever recovers returns to the sewer as wastewater the utility can charge for; set the return-to-sewer ratio, the sewer charge (per m³) and the collection rate, and the collected revenue funds new safely-managed sanitation service. It has no effect unless NRW reduction is switched on in the water supply interventions.',
   },
   san_tariff: {
     title: 'Sanitation · Tariff reform',
-    content: 'Raises the sewer tariff linearly from current to target over the start→target years; the extra revenue (billed wastewater volume × tariff rise) funds new service. The optional affordability cap holds the billable sewer tariff so the average household sewer bill stays within a chosen % of income.',
+    content: 'Raises the sewer tariff linearly from current to target over the start→target years; the extra revenue (billed wastewater volume × tariff rise) funds new service.',
   },
   san_microfinance: {
     title: 'Sanitation · Microfinance',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>Finances a sanitation connection loan for gap households — same mechanic as the water side, with sanitation's own willingness-to-pay %, loan terms, gap split and grant pool. A household connects if its income can service the loan. It also contains:</p>
+        <p style={{ margin: '0 0 6px' }}>Finances a loan for <em>gap households</em> — those without safely-managed sanitation service — same mechanic as the water side, with sanitation's own willingness-to-pay %, loan terms, gap split and grant pool. A household gains service if its income can service the loan. It also contains:</p>
         <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
-          <li><strong>Self-finance carve-out:</strong> the richest-first share of the gap that pays upfront from savings — isolated out as BAU-anyway, so it isn't credited for connections that would happen without it.</li>
+          <li><strong>Self-finance carve-out:</strong> the richest-first share of the gap that pays upfront from savings — isolated out as BAU-anyway, so it isn't credited for service that would happen without it.</li>
           <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one (cheapest buy-downs funded first).</li>
         </ul>
       </div>
@@ -974,12 +974,12 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
     title: 'Custom Interventions',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>Add interventions not covered by the standard set — for example biogas/compost sales, resource recovery, or a technology that lowers connection costs. Custom interventions <strong>affect the calculation</strong> and appear on the impact graph.</p>
+        <p style={{ margin: '0 0 6px' }}>Add interventions not covered by the standard set — for example biogas/compost sales, resource recovery, or a technology that lowers service costs. Each one appears on the impact graph alongside the standard levers.</p>
         <p style={{ margin: '0 0 6px' }}>Click <strong>+ Add Custom Intervention</strong>, tick its box to switch it on, name it, then choose its <strong>Sector</strong> (Water, Sanitation or Both) and <strong>Type</strong> from the two dropdowns (▾). A new intervention defaults to the sector currently selected by the Water Supply / Sanitation toggle above. It is forced off in the BAU baseline, so it never moves the counterfactual.</p>
         <p style={{ margin: 0 }}>The <strong>Type</strong> dropdown sets which fields appear:</p>
         <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
-          <li><strong>New revenue source</strong> — you invest a <em>cost to implement</em> (spread over a number of years from the start time) to produce an <em>output</em> (with its own unit, start year, yearly quantity and value per unit). The net of the output's value minus the cost is added to that sector's capex to build more safely-managed connections.</li>
-          <li><strong>Cost reduction</strong> — from the start year it cuts the safely-managed connection cost per household by a percentage or a flat amount, so the same budget reaches more households.</li>
+          <li><strong>New revenue source</strong> — you invest a <em>cost to implement</em> (spread over a number of years from the start time) to produce an <em>output</em> (with its own unit, start year, yearly quantity and value per unit). The net of the output's value minus the cost is added to that sector's capex to provide more safely-managed service.</li>
+          <li><strong>Cost reduction</strong> — from the start year it cuts the safely-managed service cost per household by a percentage or a flat amount, so the same budget reaches more households.</li>
         </ul>
       </div>
     ),

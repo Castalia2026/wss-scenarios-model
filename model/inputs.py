@@ -385,10 +385,6 @@ class WaterInterventionInputs(BaseModel):
     tariff_volume_mld: float = 240.0         # volume of water sold at tariff_start_year (scales with population)
     tariff_current: float = 32.0             # current average tariff, local currency per m3
     tariff_target: float = 40.0              # target average tariff, local currency per m3
-    # Affordability cap: the tariff used to raise revenue is held so the average household's water bill
-    # (avg per-HH billed volume × tariff) never exceeds this share of average monthly income (× 12). The
-    # average income comes from the shared income distribution. 0 = no cap (revenue uses the full target).
-    tariff_afford_pct: float = 0.0
 
     # ── Microfinance + means-based grant (affordability lever) ──────────────────────────────────────
     # Households in the safely-managed service gap that the budget can't reach are financed by a CONNECTION
@@ -464,9 +460,6 @@ class SanitationInterventionInputs(BaseModel):
     tariff_volume_mld: float = 120.0         # volume of wastewater billed at tariff_start_year (scales with population)
     tariff_current: float = 16.0             # current average sewer tariff, local currency per m3
     tariff_target: float = 24.0              # target average sewer tariff, local currency per m3
-    # Affordability cap on the sewer bill: same mechanic as water — the tariff is held so the average
-    # household's sewer bill never exceeds this share of average monthly income (× 12). 0 = no cap.
-    tariff_afford_pct: float = 0.0
 
     # ── Microfinance + means-based grant (affordability lever) — see WaterInterventionInputs for the full
     #    mechanic. Sanitation runs it independently with its own willingness-to-pay %, loan terms, gap split
