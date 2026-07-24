@@ -268,7 +268,7 @@ def _default_ws_intervention():
             # zero effect until the user re-weights it). techmix_sm_cost is derived from this mix in to_engine.
             'techmix_start_year':2026,'techmix_sm_tech_mix':[dict(t) for t in _WS_SM_MIX],
             'tariff_start_year':2026,'tariff_target_year':2035,'tariff_volume_mld':87.6,
-            'tariff_current':32.0,'tariff_target':40.0,'tariff_afford_pct':0.0,
+            'tariff_current':32.0,'tariff_target':40.0,
             **_afford_defaults()}
 
 
@@ -282,7 +282,7 @@ def _default_san_intervention():
             # lever recovers, and spend it on SM sanitation connections.
             'nrw_link_return_ratio':0.80,'nrw_link_sewer_charge':16.0,'nrw_link_collection_rate':0.80,
             'tariff_start_year':2026,'tariff_target_year':2035,'tariff_volume_mld':43.8,
-            'tariff_current':16.0,'tariff_target':24.0,'tariff_afford_pct':0.0,
+            'tariff_current':16.0,'tariff_target':24.0,
             **_afford_defaults()}
 
 
@@ -534,7 +534,6 @@ def to_engine(fe: dict) -> ModelInputs:
         tariff_volume_mld=float(wi.get('tariff_volume_mld', 0.0) or 0.0),
         tariff_current=float(wi.get('tariff_current', 0.0) or 0.0),
         tariff_target=float(wi.get('tariff_target', 0.0) or 0.0),
-        tariff_afford_pct=float(wi.get('tariff_afford_pct', 0.0) or 0.0),
         # Microfinance + means-based grant (affordability lever).
         **_afford_fields(wi),
     )
@@ -568,7 +567,6 @@ def to_engine(fe: dict) -> ModelInputs:
         tariff_volume_mld=float(si.get('tariff_volume_mld', 0.0) or 0.0),
         tariff_current=float(si.get('tariff_current', 0.0) or 0.0),
         tariff_target=float(si.get('tariff_target', 0.0) or 0.0),
-        tariff_afford_pct=float(si.get('tariff_afford_pct', 0.0) or 0.0),
         # Microfinance + means-based grant (affordability lever).
         **_afford_fields(si),
     )

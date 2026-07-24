@@ -244,7 +244,6 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                ce_vol_anchor_year=0, ce_vol_growth=None,
                tariff_enabled=False, tariff_start=0, tariff_target_year=0,
                tariff_current=0.0, tariff_target=0.0, tariff_volume_base_m3=0.0,
-               tariff_afford_pct=0.0, tariff_afford_income_monthly=0.0,
                nrw_enabled=False, nrw_start=0, nrw_target_year=0, nrw_current=0.0, nrw_target=0.0,
                nrw_physical=0.5, nrw_vol_m3yr=0.0, nrw_vol_m3day=0.0, nrw_water_per_upgrade=0.0,
                nrw_value_unit=0.0, nrw_capex_unit_m3day=0.0, nrw_vol_growth=None,
@@ -474,18 +473,6 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     # forecast year = billed_volume × (tariff[t] − tariff_current) is recycled 100% into capex for new
     # service (folded into `avail` in the 4a loop). Gated by tariff_enabled → 0 in the BAU pass, so the
     # BAU counterfactual is unchanged; only the scenario pass (toggle on) moves.
-    #
-    # AFFORDABILITY CAP (test2): the tariff used to raise revenue is held so the average household's
-    # annual bill stays within `tariff_afford_pct` of average income. bill = per-HH billed volume ×
-    # tariff, where per-HH volume = tariff_volume_base_m3 / served_base (both in millions → m³/HH/yr).
-    # So the tariff ceiling = afford_pct × (avg_monthly_income × 12) / per_HH_volume. A ceiling below the
-    # current tariff simply yields no rise (tariff_add clamps to ≥0). 0 pct / no income data → no cap.
-    tariff_ceiling = None
-    if (tariff_afford_pct and tariff_afford_pct > 0 and tariff_afford_income_monthly
-            and tariff_afford_income_monthly > 0 and served_base > 0 and tariff_volume_base_m3 > 0):
-        per_hh_vol = tariff_volume_base_m3 / served_base                 # m³/HH/yr (millions cancel)
-        if per_hh_vol > 0:
-            tariff_ceiling = tariff_afford_pct * (tariff_afford_income_monthly * 12.0) / per_hh_vol
     tariff_add = np.zeros(n)                          # tariff rise vs current, per year (≥0)
     if tariff_enabled and tariff_target > tariff_current and tariff_start:
         for t in range(n):
@@ -499,8 +486,6 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                     tr = tariff_current + (tariff_target - tariff_current) * (y - tariff_start) / (tariff_target_year - tariff_start)
             else:
                 tr = tariff_target if y >= tariff_start else tariff_current
-            if tariff_ceiling is not None:
-                tr = min(tr, tariff_ceiling)         # affordability cap on the billable tariff
             tariff_add[t] = max(0.0, tr - tariff_current)
     tariff_cash = np.zeros(n)                         # additional tariff revenue → capex, per forecast year
 
@@ -851,16 +836,6 @@ def calculate_water_supply(inputs, ctx):
                                         getattr(inputs, 'custom_interventions', None) or [], 'water')
     cost_factor = cost_factor * cust_cf
     bracket_income = [br.income_monthly for br in inputs.income_distribution.brackets]
-    # Average monthly household income (hh_share-weighted, simple mean if shares are blank) — drives the
-    # tariff affordability cap. Falls back to 0 (→ no cap) when there is no income data.
-    _brs = inputs.income_distribution.brackets
-    _wsum = sum(float(br.hh_share or 0.0) for br in _brs)
-    if _wsum > 0:
-        avg_hh_income_monthly = sum(float(br.income_monthly or 0.0) * float(br.hh_share or 0.0) for br in _brs) / _wsum
-    elif _brs:
-        avg_hh_income_monthly = sum(float(br.income_monthly or 0.0) for br in _brs) / len(_brs)
-    else:
-        avg_hh_income_monthly = 0.0
     # Billed volume base: MLD → million m³/yr (× days_in_year ÷ litres-per-m³). Grows with coverage in the loop.
     _mld_to_m3 = inputs.constants.days_in_year / inputs.constants.cubic_meter_liters
     ce_vol_base_m3 = float(getattr(nrw, 'ce_water_sold_mld', 0.0) or 0.0) * _mld_to_m3
@@ -926,8 +901,6 @@ def calculate_water_supply(inputs, ctx):
         tariff_current=float(getattr(nrw, 'tariff_current', 0.0) or 0.0),
         tariff_target=float(getattr(nrw, 'tariff_target', 0.0) or 0.0),
         tariff_volume_base_m3=tariff_vol_base_m3,
-        tariff_afford_pct=float(getattr(nrw, 'tariff_afford_pct', 0.0) or 0.0),
-        tariff_afford_income_monthly=avg_hh_income_monthly,
         # NRW reduction: recovered physical water → basic→SM upgrades (capped at target); money ledger
         # (value − fixing cost) → avail. Water-only lever.
         nrw_enabled=nrw_on,
