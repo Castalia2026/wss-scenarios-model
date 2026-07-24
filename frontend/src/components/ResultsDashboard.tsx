@@ -1,283 +1,535 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
-  AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  Legend, ResponsiveContainer, ComposedChart, Line, Cell
+  Area, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 
-// Static example data for Nepal-like scenario
-const years = [2025, 2026, 2027, 2028, 2029, 2030, 2031, 2032, 2033, 2034, 2035, 2036, 2037, 2038, 2039, 2040];
+// ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
+function round3(v: number): number { return (!isFinite(v) || v === 0) ? 0 : Number(v.toPrecision(3)); }
+function sig3(v: number): string { return round3(v).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+// Money is carried in MILLIONS; show as BILLIONS (÷1000) so a 254,000 M gap reads "254 B".
+function sigB(vMillions: number): string { return sig3(vMillions / 1000); }
 
-const ruralWater = years.map(y => ({
-  year: y,
-  BAU: 0.15 + (y - 2025) * 0.008,
-  'Collection & NRW': Math.max(0, (y - 2028) * 0.005),
-  'Budget execution': Math.max(0, (y - 2033) * 0.004),
-  'Tariff Reform': Math.max(0, (y - 2028) * 0.002),
-  Target: 0.15 + (y - 2025) * 0.025,
-}));
+// Period buckets for the investment tables (mirrors the presentation: 2026–2030, 2031–2040, total).
+function buildPeriods(years: number[], baseYr: number): { label: string; lo: number; hi: number }[] {
+  const first = baseYr + 1;                               // first forecast year (e.g. 2026)
+  const end = years[years.length - 1];
+  const mid = Math.min(2030, end);
+  const ps = [{ label: `${first}–${mid}`, lo: first, hi: mid }];
+  if (end > mid) ps.push({ label: `${mid + 1}–${end}`, lo: mid + 1, hi: end });
+  ps.push({ label: `Total ${first}–${end}`, lo: first, hi: end });
+  return ps;
+}
+const sumRange = (arr: number[], years: number[], lo: number, hi: number) =>
+  years.reduce((a, y, i) => a + (y >= lo && y <= hi ? (arr[i] || 0) : 0), 0);
 
-const urbanWater = years.map(y => ({
-  year: y,
-  BAU: 0.49 + (y - 2025) * 0.021,
-  'Collection & NRW': Math.max(0, (y - 2028) * 0.008),
-  'Budget execution': Math.max(0, (y - 2033) * 0.006),
-  'Tariff Reform': Math.max(0, (y - 2028) * 0.003),
-  Target: 0.49 + (y - 2025) * 0.067,
-}));
+// ── intervention lists (key → label; resourceKey names the scenario cash stream it mobilises, if any) ──
+type IntvDef = { key: string; label: string; resourceKey?: string };
+const WATER_INTV: IntvDef[] = [
+  { key: 'ws_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash' },
+  { key: 'ws_nrw_enabled', label: 'NRW reduction', resourceKey: 'scenario_nrw_net' },
+  { key: 'ws_capital_efficiency_enabled', label: 'Budget execution improvement' },
+  { key: 'ws_costeff_enabled', label: 'Capex efficiency (unit cost)' },
+  { key: 'ws_techmix_enabled', label: 'Optimised technology selection' },
+  { key: 'ws_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash' },
+  { key: 'ws_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume' },
+];
+const SAN_INTV: IntvDef[] = [
+  { key: 'san_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash' },
+  { key: 'san_capital_efficiency_enabled', label: 'Budget execution improvement' },
+  { key: 'san_costeff_enabled', label: 'Capex efficiency (unit cost)' },
+  { key: 'san_techmix_enabled', label: 'Optimised technology selection' },
+  { key: 'san_nrw_link_enabled', label: 'NRW-linked sanitation revenue', resourceKey: 'scenario_nrw_link_cash' },
+  { key: 'san_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash' },
+  { key: 'san_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume' },
+];
 
-const nationalWater = years.map((y, i) => ({
-  year: y,
-  BAU: ruralWater[i].BAU * 0.6 + urbanWater[i].BAU * 0.4,
-  'Collection & NRW': ruralWater[i]['Collection & NRW'] * 0.6 + urbanWater[i]['Collection & NRW'] * 0.4,
-  'Budget execution': ruralWater[i]['Budget execution'] * 0.6 + urbanWater[i]['Budget execution'] * 0.4,
-  'Tariff Reform': ruralWater[i]['Tariff Reform'] * 0.6 + urbanWater[i]['Tariff Reform'] * 0.4,
-  Target: ruralWater[i].Target * 0.6 + urbanWater[i].Target * 0.4,
-}));
+interface Props {
+  geoScope: 'urban' | 'rural' | 'urban_rural' | 'national';
+  scenarios: { name: string; inputs: any }[];
+  inputs: any;
+  altInputs?: Record<string, any>;
+  onToggle?: (key: string, value: boolean) => void;
+}
 
-const financingData = years.map(y => ({
-  year: y,
-  'Investment Need': (2 + (y - 2025) * 0.8) * (y > 2025 ? 1 : 0),
-  'BAU Investment': (1.5 + (y - 2025) * 0.15) * (y > 2025 ? 1 : 0),
-  'Intervention Cash': Math.max(0, (y - 2028) * 0.3) * (y > 2025 ? 1 : 0),
-}));
+type InvTable = { periods: { label: string; lo: number; hi: number }[]; rows: { label: string; vals: number[]; strong?: boolean }[] };
+type Series = { cov: any[]; gap: any[]; sum: any; inv: InvTable; unit: { sm: number; basic: number } };
+type Both = { water: Series; sanitation: Series } | null;
+type Row = { key: string; label: string; addHH: number; resources: number | null };
 
-const COLORS = {
-  bau: '#64748b', target: '#2563eb', ce_nrw: '#10b981', capeff: '#f59e0b',
-  tariff: '#8b5cf6', inv_need: '#ef4444', bau_inv: '#64748b',
-};
-
-interface LayerActive { ceNrw: boolean; capeff: boolean; tariff: boolean }
-function MockChart({ data, title, active }: { data: any[]; title: string; active: LayerActive }) {
+// A "fan" chart: a shaded band (dataKey "fan" = [low, high]) that widens over the forecast between the
+// BAU projection and the with-interventions scenario, with reference lines traced on top.
+function FanChart({ title, subtitle, data, yLabel, fanFill, fanName, lines, fmt, domain }: {
+  title: string; subtitle?: string; data: any[]; yLabel: string; fanFill: string; fanName: string;
+  lines: { key: string; name: string; color: string; dash?: string; width?: number }[];
+  fmt: (v: number) => string; domain?: [number, number];
+}) {
   return (
-    <div style={{ marginBottom: 28 }}>
-      <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>{title}</h3>
+    <div style={{ marginBottom: 12 }}>
+      <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e3a5f', margin: '0 0 1px' }}>{title}</h4>
+      {subtitle && <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>{subtitle}</div>}
       <ResponsiveContainer width="100%" height={280}>
-        <ComposedChart data={data}>
+        <ComposedChart data={data} margin={{ top: 10, right: 24, bottom: 5, left: 12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} label={{ value: 'HH (millions)', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-          <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(3)} contentStyle={{ fontSize: 11 }} />
+          <YAxis tick={{ fontSize: 10 }} domain={domain} tickFormatter={fmt}>
+            <Label value={yLabel} angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
+          </YAxis>
+          <Tooltip formatter={(v: any) => (Array.isArray(v) ? `${fmt(+v[0])} – ${fmt(+v[1])}` : fmt(+v)) as any}
+            labelFormatter={(l: any) => String(l)} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
-          <Area type="monotone" dataKey="BAU" stackId="1" fill={COLORS.bau} stroke={COLORS.bau} fillOpacity={0.5} legendType="rect" />
-          {active.ceNrw && <Area type="monotone" dataKey="Collection & NRW" stackId="1" fill={COLORS.ce_nrw} stroke={COLORS.ce_nrw} fillOpacity={0.6} legendType="rect" />}
-          {active.capeff && <Area type="monotone" dataKey="Budget execution" stackId="1" fill={COLORS.capeff} stroke={COLORS.capeff} fillOpacity={0.6} legendType="rect" />}
-          {active.tariff && <Area type="monotone" dataKey="Tariff Reform" stackId="1" fill={COLORS.tariff} stroke={COLORS.tariff} fillOpacity={0.6} legendType="rect" />}
-          <Line type="monotone" dataKey="Target" stroke={COLORS.target} strokeWidth={2.5} dot={false} strokeDasharray="6 3" legendType="plainline" />
+          <Area type="monotone" dataKey="fan" name={fanName} fill={fanFill} stroke="none" fillOpacity={0.4} legendType="rect" isAnimationActive={false} />
+          {lines.map(l => (
+            <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2}
+              strokeDasharray={l.dash} dot={false} legendType="plainline" connectNulls isAnimationActive={false} />
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
     </div>
   );
 }
 
-// --- BAU Forecast static data ---
-const bauYears = [2025,2026,2027,2028,2029,2030,2031,2032,2033,2034,2035,2036,2037,2038,2039,2040];
-const bauForecastData = bauYears.map((y, i) => {
-  const t = i / 15;
-  return {
-    year: y,
-    'Safely Managed': +(0.49 + (0.81 - 0.49) * t).toFixed(3),
-    'Basic': +(0.35 + (0.42 - 0.35) * Math.sin(t * Math.PI * 0.6)).toFixed(3),
-    'Limited': +(0.03 - 0.02 * t).toFixed(3),
-    'Unimproved': 0.005,
-    'No Service': 0.002,
-  };
-});
-
-// --- Intervention Impact waterfall data ---
-const interventionImpactData = [
-  { name: 'Service Gap',          value: 0.69,  fill: '#ef4444' },
-  { name: 'Collection Efficiency', value: 0.05,  fill: '#10b981' },
-  { name: 'NRW Reduction',        value: 0.29,  fill: '#10b981' },
-  { name: 'Budget execution',   value: 0.19,  fill: '#10b981' },
-  { name: 'Tariff Reform',        value: 0.09,  fill: '#10b981' },
-  { name: 'Remaining Gap',        value: -0.02, fill: '#f59e0b' },
-];
-
-const BAU_LINE_COLORS: Record<string, string> = {
-  'Safely Managed': '#2563eb',
-  'Basic': '#10b981',
-  'Limited': '#f59e0b',
-  'Unimproved': '#ef4444',
-  'No Service': '#64748b',
-};
-
-interface Props {
-  geoScope: 'urban' | 'rural' | 'urban_rural' | 'national';
-  scenarios: { name: string; inputs: any }[];
-  inputs: any;
-}
-
-export default function ResultsDashboard({ geoScope, scenarios, inputs }: Props) {
-  const [activeSector, setActiveSector] = useState<'water' | 'sanitation'>('water');
-  // Local view scope for the dashboard charts (chosen from the dropdown in the side panel)
+export default function ResultsDashboard({ geoScope, scenarios, inputs, altInputs, onToggle }: Props) {
   const [viewScope, setViewScope] = useState<'urban' | 'rural' | 'national'>(
     geoScope === 'urban' ? 'urban' : geoScope === 'rural' ? 'rural' : 'national'
   );
-  const [activeIntv, setActiveIntv] = useState<Record<string, boolean>>({
-    'Collection Efficiency': true, 'NRW Reduction': true, 'Budget execution': true,
-    'Tariff Reform': true,
+  const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
+  const [both, setBoth] = useState<Both>(null);
+  const [table, setTable] = useState<{ water: Row[]; sanitation: Row[] } | null>(null);
+  const [hhForecast, setHhForecast] = useState<{ year: number; total: number }[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // Datasets for the chosen scope (national = urban + rural summed, when rural data exists).
+  const datasets = useMemo(() => {
+    const rural = altInputs?.['rural'];
+    if (viewScope === 'urban') return [inputs];
+    if (viewScope === 'rural') return [rural ?? inputs];
+    return rural ? [inputs, rural] : [inputs];        // national
+  }, [inputs, altInputs, viewScope]);
+
+  const cur = datasets[0]?.country_config?.currency || 'LCU';
+  const toggles = inputs?.toggles || {};
+  const depKey = JSON.stringify(datasets);
+
+  // ── Fan charts: BAU vs the user's full designed scenario (interventions + customs) ──────────────
+  useEffect(() => {
+    if (!datasets.length || !datasets[0]) return;
+    const h = setTimeout(() => {
+      Promise.all(datasets.map((inp: any) =>
+        fetch('/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inp) })
+          .then(r => { if (!r.ok) throw new Error('calc failed (' + r.status + ')'); return r.json(); })
+      )).then(resList => {
+        const years: number[] = resList[0].years;
+        const per = datasets[0]?.period || {};
+        const baseYr = per.baseline_year ?? years[0];
+        const endIdx = years.length - 1;
+        const sum = (pick: (res: any, i: number) => number) =>
+          years.map((_: number, i: number) => resList.reduce((a, res) => a + (pick(res, i) || 0), 0));
+        const totalHH = years.map((_, i) => resList.reduce((a, res) => a + (res.total_hh[i] || 0), 0));
+        const build = (secKey: 'water_supply' | 'sanitation'): Series => {
+          const secOf = (res: any) => res[secKey];
+          const bau = sum((r, i) => secOf(r).bau_hh[0][i]);
+          const scn = sum((r, i) => secOf(r).scenario_hh[0][i]);
+          const tgt = sum((r, i) => secOf(r).target_hh[0][i]);
+          const bauGap = sum((r, i) => (secOf(r).financing_gap || [])[i] || 0);
+          const scnGap = sum((r, i) => (secOf(r).scenario_financing_gap || [])[i] || 0);
+          const cov = years.map((y, i) => {
+            const tot = totalHH[i];
+            const b = Math.min(tot, bau[i]), s = Math.min(tot, scn[i]), t = Math.min(tot, tgt[i]);
+            return { year: y, total: +tot.toFixed(4), bau: +b.toFixed(4), scn: +s.toFixed(4), tgt: +t.toFixed(4),
+              fan: [+Math.min(b, s).toFixed(4), +Math.max(b, s).toFixed(4)] as [number, number] };
+          });
+          const gap = years.map((y, i) => {
+            const b = bauGap[i] || 0, s = scnGap[i] || 0;
+            return { year: y, bauGap: b, scnGap: s, fan: [Math.min(b, s), Math.max(b, s)] as [number, number] };
+          });
+          const tEnd = totalHH[endIdx] || 0;
+          const covPct = (a: number[]) => tEnd > 0 ? Math.min(tEnd, a[endIdx]) / tEnd : 0;
+          const cumGap = (a: number[]) => years.reduce((s2, y, i) => s2 + (y > baseYr ? (a[i] || 0) : 0), 0);
+          // Current (baseline-year) safely-managed coverage — BAU at the baseline = the actual.
+          const baseIdx = Math.max(0, years.indexOf(baseYr));
+          const tBase = totalHH[baseIdx] || 0;
+          const curCov = tBase > 0 ? Math.min(tBase, bau[baseIdx]) / tBase : 0;
+          // Investment-gap table (BAU basis): annual flows summed over each period, millions → billions.
+          const newCap = sum((r, i) => secOf(r).new_capex_total?.[i] || 0);
+          const repl = sum((r, i) => secOf(r).replacement_capex?.[i] || 0);
+          const totNeed = sum((r, i) => secOf(r).total_investment_need?.[i] || 0);
+          const bauInv = sum((r, i) => secOf(r).bau_available?.[i] || 0);
+          const periods = buildPeriods(years, baseYr);
+          const invRow = (label: string, arr: number[], strong = false) =>
+            ({ label, strong, vals: periods.map(p => sumRange(arr, years, p.lo, p.hi) / 1000) });
+          const inv: InvTable = { periods, rows: [
+            invRow('Investment for new households (A)', newCap),
+            invRow('Replacement capex (B)', repl),
+            invRow('Total investment need (C = A + B)', totNeed, true),
+            invRow('BAU investment (D)', bauInv),
+            invRow('Financing gap (C − D)', bauGap, true),
+          ] };
+          const unit = { sm: secOf(resList[0]).cost_per_hh || 0, basic: secOf(resList[0]).cost_basic || 0 };
+          return { cov, gap, inv, unit, sum: {
+            endline: years[endIdx], curCov, bauCov: covPct(bau), scnCov: covPct(scn), tgtCov: covPct(tgt),
+            addHH: Math.max(0, Math.min(tEnd, scn[endIdx]) - Math.min(tEnd, bau[endIdx])),
+            gapBauCum: cumGap(bauGap), gapScnCum: cumGap(scnGap),
+          } };
+        };
+        setBoth({ water: build('water_supply'), sanitation: build('sanitation') });
+        setHhForecast(years.map((y, i) => ({ year: y, total: +(totalHH[i] || 0).toFixed(4) })));
+        setError(null);
+      }).catch(e => setError(String(e)));
+    }, 350);
+    return () => clearTimeout(h);
+  }, [depKey]);
+
+  // ── Per-intervention table: cumulative passes over the ENABLED built-in toggles isolate each lever's
+  //    marginal safely-managed households (Δ scenario_hh) and its mobilised resources (Δ its cash stream).
+  //    Customs are excluded from this itemisation (they still feed the fan above). ─────────────────────
+  useEffect(() => {
+    if (!datasets.length || !datasets[0]) { setTable(null); return; }
+    const enW = WATER_INTV.filter(d => toggles[d.key]);
+    const enS = SAN_INTV.filter(d => toggles[d.key]);
+    const enabled = [...enW, ...enS];
+    if (!enabled.length) { setTable({ water: [], sanitation: [] }); return; }
+    const h = setTimeout(() => {
+      const off = Object.fromEntries(Object.keys(toggles).map(k => [k, false]));
+      const sets: any[] = [{ ...off }];                                  // pass 0 = BAU (all off)
+      let acc: any = { ...off };
+      enabled.forEach(d => { acc = { ...acc, [d.key]: true }; sets.push({ ...acc }); });
+      const fetchPass = (tg: any) => Promise.all(datasets.map((inp: any) =>
+        fetch('/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...inp, toggles: tg, custom_interventions: [] }) }).then(r => r.json())));
+      Promise.all(sets.map(fetchPass)).then(passes => {           // passes[p] = results[] (one per dataset)
+        const years: number[] = passes[0][0].years;
+        const per = datasets[0]?.period || {};
+        const baseYr = per.baseline_year ?? years[0];
+        const endIdx = years.length - 1;
+        const smEnd = (rl: any[], sk: string) => rl.reduce((a, r) => a + (r[sk].scenario_hh[0][endIdx] || 0), 0);
+        const cashCum = (rl: any[], sk: string, f: string) => rl.reduce((a, r) =>
+          a + (r[sk][f] || []).reduce((s: number, v: number, i: number) => s + (years[i] > baseYr ? (v || 0) : 0), 0), 0);
+        const rowsFor = (defs: IntvDef[], sk: string): Row[] => defs.map(d => {
+          const idx = enabled.findIndex(e => e.key === d.key);       // position in the cumulative sequence
+          const after = passes[idx + 1], before = passes[idx];
+          const addHH = Math.max(0, smEnd(after, sk) - smEnd(before, sk)) * 1000;      // millions HH → thousands
+          const resources = d.resourceKey
+            ? (cashCum(after, sk, d.resourceKey) - cashCum(before, sk, d.resourceKey)) / 1000               // M → B
+            : null;
+          return { key: d.key, label: d.label, addHH, resources };
+        });
+        setTable({ water: rowsFor(enW, 'water_supply'), sanitation: rowsFor(enS, 'sanitation') });
+      }).catch(() => { /* leave the previous table on a transient fetch error */ });
+    }, 400);
+    return () => clearTimeout(h);
+  }, [depKey, JSON.stringify(toggles)]);
+
+  const isShare = unitMode === 'share';
+  const covFmt = isShare ? (v: number) => Math.round(v * 100) + '%' : (v: number) => sig3(v);
+  const gapFmt = (v: number) => sigB(v);
+  const asShare = (rows: any[]) => rows.map(r => {
+    const tot = r.total || 0; const d = (v: number) => tot > 0 ? v / tot : 0;
+    return { year: r.year, total: tot > 0 ? 1 : 0, bau: d(r.bau), scn: d(r.scn), tgt: d(r.tgt), fan: [d(r.fan[0]), d(r.fan[1])] };
   });
-  const layerActive = {
-    ceNrw: !!(activeIntv['Collection Efficiency'] || activeIntv['NRW Reduction']),
-    capeff: !!activeIntv['Budget execution'],
-    tariff: !!activeIntv['Tariff Reform'],
-  };
-  return (
-    <div style={{ flex: 1, display: 'flex', overflow: 'hidden' }}>
-      {/* Main scrollable charts area */}
-      <div style={{ flex: 3, minWidth: 0, overflowY: 'auto', padding: '20px 28px' }}>
-      {/* Prototype banner */}
-      <div style={{ background: '#fef3c7', padding: '8px 14px', borderRadius: 6, fontSize: 11, color: '#92400e', marginBottom: 16 }}>
-        <strong>Static mock-up:</strong> These charts show example outputs to demonstrate what the final tool will produce. No live calculations are performed.
-      </div>
 
-      {/* Coverage chart for the scope chosen in the side panel */}
-      {(() => {
-        const sectorName = activeSector === 'water' ? 'Water Supply' : 'Sanitation';
-        const data = viewScope === 'rural' ? ruralWater : viewScope === 'urban' ? urbanWater : nationalWater;
-        const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
-        return <MockChart data={data} title={`${scopeName} ${sectorName} — Coverage Progress`} active={layerActive} />;
-      })()}
+  const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
+  const pct = (f: number) => (f * 100).toFixed(1) + '%';
 
-      {/* Financing gap chart */}
-      <div style={{ marginBottom: 28 }}>
-        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-          {activeSector === 'water' ? 'Water Supply' : 'Sanitation'} — Annual Financing Gap
-        </h3>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={financingData.filter(d => d.year > 2025)}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} label={{ value: 'Billions', angle: -90, position: 'insideLeft', style: { fontSize: 10 } }} />
-            <Tooltip formatter={(value: any) => (+(value ?? 0)).toFixed(2)} contentStyle={{ fontSize: 11 }} />
-            <Legend wrapperStyle={{ fontSize: 10 }} />
-            <Bar dataKey="Investment Need" fill={COLORS.inv_need} opacity={0.7} />
-            <Bar dataKey="BAU Investment" stackId="funding" fill={COLORS.bau_inv} opacity={0.7} />
-            <Bar dataKey="Intervention Cash" stackId="funding" fill={COLORS.ce_nrw} opacity={0.7} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* Summary table */}
-      <div style={{ marginBottom: 28 }}>
-        <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>Summary at Key Years (Example)</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
+  // ── Resources-and-households table (per sector) ────────────────────────────────────────────────
+  const ImpactTable = ({ rows, hhCol }: { rows: Row[]; hhCol: string }) => {
+    if (!rows || !rows.length) return null;
+    const totRes = rows.reduce((a, r) => a + (r.resources || 0), 0);
+    const totHH = rows.reduce((a, r) => a + (r.addHH || 0), 0);
+    const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
+    const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    return (
+      <div style={{ margin: '2px 0 4px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+        <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
           <thead>
-            <tr style={{ background: '#f1f5f9' }}>
-              <th style={thStyle}>Metric</th>
-              <th style={thStyle}>2025</th>
-              <th style={thStyle}>2030</th>
-              <th style={thStyle}>2035</th>
-              <th style={thStyle}>2040</th>
+            <tr>
+              <th style={{ ...th, textAlign: 'left' }}>Intervention</th>
+              <th style={th}>Resources generated ({cur} b)</th>
+              <th style={th}>{hhCol}</th>
             </tr>
           </thead>
           <tbody>
-            {[
-              ['Total HH (millions)', '0.940', '1.098', '1.283', '1.499'],
-              ['Target Safely Managed', '0.487', '0.725', '1.042', '1.499'],
-              ['BAU Safely Managed', '0.487', '0.564', '0.671', '0.807'],
-              ['Service Gap', '0.000', '0.161', '0.371', '0.691'],
-              ['Financing Gap (bill)', '0.00', '6.98', '6.60', '10.23'],
-              ['Adjusted Gap (bill)', '0.00', '5.88', '1.60', '4.53'],
-            ].map(([label, ...vals]) => (
-              <tr key={label}>
-                <td style={tdStyle}>{label}</td>
-                {vals.map((v, i) => <td key={i} style={{ ...tdStyle, textAlign: 'left', fontFamily: 'monospace' }}>{v}</td>)}
+            {rows.map((r, i) => (
+              <tr key={r.key} style={{ background: i % 2 ? '#f1f8fd' : '#fff' }}>
+                <td style={{ ...td, textAlign: 'left', color: '#334155' }}>{r.label}</td>
+                <td style={{ ...td, color: '#0369a1' }}>{r.resources == null ? '—' : sig3(r.resources)}</td>
+                <td style={{ ...td, color: '#0369a1' }}>{sig3(r.addHH)}</td>
               </tr>
             ))}
+            <tr style={{ background: '#dff1fb', fontWeight: 700 }}>
+              <td style={{ ...td, textAlign: 'left', color: '#1e3a5f', borderBottom: 'none' }}>Total</td>
+              <td style={{ ...td, color: '#1e3a5f', borderBottom: 'none' }}>{sig3(totRes)}</td>
+              <td style={{ ...td, color: '#1e3a5f', borderBottom: 'none' }}>{sig3(totHH)}</td>
+            </tr>
           </tbody>
         </table>
       </div>
+    );
+  };
 
-      {/* Saved scenarios */}
+  // ── Slide 6: Households forecast (total HHs over the model window) ──────────────────────────────
+  const HouseholdsForecast = () => {
+    if (!hhForecast || !hhForecast.length) return null;
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', marginBottom: 1 }}>Households forecast — {scopeName}</div>
+        <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>Total households across the model window (historical → forecast).</div>
+        <ResponsiveContainer width="100%" height={220}>
+          <ComposedChart data={hhForecast} margin={{ top: 8, right: 24, bottom: 5, left: 12 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => sig3(v)}>
+              <Label value="millions of HHs" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
+            </YAxis>
+            <Tooltip formatter={(v: any) => sig3(+v) + ' M'} contentStyle={{ fontSize: 11 }} />
+            <Bar dataKey="total" name="Total households" fill="#60a5fa" isAnimationActive={false} />
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    );
+  };
+
+  // ── Table 9: Executive summary — SM coverage now vs BAU / target / with-reforms at the endline ──
+  const ExecSummary = () => {
+    if (!both) return null;
+    const end = both.water.sum.endline;
+    const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
+    const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    const rows: [string, any][] = [['Water Supply', both.water.sum], ['Sanitation', both.sanitation.sum]];
+    return (
+      <div style={{ marginBottom: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>Executive summary — safely-managed coverage (% of households)</div>
+        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 460 }}>
+            <thead><tr>
+              <th style={{ ...th, textAlign: 'left' }}>Sector · {scopeName}</th>
+              <th style={th}>Current</th><th style={th}>BAU {end}</th><th style={th}>Target {end}</th><th style={th}>With reforms {end}</th>
+            </tr></thead>
+            <tbody>
+              {rows.map(([label, s], i) => (
+                <tr key={label} style={{ background: i % 2 ? '#f1f8fd' : '#fff' }}>
+                  <td style={{ ...td, textAlign: 'left', color: '#334155', fontWeight: 600 }}>{label}</td>
+                  <td style={{ ...td, color: '#475569' }}>{pct(s.curCov)}</td>
+                  <td style={{ ...td, color: '#94a3b8' }}>{pct(s.bauCov)}</td>
+                  <td style={{ ...td, color: '#16a34a' }}>{pct(s.tgtCov)}</td>
+                  <td style={{ ...td, color: '#0369a1', fontWeight: 700 }}>{pct(s.scnCov)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Table 3: Investment gap (BAU basis), by period. ── & Table 5: Unit costs. ───────────────────
+  const InvestmentGapTable = ({ inv }: { inv: InvTable }) => {
+    const th: React.CSSProperties = { padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#fff', background: '#0369a1', textAlign: 'right' };
+    const td: React.CSSProperties = { padding: '5px 10px', fontSize: 11, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Investment gap (BAU, {cur} b)</div>
+        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
+            <thead><tr>
+              <th style={{ ...th, textAlign: 'left' }}> </th>
+              {inv.periods.map(p => <th key={p.label} style={th}>{p.label}</th>)}
+            </tr></thead>
+            <tbody>
+              {inv.rows.map((r, i) => (
+                <tr key={r.label} style={{ background: r.strong ? '#eef6fb' : i % 2 ? '#f8fbfd' : '#fff', fontWeight: r.strong ? 700 : 400 }}>
+                  <td style={{ ...td, textAlign: 'left', color: r.strong ? '#1e3a5f' : '#334155' }}>{r.label}</td>
+                  {r.vals.map((v, j) => <td key={j} style={{ ...td, color: r.strong ? '#1e3a5f' : '#0369a1' }}>{sig3(v)}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  };
+
+  const UnitCostTable = ({ unit }: { unit: { sm: number; basic: number } }) => {
+    const td: React.CSSProperties = { padding: '5px 10px', fontSize: 11, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    const avg = (unit.sm + unit.basic) / 2;
+    const rows: [string, number][] = [
+      ['Safely-managed connection', unit.sm],
+      ['Basic connection', unit.basic],
+      ['Average capex per HH', avg],
+    ];
+    return (
+      <div style={{ marginTop: 8 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Unit cost per household ({cur})</div>
+        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 420 }}>
+          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+            <tbody>
+              {rows.map(([label, v], i) => (
+                <tr key={label} style={{ background: i === 2 ? '#eef6fb' : i % 2 ? '#f8fbfd' : '#fff', fontWeight: i === 2 ? 700 : 400 }}>
+                  <td style={{ ...td, textAlign: 'left', color: '#334155' }}>{label}</td>
+                  <td style={{ ...td, color: '#0369a1' }}>{Math.round(v).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 2 }}>Unit costs shown for the primary dataset ({scopeName === 'National' ? 'urban' : scopeName.toLowerCase()}).</div>
+      </div>
+    );
+  };
+
+  const sectorBlock = (secKey: 'water' | 'sanitation') => {
+    if (!both) return null;
+    const s = secKey === 'water' ? both.water : both.sanitation;
+    const label = secKey === 'water' ? 'Water Supply' : 'Sanitation';
+    const covRows = isShare ? asShare(s.cov) : s.cov;
+    const covLines = [
+      { key: 'bau', name: 'BAU', color: '#94a3b8', width: 2 },
+      { key: 'scn', name: 'With interventions', color: '#0ea5e9', width: 2.5 },
+      { key: 'tgt', name: 'Target', color: '#16a34a', dash: '6 3', width: 2 },
+      { key: 'total', name: 'Total households', color: '#6b7280', dash: '8 4', width: 1.5 },
+    ];
+    const gapLines = [
+      { key: 'bauGap', name: 'BAU financing gap', color: '#ef4444', width: 2.5 },
+      { key: 'scnGap', name: 'With interventions', color: '#16a34a', width: 2.5 },
+    ];
+    const noFan = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
+    const rows = secKey === 'water' ? table?.water : table?.sanitation;
+    const hhCol = secKey === 'water' ? "Added HHs with treated, piped (HHs '000)" : "Added safely-managed HHs (HHs '000)";
+    return (
+      <div key={secKey} style={{ marginBottom: 26 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, borderBottom: '2px solid #e2e8f0', paddingBottom: 4, marginBottom: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 700, color: '#1e3a5f' }}>{label}</span>
+          <span style={{ fontSize: 11, color: '#64748b' }}>· {scopeName}</span>
+        </div>
+        <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #0ea5e9', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 12 }}>
+          <b>By {s.sum.endline}</b>, safely-managed coverage fans from <b>{pct(s.sum.bauCov)}</b> (BAU) to <b>{pct(s.sum.scnCov)}</b> with the current interventions — <b>{sig3(s.sum.addHH)} M</b> more households — against a target of <b>{pct(s.sum.tgtCov)}</b>. The cumulative financing gap narrows from <b>{sigB(s.sum.gapBauCum)}</b> to <b>{sigB(s.sum.gapScnCum)} B {cur}</b>.
+        </div>
+        {noFan && (
+          <div style={{ fontSize: 10.5, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4, padding: '5px 9px', marginBottom: 10 }}>
+            No interventions are active for {label.toLowerCase()}. Toggle some on above to open the fan and fill the table.
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
+          <FanChart title={`${label} — safely-managed coverage`} subtitle="Fan = BAU → with-interventions; green = target"
+            data={covRows} yLabel={isShare ? '% of population' : '# households (millions)'}
+            fanFill="#7dd3fc" fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+          <FanChart title={`${label} — annual financing gap`} subtitle="Fan = the gap closed by the interventions"
+            data={s.gap} yLabel={`Financing gap (B ${cur}/yr)`}
+            fanFill="#fca5a5" fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
+        </div>
+        {rows && rows.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Contribution by intervention (cumulative to {s.sum.endline})</div>
+            <ImpactTable rows={rows} hhCol={hhCol} />
+          </div>
+        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 12, alignItems: 'start' }}>
+          <InvestmentGapTable inv={s.inv} />
+          <UnitCostTable unit={s.unit} />
+        </div>
+      </div>
+    );
+  };
+
+  // ── Intervention on/off toggle bar (details live on the Intervention Design tab) ─────────────────
+  const ToggleColumn = ({ title, defs }: { title: string; defs: IntvDef[] }) => (
+    <div style={{ flex: 1, minWidth: 220 }}>
+      <div style={{ fontSize: 11.5, fontWeight: 700, color: '#1e3a5f', marginBottom: 5 }}>{title}</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+        {defs.map(d => {
+          const on = !!toggles[d.key];
+          return (
+            <label key={d.key} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 11.5, cursor: 'pointer',
+              padding: '4px 8px', background: on ? '#eff6ff' : '#fff', border: `1px solid ${on ? '#bfdbfe' : '#e5e7eb'}`, borderRadius: 5 }}>
+              <input type="checkbox" checked={on} onChange={e => onToggle?.(d.key, e.target.checked)}
+                style={{ width: 15, height: 15, accentColor: '#2563eb' }} />
+              <span style={{ color: on ? '#1e3a5f' : '#475569', fontWeight: on ? 600 : 400 }}>{d.label}</span>
+            </label>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  return (
+    <div style={{ flex: 1, overflowY: 'auto', padding: '18px 26px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 12 }}>
+        <div>
+          <h2 style={{ fontSize: 17, color: '#1e3a5f', margin: 0 }}>Results — intervention impact (live)</h2>
+          <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+            Fan charts show the range from business-as-usual to your designed intervention scenario, widening over the forecast.
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Scope</span>
+            <select value={viewScope} onChange={e => setViewScope(e.target.value as any)}
+              style={{ padding: '5px 26px 5px 8px', borderRadius: 5, border: '1px solid #94a3b8', fontSize: 12, background: '#fff', cursor: 'pointer' }}>
+              <option value="urban">Urban</option>
+              <option value="rural">Rural</option>
+              <option value="national">National</option>
+            </select>
+          </div>
+          <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
+            {([['count', '# Households'], ['share', '% of population']] as const).map(([m, l]) => (
+              <button key={m} onClick={() => setUnitMode(m)} style={{
+                padding: '5px 10px', fontSize: 11, border: 'none', cursor: 'pointer',
+                background: unitMode === m ? '#2563eb' : '#fff', color: unitMode === m ? '#fff' : '#475569',
+                fontWeight: unitMode === m ? 700 : 500,
+              }}>{l}</button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Intervention on/off toggles — parameters are set on the Intervention Design tab. */}
+      <div style={{ border: '1px solid #c7d2fe', background: '#f5f7ff', borderRadius: 8, padding: '10px 14px', marginBottom: 18 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 12.5, fontWeight: 700, color: '#312e81' }}>Interventions</span>
+          <span style={{ fontSize: 10.5, color: '#64748b' }}>Switch each on or off — set its parameters on the <b>Intervention Design</b> tab.</span>
+        </div>
+        <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap' }}>
+          <ToggleColumn title="Water Supply" defs={WATER_INTV} />
+          <ToggleColumn title="Sanitation" defs={SAN_INTV} />
+        </div>
+      </div>
+
+      {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
+      {!both && !error && <div style={{ fontSize: 12, color: '#64748b', padding: '20px 0' }}>Computing…</div>}
+
+      {/* Presentation-style summary: households forecast (slide 6) + executive summary (table 9). */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20, alignItems: 'start' }}>
+        <HouseholdsForecast />
+        <ExecSummary />
+      </div>
+
+      {sectorBlock('water')}
+      {sectorBlock('sanitation')}
+
+      <div style={{ fontSize: 10, color: '#94a3b8', marginTop: -6, marginBottom: 16 }}>
+        Table: “Resources generated” is the finance each lever mobilises (revenue collected, tariff income, recovered-water
+        value, sewer revenue, or loans) — cost-side and budget-execution levers show “—” as they stretch existing budget
+        rather than raise new money. “Added HHs” is each lever’s marginal safely-managed connections. Custom interventions
+        feed the fan charts but are not itemised here.
+      </div>
+
       {scenarios.length > 0 && (
-        <div style={{ marginBottom: 28 }}>
-          <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>Saved Scenarios</h3>
+        <div style={{ marginTop: 8 }}>
+          <h3 style={{ fontSize: 13, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>Saved scenarios</h3>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            {scenarios.map((s, i) => (
+            {scenarios.map((sc, i) => (
               <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 14px', background: '#f8fafc' }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', marginBottom: 4 }}>{s.name}</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', marginBottom: 4 }}>{sc.name}</div>
                 <button onClick={() => {
-                  fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s.inputs) })
-                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${s.name}.pptx`; a.click(); });
+                  fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sc.inputs) })
+                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${sc.name}.pptx`; a.click(); });
                 }} style={{ fontSize: 10, padding: '3px 8px', border: '1px solid #d1d5db', borderRadius: 3, background: '#fff', cursor: 'pointer', color: '#374151' }}>
-                  📑 Export Slide
+                  📑 Export slide
                 </button>
               </div>
             ))}
           </div>
         </div>
       )}
-      </div>
-
-      {/* Left-hand control panel — stays visible while you scroll the charts */}
-      <div style={{ order: -1, flex: 2, minWidth: 220, borderRight: '1px solid #e2e8f0', background: '#fafaff', overflowY: 'auto', padding: '16px 16px 24px' }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#312e81', marginBottom: 4 }}>Controls</div>
-        <div style={{ fontSize: 10, color: '#64748b', marginBottom: 14, fontStyle: 'italic' }}>Adjust these while viewing any graph.</div>
-
-        {/* Geographic scope */}
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Geographic scope</div>
-        <div style={{ position: 'relative', marginBottom: 16 }}>
-          <select value={viewScope} onChange={e => setViewScope(e.target.value as 'urban' | 'rural' | 'national')}
-            style={{ width: '100%', padding: '7px 28px 7px 8px', borderRadius: 5, border: '1px solid #94a3b8', fontSize: 12, background: '#fff', cursor: 'pointer', appearance: 'none', WebkitAppearance: 'none', MozAppearance: 'none' }}>
-            <option value="urban">Urban</option>
-            <option value="rural">Rural</option>
-            <option value="national">National</option>
-          </select>
-          <span style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', fontSize: 10, color: '#475569' }}>▼</span>
-        </div>
-
-        {/* Sector */}
-        <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 6 }}>Sector</div>
-        <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-          {(['water', 'sanitation'] as const).map(s => (
-            <button key={s} onClick={() => setActiveSector(s)} style={{
-              flex: 1, padding: '7px 10px', border: 'none', borderRadius: 5, cursor: 'pointer',
-              background: activeSector === s ? '#2563eb' : '#e5e7eb',
-              color: activeSector === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 12,
-            }}>{s === 'water' ? 'Water' : 'Sanitation'}</button>
-          ))}
-        </div>
-
-        {/* Intervention toggles */}
-        <div style={{ background: '#f0f4ff', padding: '10px 12px', borderRadius: 8, marginBottom: 14, border: '1px solid #c7d2fe' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#312e81', marginBottom: 8 }}>Toggle interventions</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            {['Collection Efficiency', 'NRW Reduction', 'Budget execution', 'Tariff Reform'].map(name => (
-              <label key={name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, cursor: 'pointer', padding: '5px 8px', background: '#fff', borderRadius: 5, border: '1px solid #e0e7ff' }}>
-                <input type="checkbox" checked={!!activeIntv[name]} onChange={e => setActiveIntv(p => ({ ...p, [name]: e.target.checked }))} style={{ accentColor: '#2563eb', width: 15, height: 15 }} />
-                <span>{name}</span>
-              </label>
-            ))}
-          </div>
-          <div style={{ fontSize: 10, color: '#64748b', marginTop: 8, fontStyle: 'italic' }}>
-            Toggle these to add or remove each layer from the coverage charts.
-          </div>
-        </div>
-
-        {/* Target adjustment */}
-        <div style={{ background: '#fefce8', padding: '10px 12px', borderRadius: 8, border: '1px solid #fde68a' }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#92400e', marginBottom: 8 }}>Adjust targets</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 11, color: '#78350f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Target 1 year</span>
-              <input type="number" defaultValue={inputs?.period?.target1_year || 2030}
-                style={{ width: 64, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
-            </label>
-            <label style={{ fontSize: 11, color: '#78350f', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <span>Target 2 year</span>
-              <input type="number" defaultValue={inputs?.period?.target2_year || 2040}
-                style={{ width: 64, padding: '2px 4px', border: '1px solid #fbbf24', borderRadius: 3, fontSize: 11, textAlign: 'center' }} />
-            </label>
-          </div>
-          <div style={{ fontSize: 10, color: '#92400e', marginTop: 8, fontStyle: 'italic' }}>
-            In the full tool, changing targets updates projections in real time.
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
-
-const thStyle: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', borderBottom: '2px solid #e5e7eb', fontSize: 11 };
-const tdStyle: React.CSSProperties = { padding: '6px 12px', borderBottom: '1px solid #f1f5f9', fontSize: 11 };

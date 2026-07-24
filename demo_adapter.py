@@ -268,7 +268,7 @@ def _default_ws_intervention():
             # zero effect until the user re-weights it). techmix_sm_cost is derived from this mix in to_engine.
             'techmix_start_year':2026,'techmix_sm_tech_mix':[dict(t) for t in _WS_SM_MIX],
             'tariff_start_year':2026,'tariff_target_year':2035,'tariff_volume_mld':87.6,
-            'tariff_current':32.0,'tariff_target':40.0,
+            'tariff_current':32.0,'tariff_target':40.0,'tariff_afford_pct':0.0,
             **_afford_defaults()}
 
 
@@ -282,7 +282,7 @@ def _default_san_intervention():
             # lever recovers, and spend it on SM sanitation connections.
             'nrw_link_return_ratio':0.80,'nrw_link_sewer_charge':16.0,'nrw_link_collection_rate':0.80,
             'tariff_start_year':2026,'tariff_target_year':2035,'tariff_volume_mld':43.8,
-            'tariff_current':16.0,'tariff_target':24.0,
+            'tariff_current':16.0,'tariff_target':24.0,'tariff_afford_pct':0.0,
             **_afford_defaults()}
 
 
@@ -358,7 +358,8 @@ def coerce_to_engine(inputs: dict) -> ModelInputs:
 
 def _afford_fields(d: dict) -> dict:
     """Microfinance + means-based grant fields for a (water|sanitation)_interventions dict → schema kwargs."""
-    gs = [float(x) for x in (d.get('mf_gap_shares') or _GAP_SHARES_DEFAULT)]
+    # null-safe per element: a cleared array cell serialises positionally to null → None; coerce to 0.0.
+    gs = [float(x or 0.0) for x in (d.get('mf_gap_shares') or _GAP_SHARES_DEFAULT)]
     return dict(
         mf_connection_fee=float(d.get('mf_connection_fee', 0.0) or 0.0),
         mf_start_year=int(d.get('mf_start_year', 0) or 0),
@@ -488,10 +489,11 @@ def to_engine(fe: dict) -> ModelInputs:
     # NRW factors (feed the 4d capex adder; sanitation reads the same water cells)
     wi = fe.get('water_interventions', {}) or {}
     ws_intv = WaterInterventionInputs(
-        nrw_treatment_cost_pct_capex=wi.get('nrw_treatment_cost_pct_capex', 0.40),
-        nrw_current_pct=wi.get('nrw_current_pct', 0.40),
+        # null-safe: a cleared cell serialises to JSON null (dict.get returns None), so guard with `or default`.
+        nrw_treatment_cost_pct_capex=float(wi.get('nrw_treatment_cost_pct_capex', 0.40) or 0.40),
+        nrw_current_pct=float(wi.get('nrw_current_pct', 0.40) or 0.40),
         nrw_target_pct=float(wi.get('nrw_target_pct', 0.15) or 0.15),
-        nrw_physical_loss_pct=wi.get('nrw_physical_loss_pct', 0.50),
+        nrw_physical_loss_pct=float(wi.get('nrw_physical_loss_pct', 0.50) or 0.50),
         nrw_start_year=int(wi.get('nrw_start_year', 0) or 0),
         nrw_target_year=int(wi.get('nrw_target_year', 0) or 0),
         # NRW reduction lever (simplified): recovered physical water → basic→SM upgrades + a money ledger.
@@ -532,6 +534,7 @@ def to_engine(fe: dict) -> ModelInputs:
         tariff_volume_mld=float(wi.get('tariff_volume_mld', 0.0) or 0.0),
         tariff_current=float(wi.get('tariff_current', 0.0) or 0.0),
         tariff_target=float(wi.get('tariff_target', 0.0) or 0.0),
+        tariff_afford_pct=float(wi.get('tariff_afford_pct', 0.0) or 0.0),
         # Microfinance + means-based grant (affordability lever).
         **_afford_fields(wi),
     )
@@ -565,6 +568,7 @@ def to_engine(fe: dict) -> ModelInputs:
         tariff_volume_mld=float(si.get('tariff_volume_mld', 0.0) or 0.0),
         tariff_current=float(si.get('tariff_current', 0.0) or 0.0),
         tariff_target=float(si.get('tariff_target', 0.0) or 0.0),
+        tariff_afford_pct=float(si.get('tariff_afford_pct', 0.0) or 0.0),
         # Microfinance + means-based grant (affordability lever).
         **_afford_fields(si),
     )

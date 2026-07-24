@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import LiveInterventionChart from './LiveInterventionChart';
+import NumInput from './NumInput';
 
 function Section({ title, children, defaultOpen = false, sectionKey, onFocus }: { title: string; children: React.ReactNode; defaultOpen?: boolean; sectionKey?: string; onFocus?: (key: string) => void }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -46,20 +47,27 @@ function F({ label, value, onChange, unit, step, isPercent, tip, fieldType, plac
           fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
         }} title={tip}>i</span>}
       </label>
-      <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
-        value={useCommas ? commaStr : (Number.isNaN(displayVal) ? '' : displayVal)}
-        placeholder={placeholder}
-        onChange={e => { const v = parseFloat(e.target.value.replace(/,/g, '')); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
-        step={isPercent ? 1 : (step || 1)}
-        readOnly={isDerived}
-        style={{
-          width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
-          border: isDerived ? '1px solid #DDE3EA' : '1px solid #F0D070',
-          background: isDerived ? '#F1F3F5' : '#FFF9E6',
-          color: isDerived ? '#6B7785' : '#3A4452',
-          cursor: isDerived ? 'not-allowed' : 'text',
-          boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
-        }} />
+      {isDerived ? (
+        <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
+          value={useCommas ? commaStr : (Number.isNaN(displayVal) ? '' : displayVal)}
+          placeholder={placeholder} readOnly
+          style={{
+            width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+            border: '1px solid #DDE3EA', background: '#F1F3F5', color: '#6B7785',
+            cursor: 'not-allowed', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
+          }} />
+      ) : (
+        <NumInput
+          value={Number.isNaN(displayVal) ? undefined : displayVal} commas={useCommas}
+          placeholder={placeholder}
+          // Empty cell → NaN in the model (JSON-serialises to null → engine reads 0 / uses the placeholder).
+          onValue={v => onChange(v === undefined ? (NaN as number) : (isPercent ? v / 100 : v))}
+          style={{
+            width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+            border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452',
+            cursor: 'text', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit',
+          }} />
+      )}
       {unit && <span style={{ fontSize: 11, color: '#6B7785' }}>{unit}</span>}
     </div>
   );
@@ -119,10 +127,10 @@ function TechMixEditor({ inputs, onChange, section, CUR }: {
     <div style={{ gridColumn: '1 / -1' }}>
       <div style={{ maxWidth: 160 }}>
         <F label="Start year" value={iv.techmix_start_year} onChange={v => onChange({ ...inputs, [section]: { ...iv, techmix_start_year: v } })}
-          tip="Year the re-modelled technology mix takes effect. From this year on, new safely-managed connections use the mix below; earlier years keep the BAU mix." />
+          tip="Year the re-modelled technology mix takes effect. From this year on, new safely-managed service uses the mix below; earlier years keep the BAU mix." />
       </div>
       <div style={{ fontSize: 11, color: '#475569', margin: '8px 0 4px' }}>
-        Re-weight or re-cost the <b>safely-managed</b> technology mix (pre-filled from your BAU mix). Its weighted cost becomes the new safely-managed connection cost from the start year — cheaper connections let the same budget reach more households.
+        Re-weight or re-cost the <b>safely-managed</b> technology mix (pre-filled from your BAU mix). Its weighted cost becomes the new safely-managed service cost from the start year — cheaper service lets the same budget reach more households.
       </div>
       <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
         <thead><tr style={{ color: '#64748b' }}><th style={{ textAlign: 'left', padding: '2px 6px' }}>technology</th><th>share %</th><th>cost/HH</th><th></th></tr></thead>
@@ -130,8 +138,12 @@ function TechMixEditor({ inputs, onChange, section, CUR }: {
           {mix.map((t: any, i: number) => (
             <tr key={i}>
               <td><input type="text" style={{ ...cellStyle, width: 180 }} value={t.name || ''} onChange={e => upd(i, { name: e.target.value })} /></td>
-              <td><input type="number" style={{ ...cellStyle, width: 60 }} value={Math.round((+t.share || 0) * 1e6) / 1e4} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { share: v / 100 }); }} /></td>
-              <td><input type="number" style={{ ...cellStyle, width: 92 }} value={Math.round(+t.cost || 0)} onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { cost: v }); }} /></td>
+              <td><NumInput style={{ ...cellStyle, width: 60 }}
+                    value={(t.share == null || Number.isNaN(+t.share)) ? undefined : Math.round((+t.share) * 1e6) / 1e4}
+                    onValue={v => upd(i, { share: v === undefined ? undefined : v / 100 })} /></td>
+              <td><NumInput style={{ ...cellStyle, width: 92 }} commas
+                    value={(t.cost == null || Number.isNaN(+t.cost)) ? undefined : Math.round(+t.cost)}
+                    onValue={v => upd(i, { cost: v })} /></td>
               <td><button onClick={() => { if (mix.length > 1) setMix(mix.filter((_: any, j: number) => j !== i)); }} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>✕</button></td>
             </tr>
           ))}
@@ -147,7 +159,7 @@ function TechMixEditor({ inputs, onChange, section, CUR }: {
         Shares total {(shareSum * 100).toFixed(2)}%{okShare ? '' : ' (they must total 100%)'}.
       </div>
       <div style={{ fontSize: 11, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 9px', marginTop: 4 }}>
-        New safely-managed connection cost: <b>{Math.round(newCost).toLocaleString()} {CUR}</b> vs BAU <b>{Math.round(bauCost).toLocaleString()} {CUR}</b>{' '}
+        New safely-managed service cost: <b>{Math.round(newCost).toLocaleString()} {CUR}</b> vs BAU <b>{Math.round(bauCost).toLocaleString()} {CUR}</b>{' '}
         (<b style={{ color: pct < 0 ? '#16a34a' : pct > 0 ? '#b45309' : '#64748b' }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</b>). Applied from {iv.techmix_start_year || 'the start year'}.
       </div>
     </div>
@@ -173,15 +185,37 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
   const scopeLabel = geoScope === 'national' ? 'National' : geoScope === 'rural' ? 'Rural' : 'Urban';
   const scopeLower = scopeLabel.toLowerCase();
 
+  // Average monthly household income (LC), from the shared income distribution — hh_share-weighted,
+  // falling back to a simple mean when the shares are blank. Drives the tariff affordability cap hint.
+  const avgHhIncomeMonthly = (() => {
+    const bks: any[] = inputs?.income_distribution?.brackets || [];
+    if (!bks.length) return 0;
+    const wSum = bks.reduce((s, b) => s + (+b.hh_share || 0), 0);
+    if (wSum > 0) return bks.reduce((s, b) => s + (+b.income_monthly || 0) * (+b.hh_share || 0), 0) / wSum;
+    return bks.reduce((s, b) => s + (+b.income_monthly || 0), 0) / bks.length;
+  })();
+  // Full-width affordability-cap hint shown under the tariff target field.
+  const affordCapHint = (capPct?: number) => {
+    if (!capPct || capPct <= 0 || avgHhIncomeMonthly <= 0) return null;
+    const maxBill = capPct * avgHhIncomeMonthly * 12;   // LC/yr per household
+    return (
+      <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b' }}>
+        Caps the tariff so the average household's annual bill stays within <b>{Math.round(capPct * 1000) / 10}%</b> of income
+        — ≈ <b>{Math.round(maxBill).toLocaleString()} {CUR}/yr</b> at the average income of {Math.round(avgHhIncomeMonthly).toLocaleString()} {CUR}/month
+        (from the shared income distribution). Any tariff rise beyond that ceiling earns no extra revenue.
+      </div>
+    );
+  };
+
   // ── Affordability lever (microfinance + means-based grant) helpers ──────────────────────────────
   const miniInput: React.CSSProperties = { width: '100%', padding: '5px 7px', borderRadius: 4, fontSize: 12,
     border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' };
-  const uArr = (section: string, field: string, idx: number, value: number) => {
+  const uArr = (section: string, field: string, idx: number, value: number | undefined) => {
     const arr = [...((inputs[section]?.[field]) || [])];
     arr[idx] = value;
     onChange({ ...inputs, [section]: { ...inputs[section], [field]: arr } });
   };
-  const uBracket = (idx: number, field: string, value: number) => {
+  const uBracket = (idx: number, field: string, value: number | undefined) => {
     const brackets = ((inputs.income_distribution?.brackets) || []).map((b: any, i: number) => i === idx ? { ...b, [field]: value } : b);
     onChange({ ...inputs, income_distribution: { ...(inputs.income_distribution || {}), brackets } });
   };
@@ -222,8 +256,8 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
           {brackets.map((b: any, i: number) => (
             <React.Fragment key={i}>
               <span style={{ color: '#475569' }}>{bracketLabel(i, brackets.length)}</span>
-              <input type="number" value={b.income_monthly ?? ''} onChange={e => uBracket(i, 'income_monthly', parseFloat(e.target.value) || 0)} style={miniInput} />
-              <input type="number" value={Number.isFinite(b.hh_share) ? Math.round((b.hh_share) * 1e4) / 1e2 : ''} onChange={e => uBracket(i, 'hh_share', (parseFloat(e.target.value) || 0) / 100)} style={miniInput} />
+              <NumInput commas value={b.income_monthly ?? undefined} onValue={v => uBracket(i, 'income_monthly', v)} style={miniInput} />
+              <NumInput value={Number.isFinite(b.hh_share) ? Math.round((b.hh_share) * 1e4) / 1e2 : undefined} onValue={v => uBracket(i, 'hh_share', v === undefined ? undefined : v / 100)} style={miniInput} />
             </React.Fragment>
           ))}
         </div>
@@ -308,7 +342,7 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {sectorTab === 'water' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Water Supply Interventions</h3>
 
-          <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_ce')}>
             <F label="Start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />
             <F label="Target year" value={inputs.water_interventions.ce_target_year} onChange={v => u('water_interventions','ce_target_year',v)} tip="Year the target collection ratio is achieved" />
             <F label="Current collection ratio" value={inputs.water_interventions.ce_current_ratio} onChange={v => u('water_interventions','ce_current_ratio',v)} isPercent unit="%" tip="Current revenue collected ÷ revenue billed. Represents how much of what is billed is actually collected." />
@@ -318,7 +352,7 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             <F label="Current tariff" value={inputs.water_interventions.ce_current_tariff} onChange={v => u('water_interventions','ce_current_tariff',v)} unit={`${CUR}/m3`} tip="Current average water tariff per cubic metre" />
           </InterventionToggle>
 
-          <InterventionToggle label="NRW reduction" checked={inputs.toggles?.ws_nrw_enabled ?? false} onChange={v => toggleIntv('ws_nrw_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="NRW reduction" checked={inputs.toggles?.ws_nrw_enabled ?? false} onChange={v => toggleIntv('ws_nrw_enabled', v)} onFocus={() => onSectionFocus?.('ws_nrw')}>
             <F label="Start year" value={inputs.water_interventions.nrw_start_year} onChange={v => u('water_interventions','nrw_start_year',v)} tip="Year the NRW reduction programme begins" />
             <F label="Target year" value={inputs.water_interventions.nrw_target_year} onChange={v => u('water_interventions','nrw_target_year',v)} tip="Year the target NRW level is achieved" />
             <F label="Current NRW %" value={inputs.water_interventions.nrw_current_pct} onChange={v => u('water_interventions','nrw_current_pct',v)} isPercent unit="%" tip="Current non-revenue water: share of water produced that is not billed (physical leaks + commercial losses)" />
@@ -341,10 +375,10 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             <F label="Water per basic→SM upgrade" value={inputs.water_interventions.nrw_water_per_upgrade || 0} onChange={v => u('water_interventions','nrw_water_per_upgrade',v)} step={5} unit="m³/HH/yr" tip="Extra water a basic household needs each year to become safely managed. Recovered physical water ÷ this = households upgraded." />
             <F label="Cost of fixing" value={inputs.water_interventions.nrw_capex_unit_cost_local || 0} onChange={v => u('water_interventions','nrw_capex_unit_cost_local',v)} step={1000} unit={`${CUR}/m³/day`} tip="Capital cost to recover one cubic metre per day of lost water — leak detection, pipe and meter replacement. Charged as the losses are cut." />
             <div style={{ gridColumn: '1 / -1', display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 }}>
-              <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }} title="How to value the recovered water: as tariff revenue from selling it, or as the production cost you no longer have to spend.">Value recovered water at</label>
+              <label style={{ fontSize: 12, color: '#3A4452', fontWeight: 500 }} title="How to value the recovered water: as tariff revenue from sales, or as the production cost you no longer have to spend.">Value recovered water at</label>
               <select value={inputs.water_interventions.nrw_value_basis || 'tariff'} onChange={e => u('water_interventions','nrw_value_basis', e.target.value)}
                 style={{ width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, border: '1px solid #F0D070', background: '#FFF9E6', color: '#3A4452', boxSizing: 'border-box', outline: 'none', fontFamily: 'inherit' }}>
-                <option value="tariff">Water tariff — revenue from selling it</option>
+                <option value="tariff">Water tariff — revenue from sales</option>
                 <option value="production">Cost of production — cost avoided</option>
               </select>
             </div>
@@ -353,7 +387,7 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
               : <F label="Water tariff" value={inputs.water_interventions.nrw_tariff || 0} onChange={v => u('water_interventions','nrw_tariff',v)} step={0.5} unit={`${CUR}/m³`} tip="The recovered water is sold at this price, per cubic metre." />}
           </InterventionToggle>
 
-          <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.ws_capital_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_capital_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.ws_capital_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_capital_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_budget_exec')}>
             <F label="Current budget execution" value={wsCurEff} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Executed budget ÷ allocated budget: the share of the allocated capital budget that actually gets spent on new service (unit cost × new households). Computed from your historical budget rows in Data Inputs → Budget — not editable here." />
             <F label="Target budget execution" value={inputs.water_interventions.capeff_target_pct ?? 1} onChange={v => u('water_interventions','capeff_target_pct',v)} isPercent unit="%" tip="The budget execution rate to reach — at most 100% (spend the whole allocated budget). Raising it lets the same allocated budget build more service and shrinks the financing gap." />
             <F label="Start year" value={inputs.water_interventions.capeff_start_year} onChange={v => u('water_interventions','capeff_start_year',v)} tip="Year the budget-execution improvement begins" />
@@ -363,29 +397,31 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             </div>
           </InterventionToggle>
 
-          <InterventionToggle label="Capex efficiency (unit cost)" checked={inputs.toggles?.ws_costeff_enabled ?? false} onChange={v => toggleIntv('ws_costeff_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Capex efficiency (unit cost)" checked={inputs.toggles?.ws_costeff_enabled ?? false} onChange={v => toggleIntv('ws_costeff_enabled', v)} onFocus={() => onSectionFocus?.('ws_capex_eff')}>
             <F label="Start year" value={inputs.water_interventions.costeff_start_year} onChange={v => u('water_interventions','costeff_start_year',v)} tip="Year the capex-efficiency programme begins. At this year the connection cost still equals BAU; the discount then grows toward the target." />
             <F label="Target year" value={inputs.water_interventions.costeff_target_year} onChange={v => u('water_interventions','costeff_target_year',v)} tip="Year the target capex efficiency is reached; the discount ramps linearly from the start year to here, then holds." />
             <F label="Current capex efficiency" value={inputs.water_interventions.costeff_current_pct} onChange={v => u('water_interventions','costeff_current_pct',v)} isPercent unit="%" tip="Today's capex efficiency (the baseline). At the start year the connection cost is unchanged from BAU; only the improvement above this value discounts the cost." />
             <F label="Target capex efficiency" value={inputs.water_interventions.costeff_target_pct} onChange={v => u('water_interventions','costeff_target_pct',v)} isPercent unit="%" tip="Target capex efficiency. By the target year each new safely-managed connection costs (target − current)% less; held constant after. Cheaper connections let the same budget serve more households." />
             <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b' }}>
-              Discounts the safely-managed connection cost, ramping up from 0 at the start year to <b>{Math.max(0, Math.round(((inputs.water_interventions.costeff_target_pct||0)-(inputs.water_interventions.costeff_current_pct||0))*1000)/10)}%</b> by the target year — so the same budget builds more connections and the financing gap shrinks.
+              Discounts the safely-managed connection cost, ramping up from 0 at the start year to <b>{Math.max(0, Math.round(((inputs.water_interventions.costeff_target_pct||0)-(inputs.water_interventions.costeff_current_pct||0))*1000)/10)}%</b> by the target year.
             </div>
           </InterventionToggle>
 
-          <InterventionToggle label="Optimised technology selection" checked={inputs.toggles?.ws_techmix_enabled ?? false} onChange={v => toggleIntv('ws_techmix_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Optimised technology selection" checked={inputs.toggles?.ws_techmix_enabled ?? false} onChange={v => toggleIntv('ws_techmix_enabled', v)} onFocus={() => onSectionFocus?.('ws_techmix')}>
             <TechMixEditor inputs={inputs} onChange={onChange} section="water_interventions" CUR={CUR} />
           </InterventionToggle>
 
-          <InterventionToggle label="Tariff reform" checked={inputs.toggles?.ws_tariff_enabled ?? false} onChange={v => toggleIntv('ws_tariff_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Tariff reform" checked={inputs.toggles?.ws_tariff_enabled ?? false} onChange={v => toggleIntv('ws_tariff_enabled', v)} onFocus={() => onSectionFocus?.('ws_tariff')}>
             <F label="Start year" value={inputs.water_interventions.tariff_start_year} onChange={v => u('water_interventions','tariff_start_year',v)} tip="Year the tariff starts rising" />
             <F label="Target year" value={inputs.water_interventions.tariff_target_year} onChange={v => u('water_interventions','tariff_target_year',v)} tip="Year the target tariff is reached; it rises linearly from the start year to here, then holds." />
             <F label="Volume sold (at start year)" value={inputs.water_interventions.tariff_volume_mld} onChange={v => u('water_interventions','tariff_volume_mld',v)} unit="MLD" tip="Volume of water sold/billed at the start year, in million litres per day. Grows with population over the forecast." />
             <F label="Current tariff" value={inputs.water_interventions.tariff_current} onChange={v => u('water_interventions','tariff_current',v)} step={0.5} unit={`${CUR}/m3`} tip="Current average water tariff per cubic metre" />
             <F label="Target tariff" value={inputs.water_interventions.tariff_target} onChange={v => u('water_interventions','tariff_target',v)} step={0.5} unit={`${CUR}/m3`} tip="Target average water tariff per cubic metre. The extra revenue (volume × tariff rise) is recycled into capex for new service." />
+            <F label="Affordability cap" value={inputs.water_interventions.tariff_afford_pct} onChange={v => u('water_interventions','tariff_afford_pct',v)} isPercent unit="% of income" tip="Cap the household water bill at this share of average monthly household income. The tariff used to raise revenue is held so that (average per-household billed volume × tariff) never exceeds this % of income. Blank or 0 = no cap. Income is taken from the shared income distribution (see Microfinance)." />
+            {affordCapHint(inputs.water_interventions.tariff_afford_pct)}
           </InterventionToggle>
 
-          <InterventionToggle label="Microfinance" checked={inputs.toggles?.ws_microfinance_enabled ?? false} onChange={v => toggleIntv('ws_microfinance_enabled', v)} onFocus={() => onSectionFocus?.('ws_interventions')}>
+          <InterventionToggle label="Microfinance" checked={inputs.toggles?.ws_microfinance_enabled ?? false} onChange={v => toggleIntv('ws_microfinance_enabled', v)} onFocus={() => onSectionFocus?.('ws_microfinance')}>
             {microfinanceFields('water_interventions')}
           </InterventionToggle>
 
@@ -395,13 +431,13 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {sectorTab === 'sanitation' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Sanitation Interventions</h3>
 
-          <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.san_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('san_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.san_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('san_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_ce')}>
             <F label="Start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />
             <F label="Target year" value={inputs.sanitation_interventions.ce_target_year} onChange={v => u('sanitation_interventions','ce_target_year',v)} tip="Year the target is achieved" />
             <F label="Sewer tariff as % of water tariff" value={inputs.sanitation_interventions.ce_sewer_tariff_pct_water || 0} onChange={v => u('sanitation_interventions','ce_sewer_tariff_pct_water',v)} isPercent unit="%" tip="Sewer tariff expressed as a share of the water tariff. Collection ratios are inherited from water supply." />
           </InterventionToggle>
 
-          <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.san_capital_efficiency_enabled ?? false} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Budget execution improvement" checked={inputs.toggles?.san_capital_efficiency_enabled ?? false} onChange={v => toggleIntv('san_capital_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_budget_exec')}>
             <F label="Current budget execution" value={sanCurEff} onChange={() => {}} fieldType="computed" isPercent unit="%" tip="Executed budget ÷ allocated budget: the share of the allocated capital budget that actually gets spent on new service. Computed from your historical budget rows in Data Inputs → Budget — not editable here." />
             <F label="Target budget execution" value={inputs.sanitation_interventions.capeff_target_pct ?? 1} onChange={v => u('sanitation_interventions','capeff_target_pct',v)} isPercent unit="%" tip="The budget execution rate to reach — at most 100% (spend the whole allocated budget). Raising it lets the same allocated budget build more service." />
             <F label="Start year" value={inputs.sanitation_interventions.capeff_start_year} onChange={v => u('sanitation_interventions','capeff_start_year',v)} tip="Year the budget-execution improvement begins" />
@@ -411,21 +447,21 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             </div>
           </InterventionToggle>
 
-          <InterventionToggle label="Capex efficiency (unit cost)" checked={inputs.toggles?.san_costeff_enabled ?? false} onChange={v => toggleIntv('san_costeff_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Capex efficiency (unit cost)" checked={inputs.toggles?.san_costeff_enabled ?? false} onChange={v => toggleIntv('san_costeff_enabled', v)} onFocus={() => onSectionFocus?.('san_capex_eff')}>
             <F label="Start year" value={inputs.sanitation_interventions.costeff_start_year} onChange={v => u('sanitation_interventions','costeff_start_year',v)} tip="Year the capex-efficiency programme begins. At this year the connection cost still equals BAU; the discount then grows toward the target." />
             <F label="Target year" value={inputs.sanitation_interventions.costeff_target_year} onChange={v => u('sanitation_interventions','costeff_target_year',v)} tip="Year the target capex efficiency is reached; the discount ramps linearly from the start year to here, then holds." />
             <F label="Current capex efficiency" value={inputs.sanitation_interventions.costeff_current_pct} onChange={v => u('sanitation_interventions','costeff_current_pct',v)} isPercent unit="%" tip="Today's capex efficiency (the baseline). At the start year the connection cost is unchanged from BAU; only the improvement above this value discounts the cost." />
             <F label="Target capex efficiency" value={inputs.sanitation_interventions.costeff_target_pct} onChange={v => u('sanitation_interventions','costeff_target_pct',v)} isPercent unit="%" tip="Target capex efficiency. By the target year each new safely-managed connection costs (target − current)% less; held constant after." />
             <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b' }}>
-              Discounts the safely-managed connection cost, ramping up from 0 at the start year to <b>{Math.max(0, Math.round(((inputs.sanitation_interventions.costeff_target_pct||0)-(inputs.sanitation_interventions.costeff_current_pct||0))*1000)/10)}%</b> by the target year — so the same budget builds more connections and the financing gap shrinks.
+              Discounts the safely-managed connection cost, ramping up from 0 at the start year to <b>{Math.max(0, Math.round(((inputs.sanitation_interventions.costeff_target_pct||0)-(inputs.sanitation_interventions.costeff_current_pct||0))*1000)/10)}%</b> by the target year.
             </div>
           </InterventionToggle>
 
-          <InterventionToggle label="Optimised technology selection" checked={inputs.toggles?.san_techmix_enabled ?? false} onChange={v => toggleIntv('san_techmix_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Optimised technology selection" checked={inputs.toggles?.san_techmix_enabled ?? false} onChange={v => toggleIntv('san_techmix_enabled', v)} onFocus={() => onSectionFocus?.('san_techmix')}>
             <TechMixEditor inputs={inputs} onChange={onChange} section="sanitation_interventions" CUR={CUR} />
           </InterventionToggle>
 
-          <InterventionToggle label="NRW-linked sanitation revenue" checked={inputs.toggles?.san_nrw_link_enabled ?? false} onChange={v => toggleIntv('san_nrw_link_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="NRW-linked sanitation revenue" checked={inputs.toggles?.san_nrw_link_enabled ?? false} onChange={v => toggleIntv('san_nrw_link_enabled', v)} onFocus={() => onSectionFocus?.('san_nrw_link')}>
             {(() => {
               const vols: number[] = results?.water_supply?.scenario_nrw_recovered_phys_vol || [];
               const yrs: number[] = results?.years || [];
@@ -452,15 +488,17 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             })()}
           </InterventionToggle>
 
-          <InterventionToggle label="Tariff reform" checked={inputs.toggles?.san_tariff_enabled ?? false} onChange={v => toggleIntv('san_tariff_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Tariff reform" checked={inputs.toggles?.san_tariff_enabled ?? false} onChange={v => toggleIntv('san_tariff_enabled', v)} onFocus={() => onSectionFocus?.('san_tariff')}>
             <F label="Start year" value={inputs.sanitation_interventions.tariff_start_year} onChange={v => u('sanitation_interventions','tariff_start_year',v)} tip="Year the sewer tariff starts rising" />
             <F label="Target year" value={inputs.sanitation_interventions.tariff_target_year} onChange={v => u('sanitation_interventions','tariff_target_year',v)} tip="Year the target sewer tariff is reached; it rises linearly from the start year to here, then holds." />
             <F label="Volume billed (at start year)" value={inputs.sanitation_interventions.tariff_volume_mld} onChange={v => u('sanitation_interventions','tariff_volume_mld',v)} unit="MLD" tip="Volume of wastewater billed at the start year, in million litres per day. Grows with population over the forecast." />
             <F label="Current sewer tariff" value={inputs.sanitation_interventions.tariff_current} onChange={v => u('sanitation_interventions','tariff_current',v)} step={0.5} unit={`${CUR}/m3`} tip="Current average sewer tariff per cubic metre" />
             <F label="Target sewer tariff" value={inputs.sanitation_interventions.tariff_target} onChange={v => u('sanitation_interventions','tariff_target',v)} step={0.5} unit={`${CUR}/m3`} tip="Target average sewer tariff per cubic metre. The extra revenue (volume × tariff rise) is recycled into capex for new service." />
+            <F label="Affordability cap" value={inputs.sanitation_interventions.tariff_afford_pct} onChange={v => u('sanitation_interventions','tariff_afford_pct',v)} isPercent unit="% of income" tip="Cap the household sewer bill at this share of average monthly household income. The sewer tariff used to raise revenue is held so that (average per-household billed volume × tariff) never exceeds this % of income. Blank or 0 = no cap. Income is taken from the shared income distribution (see Microfinance)." />
+            {affordCapHint(inputs.sanitation_interventions.tariff_afford_pct)}
           </InterventionToggle>
 
-          <InterventionToggle label="Microfinance" checked={inputs.toggles?.san_microfinance_enabled ?? false} onChange={v => toggleIntv('san_microfinance_enabled', v)} onFocus={() => onSectionFocus?.('san_interventions')}>
+          <InterventionToggle label="Microfinance" checked={inputs.toggles?.san_microfinance_enabled ?? false} onChange={v => toggleIntv('san_microfinance_enabled', v)} onFocus={() => onSectionFocus?.('san_microfinance')}>
             {microfinanceFields('sanitation_interventions')}
           </InterventionToggle>
         </>}

@@ -1,5 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { downloadTemplate, importTemplate } from '../api';
+import NumInput from './NumInput';
 
 // Explains why sanitation's safely-managed and basic rungs share ONE technology mix: the JMP service
 // level is set by service attributes (sharing, emptying, treatment), not the technology. Shown under
@@ -172,21 +173,27 @@ function F({ label, value, onChange, unit, step, isPercent, min, max, tip, slide
           fontStyle: 'italic', fontFamily: 'Georgia, serif', fontWeight: 700,
         }} title={tooltip}>i</span>}
       </label>
-      <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
-        value={useCommas ? commaStr : displayVal}
-        onChange={e => { const v = parseFloat(e.target.value.replace(/,/g, '')); if (!isNaN(v)) onChange(isPercent ? v / 100 : v); }}
-        step={isPercent ? 1 : (step || 1)}
-        min={useCommas ? undefined : displayMin} max={useCommas ? undefined : displayMax}
-        style={{
-          width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
-          border: outOfRange ? '1.5px solid #E74C3C' : isDerived ? '1px solid #DDE3EA' : '1px solid #F0D070',
-          background: outOfRange ? '#FFE9E9' : isDerived ? '#F1F3F5' : '#FFF9E6',
-          color: isDerived ? '#6B7785' : '#3A4452',
-          cursor: isDerived ? 'not-allowed' : 'text',
-          boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
-        }}
-        readOnly={isDerived}
-      />
+      {isDerived ? (
+        <input type={useCommas ? 'text' : 'number'} inputMode="decimal"
+          value={useCommas ? commaStr : displayVal} readOnly
+          style={{
+            width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+            border: '1px solid #DDE3EA', background: '#F1F3F5', color: '#6B7785',
+            cursor: 'not-allowed', boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
+          }} />
+      ) : (
+        <NumInput
+          value={Number.isNaN(displayVal) ? undefined : displayVal} commas={useCommas}
+          // Empty cell → NaN in the model (serialises to null → engine reads 0). Lets the user clear/retype.
+          onValue={v => onChange(v === undefined ? (NaN as number) : (isPercent ? v / 100 : v))}
+          style={{
+            width: '100%', padding: '7px 10px', borderRadius: 4, fontSize: 13, textAlign: 'left',
+            border: outOfRange ? '1.5px solid #E74C3C' : '1px solid #F0D070',
+            background: outOfRange ? '#FFE9E9' : '#FFF9E6',
+            color: '#3A4452', cursor: 'text',
+            boxSizing: 'border-box', fontFamily: 'inherit', outline: 'none',
+          }} />
+      )}
       {unit && <span style={{ fontSize: 11, color: '#6B7785' }}>{unit}</span>}
       {showSlider && (
         <input type="range" value={displayVal}
@@ -333,10 +340,12 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
               <tr key={i}>
                 <td><input type="text" style={{ ...cellStyle, width: 188 }} value={t.name || ''}
                   onChange={e => upd(i, { name: e.target.value })} /></td>
-                <td><input type="number" style={{ ...cellStyle, width: 62 }} value={Math.round((+t.share || 0) * 1e6) / 1e4}
-                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { share: v / 100 }); }} /></td>
-                <td><input type="number" style={{ ...cellStyle, width: 96 }} value={Math.round(+t.cost || 0)}
-                  onChange={e => { const v = parseFloat(e.target.value); if (!isNaN(v)) upd(i, { cost: v }); }} /></td>
+                <td><NumInput style={{ ...cellStyle, width: 62 }}
+                  value={(t.share == null || Number.isNaN(+t.share)) ? undefined : Math.round((+t.share) * 1e6) / 1e4}
+                  onValue={v => upd(i, { share: v === undefined ? undefined : v / 100 })} /></td>
+                <td><NumInput style={{ ...cellStyle, width: 96 }} commas
+                  value={(t.cost == null || Number.isNaN(+t.cost)) ? undefined : Math.round(+t.cost)}
+                  onValue={v => upd(i, { cost: v })} /></td>
                 <td><button onClick={() => { if (m.length > 1) setCostMix(section, mixKey, engineField, m.filter((_: any, j: number) => j !== i)); }}
                   style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 3, padding: '2px 7px', cursor: 'pointer', fontSize: 10 }}>✕</button></td>
               </tr>
@@ -559,22 +568,23 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             return Array.isArray(a) && idx < a.length && a[idx] != null ? a[idx] : null;
           };
           // Write a value into inputs[section][field][idx] (macro / a named section / bau), growing the array.
-          const writeCell = (section: string, field: string, idx: number, raw: string, isPct: boolean) => {
-            const v = parseFloat(raw);
+          // Write a numeric value (already in model units) into inputs[section][field][idx], growing the array.
+          const writeCellNum = (section: string, field: string, idx: number, value: number) => {
             const src = section === 'macro' ? inputs.macro : inputs[section];
             const a = [...((src?.[field]) || [])];
             while (a.length <= idx) a.push(0);
-            a[idx] = isNaN(v) ? 0 : (isPct ? v / 100 : v);
+            a[idx] = value;
             onChange(section === 'macro' ? { ...inputs, macro: { ...inputs.macro, [field]: a } }
                                          : { ...inputs, [section]: { ...inputs[section], [field]: a } });
           };
           // An editable series cell. `forecast` colours it blue; `emptyZero` shows a blank (not 0) when unset,
-          // so the user can see which forecast cells are empty (and will auto-fill at mean growth).
+          // so the user can see which forecast cells are empty (and will auto-fill at mean growth). Cells use
+          // a text buffer (NumInput) so a cell can be cleared / the last digit deleted; a cleared cell reads 0.
           const editCell = (section: string, field: string, idx: number, isPct: boolean, forecast: boolean, emptyZero = false) => {
             const val = (((section === 'macro' ? inputs.macro : inputs[section])?.[field]) || [])[idx] ?? 0;
-            const disp = (emptyZero && !(val > 0)) ? '' : (isPct ? Math.round(val * 10000) / 100 : Math.round(val * 100) / 100);
-            return <input type="number" value={disp}
-              onChange={e => writeCell(section, field, idx, e.target.value, isPct)}
+            const disp = (emptyZero && !(val > 0)) ? undefined : (isPct ? Math.round(val * 10000) / 100 : Math.round(val * 100) / 100);
+            return <NumInput value={disp}
+              onValue={v => writeCellNum(section, field, idx, v === undefined ? 0 : (isPct ? v / 100 : v))}
               style={{ ...inputBase, ...(forecast ? BLUE : CREAM) }} />;
           };
           // A grey "auto-fill" row: the value the model actually uses each year (the user's own entries,
@@ -589,10 +599,10 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             const ov = (inputs.bau?.[ovField] || [])[idx] ?? 0;
             const forecast = years[idx] > baseYr2;
             const computed = secRes(sector, placeholderField, idx);
-            return <input type="number" value={ov > 0 ? Math.round(ov * 100) / 100 : ''}
+            return <NumInput value={ov > 0 ? Math.round(ov * 100) / 100 : undefined} commas
               placeholder={computed != null ? String(Math.round(computed)) : ''}
               title={ov > 0 ? 'Your override for this year' : 'Model-computed value — type to override'}
-              onChange={e => { const v = parseFloat(e.target.value); const a = [...(inputs.bau?.[ovField] || [])]; while (a.length <= idx) a.push(0); a[idx] = isNaN(v) ? 0 : v; onChange({ ...inputs, bau: { ...inputs.bau, [ovField]: a } }); }}
+              onValue={v => { const a = [...(inputs.bau?.[ovField] || [])]; while (a.length <= idx) a.push(0); a[idx] = v === undefined ? 0 : v; onChange({ ...inputs, bau: { ...inputs.bau, [ovField]: a } }); }}
               style={{ ...inputBase, width: 64, ...(forecast ? BLUE : CREAM) }} />;
           };
 

@@ -330,7 +330,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
   // CSV of the data table (forecast years).
   const exportCsv = () => {
     if (!tableRows.length) return;
-    const header = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Households in gap (M)'];
+    const header = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Service Gap (M if HH)'];
     if (showMoney) header.push('Financing gap (B ' + (endAnno?.cur || 'LCU') + '/yr)');
     const lines = [header.join(',')];
     tableRows.forEach((r: any) => {
@@ -636,7 +636,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, width: '100%' }}>
               <thead>
                 <tr style={{ background: '#f1f5f9', color: '#334155' }}>
-                  {['Year', 'Total households (M)', `${rungNameRaw} — BAU (M)`, 'Target (M)', 'Households in gap (M)', ...(showMoney ? [`Financing gap (B ${endAnno?.cur || 'LCU'}/yr)`] : [])].map((h, i) => (
+                  {['Year', 'Total households (M)', `${rungNameRaw} — BAU (M)`, 'Target (M)', 'Service Gap (M if HH)', ...(showMoney ? [`Financing gap (B ${endAnno?.cur || 'LCU'}/yr)`] : [])].map((h, i) => (
                     <th key={i} style={{ padding: '5px 10px', textAlign: i === 0 ? 'left' : 'right', fontWeight: 700, whiteSpace: 'nowrap', position: i === 0 ? 'sticky' : undefined, left: i === 0 ? 0 : undefined, background: '#f1f5f9' }}>{h}</th>
                   ))}
                 </tr>
