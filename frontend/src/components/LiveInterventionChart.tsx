@@ -11,24 +11,27 @@ import {
  * interventions deliver, and the top of the stack is the full with-intervention scenario. Replaces the
  * old synthetic StaticCharts.InterventionImpactChart.
  */
+import { C, INTV_PALETTE as P } from '../chartColors';
+
 type Intv = [key: string, label: string, color: string];   // toggle key, legend label, band colour
+// Band palette excludes blue (BAU) and green (target) so those meanings stay reserved (see chartColors).
 const WATER_INTV: Intv[] = [
-  ['ws_collection_efficiency_enabled', 'Collection efficiency', '#0891b2'],
-  ['ws_capital_efficiency_enabled', 'Budget execution', '#16a34a'],
-  ['ws_costeff_enabled', 'Capex efficiency', '#7c3aed'],
-  ['ws_techmix_enabled', 'Optimised technology', '#0d9488'],
-  ['ws_nrw_enabled', 'NRW reduction', '#2563eb'],
-  ['ws_tariff_enabled', 'Tariff reform', '#d97706'],
-  ['ws_microfinance_enabled', 'Microfinance', '#db2777'],
+  ['ws_collection_efficiency_enabled', 'Collection efficiency', P.collection],
+  ['ws_capital_efficiency_enabled', 'Budget execution', P.budgetExec],
+  ['ws_costeff_enabled', 'Capex efficiency', P.capex],
+  ['ws_techmix_enabled', 'Optimised technology', P.techmix],
+  ['ws_nrw_enabled', 'NRW reduction', P.nrw],
+  ['ws_tariff_enabled', 'Tariff reform', P.tariff],
+  ['ws_microfinance_enabled', 'Microfinance', P.microfinance],
 ];
 const SAN_INTV: Intv[] = [
-  ['san_collection_efficiency_enabled', 'Collection efficiency', '#0891b2'],
-  ['san_capital_efficiency_enabled', 'Budget execution', '#16a34a'],
-  ['san_costeff_enabled', 'Capex efficiency', '#7c3aed'],
-  ['san_techmix_enabled', 'Optimised technology', '#0d9488'],
-  ['san_nrw_link_enabled', 'NRW-linked revenue', '#0369a1'],
-  ['san_tariff_enabled', 'Tariff reform', '#d97706'],
-  ['san_microfinance_enabled', 'Microfinance', '#db2777'],
+  ['san_collection_efficiency_enabled', 'Collection efficiency', P.collection],
+  ['san_capital_efficiency_enabled', 'Budget execution', P.budgetExec],
+  ['san_costeff_enabled', 'Capex efficiency', P.capex],
+  ['san_techmix_enabled', 'Optimised technology', P.techmix],
+  ['san_nrw_link_enabled', 'NRW-linked revenue', P.nrw],
+  ['san_tariff_enabled', 'Tariff reform', P.tariff],
+  ['san_microfinance_enabled', 'Microfinance', P.microfinance],
 ];
 
 const zeroToggles = (t: any) => Object.fromEntries(Object.keys(t || {}).map(k => [k, false]));
@@ -76,7 +79,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
         let label = ((c.name || '').trim()) || `Custom ${i + 1}`;
         while (seen.has(label)) label += ' ';
         seen.add(label);
-        bandDefs.push([`custom_${i}`, label, c.color || '#9333ea']);
+        bandDefs.push([`custom_${i}`, label, c.color || P.custom]);
       });
       Promise.all(payloads.map(post)).then(results => {
         const years: number[] = results[0].years;
@@ -117,12 +120,12 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
       <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
         {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
       </h3>
-      <div style={{ fontSize: 10, color: '#065f46', background: '#d1fae5', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Live engine output. The grey base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra households an enabled intervention delivers.
+      <div style={{ fontSize: 10, color: '#334155', background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
+        Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra households an enabled intervention delivers.
       </div>
       {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       {summary && (
-        <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #16a34a', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 10 }}>
+        <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `3px solid ${C.scenario}`, borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 10 }}>
           <b>Impact.</b> By {summary.endline}, the enabled interventions serve <b>{sig(summary.addHH)} M</b> more safely-managed households and cut the cumulative financing gap from <b>{sig(summary.gapBau)}</b> to <b>{sig(summary.gapIntv)} M {summary.cur}</b>
           {summary.gapBau > 0 && <> (a <b>{Math.round((1 - summary.gapIntv / summary.gapBau) * 100)}%</b> reduction)</>}.
         </div>
@@ -137,12 +140,12 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
           <Tooltip formatter={(v: any) => sig(+v) + ' M'} contentStyle={{ fontSize: 11 }} />
           <Legend wrapperStyle={{ fontSize: 10 }} />
           {/* Grey BAU base, then one stacked band per contributing intervention. Animated transitions. */}
-          <Area type="monotone" dataKey="BAU (safely managed)" stackId="s" fill="#cbd5e1" stroke="#94a3b8" fillOpacity={0.6} strokeWidth={1.5} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
+          <Area type="monotone" dataKey="BAU (safely managed)" stackId="s" fill={C.bauFill} stroke={C.bau} fillOpacity={0.7} strokeWidth={1.5} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           {bands.map(([k, label, color]) => (
             <Area key={k} type="monotone" dataKey={label} stackId="s" fill={color} stroke={color} fillOpacity={0.55} strokeWidth={1} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           ))}
           {/* Total households — the coverage ceiling, drawn on top (not stacked). */}
-          <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="6 4" dot={false} legendType="plainline" isAnimationActive animationDuration={600} />
+          <Line type="monotone" dataKey="Total households" stroke={C.total} strokeWidth={1.5} strokeDasharray="6 4" dot={false} legendType="plainline" isAnimationActive animationDuration={600} />
         </ComposedChart>
       </ResponsiveContainer>
     </div>

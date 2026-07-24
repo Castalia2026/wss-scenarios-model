@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
+import { C } from '../chartColors';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
 function round3(v: number): number { return (!isFinite(v) || v === 0) ? 0 : Number(v.toPrecision(3)); }
@@ -285,9 +286,9 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
                 <tr key={label} style={{ background: i % 2 ? '#f1f8fd' : '#fff' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#334155', fontWeight: 600 }}>{label}</td>
                   <td style={{ ...td, color: '#475569' }}>{pct(s.curCov)}</td>
-                  <td style={{ ...td, color: '#2563eb' }}>{pct(s.bauCov)}</td>
-                  <td style={{ ...td, color: '#16a34a' }}>{pct(s.tgtCov)}</td>
-                  <td style={{ ...td, color: '#ea580c', fontWeight: 700 }}>{pct(s.scnCov)}</td>
+                  <td style={{ ...td, color: C.bau }}>{pct(s.bauCov)}</td>
+                  <td style={{ ...td, color: C.target }}>{pct(s.tgtCov)}</td>
+                  <td style={{ ...td, color: C.scenario, fontWeight: 700 }}>{pct(s.scnCov)}</td>
                 </tr>
               ))}
             </tbody>
@@ -357,16 +358,16 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const s = secKey === 'water' ? both.water : both.sanitation;
     const label = secKey === 'water' ? 'Water Supply' : 'Sanitation';
     const covRows = isShare ? asShare(s.cov) : s.cov;
-    // Tool-wide colour convention: BLUE = BAU, GREEN = target, ORANGE = with interventions.
+    // Tool-wide colour convention (see chartColors): BLUE = BAU, GREEN = target, ORANGE = with interventions.
     const covLines = [
-      { key: 'bau', name: 'BAU', color: '#2563eb', width: 2 },
-      { key: 'scn', name: 'With interventions', color: '#ea580c', width: 2.5 },
-      { key: 'tgt', name: 'Target', color: '#16a34a', dash: '6 3', width: 2 },
-      { key: 'total', name: 'Total households', color: '#6b7280', dash: '8 4', width: 1.5 },
+      { key: 'bau', name: 'BAU', color: C.bau, width: 2 },
+      { key: 'scn', name: 'With interventions', color: C.scenario, width: 2.5 },
+      { key: 'tgt', name: 'Target', color: C.target, dash: '6 3', width: 2 },
+      { key: 'total', name: 'Total households', color: C.total, dash: '8 4', width: 1.5 },
     ];
     const gapLines = [
-      { key: 'bauGap', name: 'BAU financing gap', color: '#2563eb', width: 2.5 },
-      { key: 'scnGap', name: 'With interventions', color: '#ea580c', width: 2.5 },
+      { key: 'bauGap', name: 'BAU financing gap', color: C.bau, width: 2.5 },
+      { key: 'scnGap', name: 'With interventions', color: C.scenario, width: 2.5 },
     ];
     const noFan = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
     const rows = secKey === 'water' ? table?.water : table?.sanitation;
@@ -388,10 +389,10 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
           <FanChart title={`${label} — safely-managed coverage`} subtitle="Blue = BAU · orange = with interventions · green = target"
             data={covRows} yLabel={isShare ? '% of population' : '# households (millions)'}
-            fanFill="#fdba74" fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+            fanFill={C.scenarioFill} fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
           <FanChart title={`${label} — annual financing gap`} subtitle="Blue = BAU · orange = with interventions"
             data={s.gap} yLabel={`Financing gap (B ${cur}/yr)`}
-            fanFill="#fdba74" fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
+            fanFill={C.scenarioFill} fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
         </div>
         {rows && rows.length > 0 && (
           <div style={{ marginTop: 8 }}>
