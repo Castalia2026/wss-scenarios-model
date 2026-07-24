@@ -3,6 +3,7 @@ import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 import { C } from '../chartColors';
+import ExportButtons from './ExportButtons';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
 function round3(v: number): number { return (!isFinite(v) || v === 0) ? 0 : Number(v.toPrecision(3)); }
@@ -359,11 +360,13 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const label = secKey === 'water' ? 'Water Supply' : 'Sanitation';
     const covRows = isShare ? asShare(s.cov) : s.cov;
     // Tool-wide colour convention (see chartColors): BLUE = BAU, GREEN = target, ORANGE = with interventions.
+    // Order matters — later lines draw on top. Total (grey ceiling) first, then BAU, interventions, and
+    // Target LAST so the green target line is never hidden behind the grey ceiling where they coincide.
     const covLines = [
+      { key: 'total', name: 'Total households', color: C.total, dash: '8 4', width: 1.25 },
       { key: 'bau', name: 'BAU', color: C.bau, width: 2 },
       { key: 'scn', name: 'With interventions', color: C.scenario, width: 2.5 },
       { key: 'tgt', name: 'Target', color: C.target, dash: '6 3', width: 2 },
-      { key: 'total', name: 'Total households', color: C.total, dash: '8 4', width: 1.5 },
     ];
     const gapLines = [
       { key: 'bauGap', name: 'BAU financing gap', color: C.bau, width: 2.5 },
@@ -389,10 +392,10 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
           <FanChart title={`${label} — safely-managed coverage`} subtitle="Blue = BAU · orange = with interventions · green = target"
             data={covRows} yLabel={isShare ? '% of population' : '# households (millions)'}
-            fanFill={C.scenarioFill} fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+            fanFill={C.range} fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
           <FanChart title={`${label} — annual financing gap`} subtitle="Blue = BAU · orange = with interventions"
             data={s.gap} yLabel={`Financing gap (B ${cur}/yr)`}
-            fanFill={C.scenarioFill} fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
+            fanFill={C.range} fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
         </div>
         {rows && rows.length > 0 && (
           <div style={{ marginTop: 8 }}>
@@ -456,6 +459,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               }}>{l}</button>
             ))}
           </div>
+          <ExportButtons inputs={inputs} />
         </div>
       </div>
 

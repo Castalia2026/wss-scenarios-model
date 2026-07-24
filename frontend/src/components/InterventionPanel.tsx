@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import LiveInterventionChart from './LiveInterventionChart';
 import NumInput from './NumInput';
+import ExportButtons from './ExportButtons';
 
 function Section({ title, children, defaultOpen = false, sectionKey, onFocus }: { title: string; children: React.ReactNode; defaultOpen?: boolean; sectionKey?: string; onFocus?: (key: string) => void }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -209,9 +210,9 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
       <div style={{ gridColumn: '1 / -1', fontSize: 10, color: '#64748b', marginBottom: 2 }}>
         A loan lets <b>gap households</b> — those without safely-managed {svc} service — finance the cost of gaining service and repay it over time.
       </div>
-      <F label="Loan amount" value={iv.mf_connection_fee || undefined} onChange={v => u(section, 'mf_connection_fee', v)} step={1000} unit={CUR}
+      <F label="Connection fee" value={iv.mf_connection_fee || undefined} onChange={v => u(section, 'mf_connection_fee', v)} step={1000} unit={CUR}
          placeholder="per-household service cost"
-         tip="Loan principal per household — the capital cost of providing one household with safely-managed service, financed by the loan. Starts blank; enter the amount." />
+         tip="Connection fee per household — the capital cost of providing one household with safely-managed service, financed by the loan. Starts blank; enter the amount." />
       <F label="Start year" value={iv.mf_start_year} onChange={v => u(section, 'mf_start_year', v)} tip="Year the microfinance scheme begins." />
       <F label="End year" value={iv.mf_end_year} onChange={v => u(section, 'mf_end_year', v)} tip="Last year new microfinance-financed service is added." />
       {/* Self-finance carve-out — isolates the BAU-anyway service so microfinance isn't credited for it */}
@@ -582,6 +583,9 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
 
       {/* Right: LIVE intervention impact chart (two-pass BAU vs intervention) for the area being edited. */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: '#fff', borderLeft: '1px solid #e2e8f0' }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
+          <ExportButtons inputs={inputs} />
+        </div>
         <LiveInterventionChart inputs={inputs} sector={sectorTab} scopeLabel={scopeLabel} />
       </div>
     </div>

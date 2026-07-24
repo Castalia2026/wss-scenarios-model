@@ -894,7 +894,7 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
   },
   ws_nrw: {
     title: 'Water · NRW reduction',
-    content: "Cuts non-revenue water from its current level toward a target. Set the target at the economically optimal level of NRW — the point where the cost of further reduction outweighs the benefit; ~20% is a typical benchmark (chasing very low NRW rarely pays off). Allow a few years' lag before benefits appear. Only the physical (leak) share of NRW frees up deliverable water, which upgrades basic households to a safely-managed connection; the commercial share counts toward revenue only. Split NRW into commercial vs physical losses (they must total 100%). Value the recovered water either as tariff revenue from sales or as avoided production cost; the value net of the fixing capex flows into the budget.",
+    content: "Cuts non-revenue water from its current level toward a target. Set the target at the economically optimal level of NRW — the point where the cost of further reduction outweighs the benefit; ~20% is a typical benchmark (chasing very low NRW rarely pays off). Allow a few years' lag before benefits appear. Only the physical (leak) share of NRW frees up deliverable water, which upgrades basic households to safely-managed service; the commercial share counts toward revenue only. Split NRW into commercial vs physical losses (they must total 100%). Value the recovered water either as tariff revenue from sales or as avoided production cost; the value net of the fixing capex flows into the budget.",
   },
   ws_budget_exec: {
     title: 'Water · Budget execution improvement',
