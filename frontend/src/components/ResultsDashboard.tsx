@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  Area, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
+  Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
@@ -95,7 +95,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
   const [both, setBoth] = useState<Both>(null);
   const [table, setTable] = useState<{ water: Row[]; sanitation: Row[] } | null>(null);
-  const [hhForecast, setHhForecast] = useState<{ year: number; total: number }[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Datasets for the chosen scope (national = urban + rural summed, when rural data exists).
@@ -172,7 +171,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
           } };
         };
         setBoth({ water: build('water_supply'), sanitation: build('sanitation') });
-        setHhForecast(years.map((y, i) => ({ year: y, total: +(totalHH[i] || 0).toFixed(4) })));
         setError(null);
       }).catch(e => setError(String(e)));
     }, 350);
@@ -238,7 +236,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
     const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
     return (
-      <div style={{ margin: '2px 0 4px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+      <div style={{ margin: '2px 0 4px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 680 }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
           <thead>
             <tr>
@@ -266,28 +264,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     );
   };
 
-  // ── Slide 6: Households forecast (total HHs over the model window) ──────────────────────────────
-  const HouseholdsForecast = () => {
-    if (!hhForecast || !hhForecast.length) return null;
-    return (
-      <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', marginBottom: 1 }}>Households forecast — {scopeName}</div>
-        <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>Total households across the model window (historical → forecast).</div>
-        <ResponsiveContainer width="100%" height={220}>
-          <ComposedChart data={hhForecast} margin={{ top: 8, right: 24, bottom: 5, left: 12 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => sig3(v)}>
-              <Label value="millions of HHs" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
-            </YAxis>
-            <Tooltip formatter={(v: any) => sig3(+v) + ' M'} contentStyle={{ fontSize: 11 }} />
-            <Bar dataKey="total" name="Total households" fill="#60a5fa" isAnimationActive={false} />
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  };
-
   // ── Table 9: Executive summary — SM coverage now vs BAU / target / with-reforms at the endline ──
   const ExecSummary = () => {
     if (!both) return null;
@@ -298,7 +274,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     return (
       <div style={{ marginBottom: 18 }}>
         <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>Executive summary — safely-managed coverage (% of households)</div>
-        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
+        <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 720 }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 460 }}>
             <thead><tr>
               <th style={{ ...th, textAlign: 'left' }}>Sector · {scopeName}</th>
@@ -309,9 +285,9 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
                 <tr key={label} style={{ background: i % 2 ? '#f1f8fd' : '#fff' }}>
                   <td style={{ ...td, textAlign: 'left', color: '#334155', fontWeight: 600 }}>{label}</td>
                   <td style={{ ...td, color: '#475569' }}>{pct(s.curCov)}</td>
-                  <td style={{ ...td, color: '#94a3b8' }}>{pct(s.bauCov)}</td>
+                  <td style={{ ...td, color: '#2563eb' }}>{pct(s.bauCov)}</td>
                   <td style={{ ...td, color: '#16a34a' }}>{pct(s.tgtCov)}</td>
-                  <td style={{ ...td, color: '#0369a1', fontWeight: 700 }}>{pct(s.scnCov)}</td>
+                  <td style={{ ...td, color: '#ea580c', fontWeight: 700 }}>{pct(s.scnCov)}</td>
                 </tr>
               ))}
             </tbody>
@@ -352,8 +328,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const td: React.CSSProperties = { padding: '5px 10px', fontSize: 11, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
     const avg = (unit.sm + unit.basic) / 2;
     const rows: [string, number][] = [
-      ['Safely-managed connection', unit.sm],
-      ['Basic connection', unit.basic],
+      ['Safely-managed service', unit.sm],
+      ['Basic service', unit.basic],
       ['Average capex per HH', avg],
     ];
     return (
@@ -371,7 +347,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             </tbody>
           </table>
         </div>
-        <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 2 }}>Unit costs shown for the primary dataset ({scopeName === 'National' ? 'urban' : scopeName.toLowerCase()}).</div>
+        <div style={{ fontSize: 9.5, color: '#94a3b8', marginTop: 2 }}>Unit costs shown for the selected geographic scope ({scopeName}).</div>
       </div>
     );
   };
@@ -381,15 +357,16 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const s = secKey === 'water' ? both.water : both.sanitation;
     const label = secKey === 'water' ? 'Water Supply' : 'Sanitation';
     const covRows = isShare ? asShare(s.cov) : s.cov;
+    // Tool-wide colour convention: BLUE = BAU, GREEN = target, ORANGE = with interventions.
     const covLines = [
-      { key: 'bau', name: 'BAU', color: '#94a3b8', width: 2 },
-      { key: 'scn', name: 'With interventions', color: '#0ea5e9', width: 2.5 },
+      { key: 'bau', name: 'BAU', color: '#2563eb', width: 2 },
+      { key: 'scn', name: 'With interventions', color: '#ea580c', width: 2.5 },
       { key: 'tgt', name: 'Target', color: '#16a34a', dash: '6 3', width: 2 },
       { key: 'total', name: 'Total households', color: '#6b7280', dash: '8 4', width: 1.5 },
     ];
     const gapLines = [
-      { key: 'bauGap', name: 'BAU financing gap', color: '#ef4444', width: 2.5 },
-      { key: 'scnGap', name: 'With interventions', color: '#16a34a', width: 2.5 },
+      { key: 'bauGap', name: 'BAU financing gap', color: '#2563eb', width: 2.5 },
+      { key: 'scnGap', name: 'With interventions', color: '#ea580c', width: 2.5 },
     ];
     const noFan = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
     const rows = secKey === 'water' ? table?.water : table?.sanitation;
@@ -409,12 +386,12 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
-          <FanChart title={`${label} — safely-managed coverage`} subtitle="Fan = BAU → with-interventions; green = target"
+          <FanChart title={`${label} — safely-managed coverage`} subtitle="Blue = BAU · orange = with interventions · green = target"
             data={covRows} yLabel={isShare ? '% of population' : '# households (millions)'}
-            fanFill="#7dd3fc" fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
-          <FanChart title={`${label} — annual financing gap`} subtitle="Fan = the gap closed by the interventions"
+            fanFill="#fdba74" fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+          <FanChart title={`${label} — annual financing gap`} subtitle="Blue = BAU · orange = with interventions"
             data={s.gap} yLabel={`Financing gap (B ${cur}/yr)`}
-            fanFill="#fca5a5" fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
+            fanFill="#fdba74" fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
         </div>
         {rows && rows.length > 0 && (
           <div style={{ marginTop: 8 }}>
@@ -496,11 +473,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
       {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       {!both && !error && <div style={{ fontSize: 12, color: '#64748b', padding: '20px 0' }}>Computing…</div>}
 
-      {/* Presentation-style summary: households forecast (slide 6) + executive summary (table 9). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 20, alignItems: 'start' }}>
-        <HouseholdsForecast />
-        <ExecSummary />
-      </div>
+      {/* Executive summary (table 9) — headline coverage, results-first. */}
+      <ExecSummary />
 
       {sectorBlock('water')}
       {sectorBlock('sanitation')}
@@ -508,7 +482,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: -6, marginBottom: 16 }}>
         Table: “Resources generated” is the finance each lever mobilises (revenue collected, tariff income, recovered-water
         value, sewer revenue, or loans) — cost-side and budget-execution levers show “—” as they stretch existing budget
-        rather than raise new money. “Added HHs” is each lever’s marginal safely-managed connections. Custom interventions
+        rather than raise new money. “Added HHs” is each lever’s marginal safely-managed service. Custom interventions
         feed the fan charts but are not itemised here.
       </div>
 
