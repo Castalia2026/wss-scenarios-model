@@ -4,6 +4,7 @@ import {
   Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, LabelList,
 } from 'recharts';
 import { toPng } from 'html-to-image';
+import { C } from '../chartColors';
 
 /**
  * BAU vs Target chart driven by the LIVE calculation engine (validated cell-by-cell against the
@@ -386,8 +387,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
     return (
       <g>
         {/* endpoints on the two lines */}
-        <circle cx={x} cy={yBau} r={3} fill="#0ea5e9" stroke="#fff" strokeWidth={1} />
-        <circle cx={x} cy={yTgt} r={3} fill="#16a34a" stroke="#fff" strokeWidth={1} />
+        <circle cx={x} cy={yBau} r={3} fill={C.bau} stroke="#fff" strokeWidth={1} />
+        <circle cx={x} cy={yTgt} r={3} fill={C.target} stroke="#fff" strokeWidth={1} />
         {/* vertical double-arrow bracket */}
         <line x1={bx} y1={yTop} x2={bx} y2={yBot} stroke="#b91c1c" strokeWidth={2} />
         <line x1={bx - tick} y1={yTop} x2={bx + tick} y2={yTop} stroke="#b91c1c" strokeWidth={2} />
@@ -597,17 +598,17 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
               labelFormatter={(label: any) => (per0.baseline_year != null && label === per0.baseline_year) ? `${label} — last historical year` : String(label)}
               contentStyle={{ fontSize: 11 }} />
             <Legend wrapperStyle={{ fontSize: 10 }} />
-            <Area type="monotone" dataKey={bauKey} fill={rung === 0 ? '#7dd3fc' : '#fcd34d'} stroke={rung === 0 ? '#0ea5e9' : '#f59e0b'} fillOpacity={0.55} dot={showDots ? { r: 1.8 } : false} legendType="rect" isAnimationActive={false}>
+            <Area type="monotone" dataKey={bauKey} fill={C.bauFill} stroke={C.bau} fillOpacity={0.55} dot={showDots ? { r: 1.8 } : false} legendType="rect" isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Area>
-            <Line type="monotone" dataKey="Total households" stroke="#6b7280" strokeWidth={2.5} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="8 4" isAnimationActive={false} />
+            <Line type="monotone" dataKey="Total households" stroke={C.total} strokeWidth={2.5} dot={showDots ? { r: 1.8 } : false} legendType="plainline" strokeDasharray="8 4" isAnimationActive={false} />
             {/* Target trajectory: one solid line across all years */}
-            <Line type="monotone" dataKey={tgtKey} stroke="#16a34a" strokeWidth={3} dot={showDots ? { r: 1.8 } : false} legendType="plainline" connectNulls={false} isAnimationActive={false}>
+            <Line type="monotone" dataKey={tgtKey} stroke={C.target} strokeWidth={3} dot={showDots ? { r: 1.8 } : false} legendType="plainline" connectNulls={false} isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Line>
             {/* Horizontal reference line at each target's safely-managed level */}
             {targetLines.map((t, i) => (
-              <ReferenceLine key={i} y={isShare ? t.yShare : t.y} stroke="#16a34a" strokeDasharray="2 4" ifOverflow="extendDomain"
+              <ReferenceLine key={i} y={isShare ? t.yShare : t.y} stroke={C.target} strokeDasharray="2 4" ifOverflow="extendDomain"
                 label={{ value: t.label, position: 'right', fontSize: 9, fill: '#15803d' }} />
             ))}
           </ComposedChart>
@@ -646,7 +647,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
                   <tr key={r.year} style={{ background: ri % 2 ? '#fafbfc' : '#fff' }}>
                     <td style={{ padding: '4px 10px', fontWeight: 600, color: '#1e3a5f', position: 'sticky', left: 0, background: ri % 2 ? '#fafbfc' : '#fff' }}>{r.year}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right' }}>{sig3(r.total)}</td>
-                    <td style={{ padding: '4px 10px', textAlign: 'right', color: rung === 0 ? '#0369a1' : '#b45309' }}>{sig3(r.bau)}</td>
+                    <td style={{ padding: '4px 10px', textAlign: 'right', color: C.bau }}>{sig3(r.bau)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#15803d' }}>{sig3(r.tgt)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b45309', fontWeight: 600 }}>{sig3(r.gapHH)}</td>
                     {showMoney && <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b91c1c' }}>{r.finGap == null ? '—' : sigB(r.finGap)}</td>}
