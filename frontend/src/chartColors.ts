@@ -9,6 +9,7 @@ export const C = {
   scenarioFill: '#fdba74', // light-orange fill for the intervention band/range
   total: '#6b7280',      // total households / coverage ceiling (GREY, dashed)
   gap: '#b91c1c',        // financing gap / shortfall (RED — a money dimension, not BAU/target/scenario)
+  range: '#cbd5e1',      // NEUTRAL fill for a BAU→scenario range band, so the coloured lines stay readable on top
 };
 
 // Per-intervention categorical palette for the intervention-impact chart's stacked bands.

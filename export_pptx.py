@@ -120,6 +120,7 @@ def create_pptx(result: dict, inputs: dict) -> io.BytesIO:
     # Summary years
     sy = [baseline, t1, t2]
     si = [years.index(y) for y in sy if y in years]
+    cur = (inputs.get('country_config') or {}).get('currency') or 'LCU'
 
     for sector_key, sector_name in [('water_supply', 'Water Supply'), ('sanitation', 'Sanitation')]:
         sec = result[sector_key]
@@ -127,29 +128,22 @@ def create_pptx(result: dict, inputs: dict) -> io.BytesIO:
         # === Section slide ===
         add_section_slide(f"{sector_name}")
 
-        # === Summary table ===
+        # === Summary table (test2 engine keys) ===
+        def _row(arr, dec, div=1):
+            return [fmt((arr[i] if i < len(arr) else 0) or 0, dec, div) for i in si]
         headers = ['Metric'] + [str(years[i]) for i in si]
         rows = [
-            ['Total HH (millions)'] + [fmt(result['total_hh'][i], 3) for i in si],
-            ['Target Safely Managed HH (mill)'] + [fmt(sec['target_hh_serv'][0][i], 4) for i in si],
-            ['BAU Safely Managed HH (mill)'] + [fmt(sec['bau_hh_serv'][0][i], 4) for i in si],
-            ['Service Gap (mill HH)'] + [fmt(sec['service_gap'][i], 4) for i in si],
-            ['Investment Need ({currency} bill)'] + [fmt(sec['investment_need'][i], 2, 1000) for i in si],
-            ['BAU Investment ({currency} bill)'] + [fmt(sec['bau_investment'][i], 2, 1000) for i in si],
-            ['Financing Gap ({currency} bill)'] + [fmt(sec['financing_gap'][i], 2, 1000) for i in si],
+            ['Total HH (millions)'] + _row(result['total_hh'], 3),
+            ['Target safely-managed HH (mill)'] + _row(sec['target_hh'][0], 4),
+            ['BAU safely-managed HH (mill)'] + _row(sec['bau_hh'][0], 4),
+            ['With-interventions safely-managed HH (mill)'] + _row(sec['scenario_hh'][0], 4),
+            ['Service gap (mill HH)'] + _row(sec['household_gap'], 4),
+            [f'Investment need ({cur} bill)'] + _row(sec['total_investment_need'], 2, 1000),
+            [f'BAU investment ({cur} bill)'] + _row(sec['bau_available'], 2, 1000),
+            [f'Financing gap — BAU ({cur} bill)'] + _row(sec['financing_gap'], 2, 1000),
+            [f'Financing gap — with interventions ({cur} bill)'] + _row(sec.get('scenario_financing_gap', sec['financing_gap']), 2, 1000),
         ]
         add_table_slide(f"{sector_name} — Summary", headers, rows)
-
-        # === Intervention impact table ===
-        interv = sec['interventions']
-        interv_names = list(interv.keys())
-        int_headers = ['Intervention'] + [str(years[i]) for i in si]
-        int_rows = []
-        for name in interv_names:
-            display_name = name.replace('_', ' ').title()
-            cum_hh = interv[name].get('cumulative_hh', [0] * len(years))
-            int_rows.append([display_name] + [fmt(cum_hh[i], 4) for i in si])
-        add_table_slide(f"{sector_name} — Intervention Impact (Cumulative HH, millions)", int_headers, int_rows)
 
     # Save
     output = io.BytesIO()
