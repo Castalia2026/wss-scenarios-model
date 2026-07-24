@@ -33,6 +33,12 @@ export default function App() {
   const [bauChartScope, setBauChartScope] = useState<'national' | 'urban' | 'rural'>('national');
   const [showGuide, setShowGuide] = useState(false);
   const [guideSection, setGuideSection] = useState<string | null>(null);
+  // Focusing a section points the contextual Guide at that section. If the user has MANUALLY closed the
+  // guide, re-clicking the SAME section must not reopen it — only moving to a DIFFERENT section reopens it.
+  const focusGuideSection = (key: string) => {
+    setShowGuide(prev => prev || key !== guideSection);
+    setGuideSection(key);
+  };
 
   const refreshProfiles = () => {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
@@ -129,6 +135,17 @@ export default function App() {
     }
   }, [resizeMacroArrays, inputScope, inputs, shiftAreaArrays]);
 
+  // Flip one intervention toggle on/off across EVERY area (interventions are on/off globally, applied per
+  // area). Used by the Results dashboard's on/off toggles — the parameters still live on the Intervention tab.
+  const setToggle = useCallback((key: string, value: boolean) => {
+    setInputs((prev: any) => prev ? { ...prev, toggles: { ...prev.toggles, [key]: value } } : prev);
+    setAltInputs(prev => {
+      const n: Record<string, any> = {};
+      for (const k of Object.keys(prev)) n[k] = { ...prev[k], toggles: { ...prev[k].toggles, [key]: value } };
+      return n;
+    });
+  }, []);
+
   // Geographical scope as ONE dropdown value: 'both' (Urban + Rural), 'urban', 'rural', 'national'.
   const scopeValue = scopeMode === 'national' ? 'national' : (areaUrban && areaRural) ? 'both' : areaRural ? 'rural' : 'urban';
   const setScopeValue = (v: string) => {
@@ -196,10 +213,10 @@ export default function App() {
     if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
   }
 
-  // Data Inputs, BAU and Intervention Design are active; Results Dashboard and Export stay greyed out
-  // until they are wired to live intervention output.
+  // Data Inputs, BAU, Intervention Design and Results Dashboard are active; Export stays greyed out
+  // until it is wired to live intervention output.
   const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
-  const disabledTabs = new Set([3, 4]);
+  const disabledTabs = new Set([4]);
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -397,11 +414,11 @@ export default function App() {
 
         <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {activeTab === 0 && inputs && (
-          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} geoScope={inputScope} showSection="inputs" onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} geoScope={inputScope} showSection="inputs" onSectionFocus={focusGuideSection} />
         )}
         {activeTab === 1 && inputs && (<>
           <div style={{ flex: '0 1 460px', display: 'flex', minWidth: 0 }}>
-            <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+            <InputPanel inputs={activeInputs} onChange={handleSetActiveInputs} geoScope={inputScope} showSection="bau" bauSector={sectorTab} onBauSectorChange={setSectorTab} onSectionFocus={focusGuideSection} />
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '24px 28px', minWidth: 0, background: '#fff', borderLeft: '1px solid #e2e8f0' }}>
             {chartScope === 'urban_rural' ? (
@@ -433,7 +450,7 @@ export default function App() {
           </div>
         </>)}
         {activeTab === 2 && inputs && (
-          <InterventionPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={inputScope} chartScope={chartScope} onSectionFocus={(key) => { setGuideSection(key); setShowGuide(true); }} />
+          <InterventionPanel inputs={activeInputs} onChange={handleSetActiveInputs} results={results} sectorTab={sectorTab} onSectorChange={setSectorTab} geoScope={inputScope} chartScope={chartScope} onSectionFocus={focusGuideSection} />
         )}
         {/* Guide panel — tabs 0, 1, 2 */}
         {activeTab <= 2 && (
@@ -449,12 +466,12 @@ export default function App() {
             }}>
               {showGuide ? '✕ Close' : '📋 Guide'}
             </button>
-            {showGuide && <DataGuide tab={activeTab} activeSection={guideSection} onSelectSection={setGuideSection} />}
+            {showGuide && <DataGuide tab={activeTab} activeSection={guideSection} onSelectSection={setGuideSection} sector={sectorTab} />}
           </>
         )}
 
         {activeTab === 3 && (
-          <ResultsDashboard geoScope={chartScope} scenarios={scenarios} inputs={inputs} />
+          <ResultsDashboard geoScope={chartScope} scenarios={scenarios} inputs={inputs} altInputs={altInputs} onToggle={setToggle} />
         )}
         {activeTab === 4 && (
           <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px' }}>
@@ -861,42 +878,94 @@ const contextualGuide: Record<string, { title: string; content: React.ReactNode;
       { name: 'IBNET', url: 'https://www.ib-net.org/' },
     ],
   },
+  // ── Water supply interventions — one guide card per intervention ──────────────────────────────
   ws_interventions: {
-    title: 'Water Supply Interventions',
+    title: 'Water Supply Interventions — overview',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The available water supply interventions are collection efficiency, NRW reduction, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, tariff reform, and microfinance (which contains a self-finance carve-out and a means-based grant).</p>
-        <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on (this adds it to the graph). Click <strong>▾ Show</strong> on the right of its row to open the parameter dropdown, fill in the fields, then click <strong>▴ Hide</strong> to collapse it again. Ticking and the dropdown are independent — you can review parameters without enabling the intervention, and switching it off does not collapse the panel.</p>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
-          <li><strong>Collection efficiency:</strong> set the start/target years and the current and target collection ratios (revenue collected ÷ revenue billed).</li>
-          <li><strong>NRW reduction:</strong> set current and target non-revenue water. The target cannot go below 3%, as even the best utilities globally achieve only 3–5%. Allow a few years' lag before benefits appear.</li>
-          <li><strong>Budget execution improvement:</strong> budget execution = executed budget ÷ allocated budget — the share of the allocated capital budget that actually gets spent on new service (unit cost × new households). The current value is auto-calculated from your history (or override it); the intervention raises it toward a target of up to 100%, so more of the allocated budget builds new service and the financing gap shrinks.</li>
-          <li><strong>Capex efficiency (unit cost):</strong> discounts the safely-managed connection cost — e.g. through better procurement or standardised designs. Set the start/target years and the current and target efficiency; the discount ramps up from 0 at the start year to (target − current) by the target year and then holds, so the same budget builds more connections and the financing gap shrinks. (This is distinct from budget execution above, which spends more of the allocated budget; this makes each connection cheaper.)</li>
-          <li><strong>Optimised technology selection:</strong> re-model the safely-managed technology mix (pre-filled from the BAU mix). Re-weight the shares or re-cost the technologies; the new weighted connection cost applies from the start year onward, so a cheaper mix stretches the budget further. Use “↺ Reset to current BAU mix” to start over; a mix identical to BAU has no effect.</li>
-          <li><strong>Tariff reform:</strong> set the start and target year, the volume sold, and the current and target tariff — the tariff rises linearly to the target and the extra revenue (volume × tariff rise) funds new service.</li>
-          <li><strong>Microfinance:</strong> finances a connection loan for gap households. Set the <em>connection fee</em> (defaults to the safely-managed capex), the income distribution (5 brackets), the share of the gap in each bracket, the willingness-to-pay % of income, and the real loan rate/tenor; a household connects if its income can service the loan. It also contains:
-            <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
-              <li><strong>Self-finance carve-out:</strong> the share of the gap that pays upfront from savings (richest-bracket-first). They'd connect anyway, so they're isolated out and excluded from the microfinance impact, leaving BAU unchanged.</li>
-              <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one, resizing repayment to what they can afford (cheapest buy-downs funded first).</li>
-            </ul>
-          </li>
+        <p style={{ margin: '0 0 6px' }}>Each intervention has its own guide card below. Open an intervention on the left (▾ <strong>Show</strong>) or the sector toggle to jump to its guidance here.</p>
+        <p style={{ margin: 0 }}><strong>How to use:</strong> tick an intervention's checkbox to switch it on (this adds it to the impact graph); click <strong>▾ Show</strong> to open its parameters and <strong>▴ Hide</strong> to collapse. The checkbox and the Show/Hide dropdown are independent — you can review parameters without enabling the intervention.</p>
+      </div>
+    ),
+  },
+  ws_ce: {
+    title: 'Water · Collection efficiency',
+    content: 'Raises the collection ratio (revenue collected ÷ revenue billed) from its current to its target level over the start→target years. The extra collected revenue — billed volume × tariff × the ratio uplift — funds new safely-managed service. Enter the current and target ratios, the volume sold at the start year and its growth rate (leave blank to grow with population), and the current tariff.',
+  },
+  ws_nrw: {
+    title: 'Water · NRW reduction',
+    content: "Cuts non-revenue water from its current to its target level (target ≥ 3% — even the best utilities reach only 3–5%; allow a few years' lag). Only the physical (leak) share of NRW frees up deliverable water, which upgrades basic households to safely-managed; the commercial share counts toward revenue only. Split NRW into commercial vs physical losses (they must total 100%). Value the recovered water either as tariff revenue from sales or as avoided production cost; the value net of the fixing capex flows into the budget.",
+  },
+  ws_budget_exec: {
+    title: 'Water · Budget execution improvement',
+    content: 'Budget execution = executed budget ÷ allocated budget — the share of the allocated capital budget actually spent on new service (unit cost × new households). The current value is auto-calculated from your budget history; the intervention raises it toward a target of up to 100%, so more of the allocated budget builds new service and the financing gap shrinks. Distinct from capex efficiency, which makes each connection cheaper.',
+  },
+  ws_capex_eff: {
+    title: 'Water · Capex efficiency (unit cost)',
+    content: 'Discounts the safely-managed connection cost — e.g. through better procurement or standardised designs. Set the start/target years and the current and target efficiency; the discount ramps up from 0 at the start year to (target − current) by the target year, then holds. Distinct from budget execution (which spends more of the allocated budget); this makes each connection cheaper.',
+  },
+  ws_techmix: {
+    title: 'Water · Optimised technology selection',
+    content: 'Re-model the safely-managed technology mix (pre-filled from the BAU mix). Re-weight the shares (they must total 100%) or re-cost the technologies; the new weighted service cost applies from the start year onward, so a cheaper mix stretches the budget further. Use “↺ Reset to current BAU mix” to start over; a mix identical to BAU has no effect.',
+  },
+  ws_tariff: {
+    title: 'Water · Tariff reform',
+    content: 'Raises the tariff linearly from current to target over the start→target years; the extra revenue (billed volume × tariff rise) funds new service. The optional affordability cap holds the billable tariff so the average household bill stays within a chosen % of income (using the shared income distribution) — any rise beyond that ceiling earns no extra revenue.',
+  },
+  ws_microfinance: {
+    title: 'Water · Microfinance',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>Finances a connection loan for gap households. Set the <em>connection fee</em> (defaults to the safely-managed capex), the income distribution (5 brackets), the gap share per bracket, the willingness-to-pay % of income, and the real loan rate/tenor — a household connects if its income can service the loan. It also contains:</p>
+        <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+          <li><strong>Self-finance carve-out:</strong> the share of the gap that pays upfront from savings (richest-bracket-first). They'd connect anyway, so they're isolated out and excluded from the microfinance impact, leaving BAU unchanged.</li>
+          <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one, resizing repayment to what they can afford (cheapest buy-downs funded first).</li>
         </ul>
       </div>
     ),
   },
+  // ── Sanitation interventions — one guide card per intervention ────────────────────────────────
   san_interventions: {
-    title: 'Sanitation Interventions',
+    title: 'Sanitation Interventions — overview',
     content: (
       <div>
-        <p style={{ margin: '0 0 6px' }}>The available sanitation interventions are collection efficiency, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, NRW-linked sanitation revenue, tariff reform, and microfinance (which contains a self-finance carve-out and a means-based grant).</p>
-        <p style={{ margin: '0 0 6px' }}><strong>How to enter each one:</strong> Tick its checkbox to switch it on, then click <strong>▾ Show</strong> to open its parameter dropdown, fill in the fields, and click <strong>▴ Hide</strong> to collapse. The checkbox (which drives the graph) and the Show/Hide dropdown work independently.</p>
-        <ul style={{ margin: '4px 0 0', paddingLeft: 16 }}>
-          <li><strong>Collection efficiency:</strong> uses the same ratios as water supply — enter the sewer tariff as a % of the water tariff.</li>
-          <li><strong>Budget execution improvement:</strong> budget execution = executed budget ÷ allocated budget (the share of the allocated capital budget that actually gets spent on new service); auto-calculated, raised toward up to 100% by the intervention.</li>
-          <li><strong>Capex efficiency (unit cost) &amp; optimised technology selection:</strong> entered the same way as on the water supply side — both discount the safely-managed connection cost so the same budget builds more service. Capex efficiency ramps a discount up from 0 at the start year to (target − current) by the target year; optimised technology selection applies the weighted cost of a re-modelled technology mix from the start year.</li>
-          <li><strong>NRW-linked sanitation revenue:</strong> links to the <em>Water Supply → NRW reduction</em> lever. The physical water that lever recovers returns to the sewer as wastewater; set the return-to-sewer ratio, the sewer charge (per m³) and the collection rate, and the collected revenue funds new safely-managed sanitation connections. It has no effect unless NRW reduction is switched on in the water supply interventions.</li>
-          <li><strong>Tariff reform:</strong> entered the same way as on the water supply side.</li>
-          <li><strong>Microfinance (with self-finance carve-out &amp; means-based grant):</strong> entered the same way as on the water supply side — a connection loan serves gap households who can service it, the self-finance share who'd pay upfront are isolated out, and a grant pool buys the loan down for those who can't service a full one.</li>
+        <p style={{ margin: '0 0 6px' }}>Each intervention has its own guide card below. Open an intervention on the left (▾ <strong>Show</strong>) or the sector toggle to jump to its guidance here.</p>
+        <p style={{ margin: 0 }}><strong>How to use:</strong> tick an intervention's checkbox to switch it on (this adds it to the impact graph); click <strong>▾ Show</strong> to open its parameters and <strong>▴ Hide</strong> to collapse. The checkbox and the Show/Hide dropdown are independent.</p>
+      </div>
+    ),
+  },
+  san_ce: {
+    title: 'Sanitation · Collection efficiency',
+    content: 'Inherits the collected ratios from Water Supply → collection efficiency; you enter the sanitation start/target years and the sewer tariff as a % of the water tariff. The recovered sanitation revenue funds new safely-managed sanitation service.',
+  },
+  san_budget_exec: {
+    title: 'Sanitation · Budget execution improvement',
+    content: 'Budget execution = executed budget ÷ allocated budget — the share of the allocated sanitation capital budget actually spent on new service. Auto-calculated from your budget history and raised toward a target of up to 100%, so more of the allocated budget builds new service.',
+  },
+  san_capex_eff: {
+    title: 'Sanitation · Capex efficiency (unit cost)',
+    content: 'Discounts the safely-managed sanitation connection cost. The discount ramps from 0 at the start year to (target − current) by the target year, then holds, so the same budget builds more service. Distinct from budget execution, which spends more of the allocated budget.',
+  },
+  san_techmix: {
+    title: 'Sanitation · Optimised technology selection',
+    content: 'Re-model the safely-managed sanitation technology mix (pre-filled from the BAU mix). Re-weight the shares (they must total 100%) or re-cost the technologies; the new weighted service cost applies from the start year. A cheaper mix stretches the budget further; a mix identical to BAU has no effect.',
+  },
+  san_nrw_link: {
+    title: 'Sanitation · NRW-linked revenue',
+    content: 'Links to the Water Supply → NRW reduction lever. The physical water that lever recovers returns to the sewer as wastewater the utility can charge for; set the return-to-sewer ratio, the sewer charge (per m³) and the collection rate, and the collected revenue funds new safely-managed sanitation connections. It has no effect unless NRW reduction is switched on in the water supply interventions.',
+  },
+  san_tariff: {
+    title: 'Sanitation · Tariff reform',
+    content: 'Raises the sewer tariff linearly from current to target over the start→target years; the extra revenue (billed wastewater volume × tariff rise) funds new service. The optional affordability cap holds the billable sewer tariff so the average household sewer bill stays within a chosen % of income.',
+  },
+  san_microfinance: {
+    title: 'Sanitation · Microfinance',
+    content: (
+      <div>
+        <p style={{ margin: '0 0 6px' }}>Finances a sanitation connection loan for gap households — same mechanic as the water side, with sanitation's own willingness-to-pay %, loan terms, gap split and grant pool. A household connects if its income can service the loan. It also contains:</p>
+        <ul style={{ margin: '2px 0 0', paddingLeft: 16 }}>
+          <li><strong>Self-finance carve-out:</strong> the richest-first share of the gap that pays upfront from savings — isolated out as BAU-anyway, so it isn't credited for connections that would happen without it.</li>
+          <li><strong>Means-based grant:</strong> a one-time pool that buys down the loan for those who can't service a full one (cheapest buy-downs funded first).</li>
         </ul>
       </div>
     ),
@@ -924,11 +993,16 @@ const guideKeysByTab: Record<number, string[]> = {
   0: ['how_model_works', 'country', 'period', 'service_levels', 'econ_demo', 'budget', 'ws_unit_costs', 'san_unit_costs'],
   // BAU Scenario
   1: ['how_model_works', 'ws_unit_costs', 'san_unit_costs'],
-  // Intervention Design
-  2: ['ws_interventions', 'san_interventions', 'custom_interventions'],
+  // Intervention Design — one card per intervention, grouped by sector. DataGuide filters this list to
+  // the active sector (ws_* on water, san_* on sanitation) plus the shared custom-interventions card.
+  2: [
+    'ws_interventions', 'ws_ce', 'ws_nrw', 'ws_budget_exec', 'ws_capex_eff', 'ws_techmix', 'ws_tariff', 'ws_microfinance',
+    'san_interventions', 'san_ce', 'san_budget_exec', 'san_capex_eff', 'san_techmix', 'san_nrw_link', 'san_tariff', 'san_microfinance',
+    'custom_interventions',
+  ],
 };
 
-function DataGuide({ tab, activeSection, onSelectSection }: { tab: number; activeSection: string | null; onSelectSection?: (key: string) => void }) {
+function DataGuide({ tab, activeSection, onSelectSection, sector }: { tab: number; activeSection: string | null; onSelectSection?: (key: string) => void; sector?: 'water' | 'sanitation' }) {
   const scrollRef = React.useRef<HTMLDivElement>(null);
   const activeRef = React.useRef<HTMLDivElement>(null);
 
@@ -938,8 +1012,13 @@ function DataGuide({ tab, activeSection, onSelectSection }: { tab: number; activ
     }
   }, [activeSection]);
 
-  // Only show the guide sections relevant to the current tab, highlight the active one
-  const allKeys = (guideKeysByTab[tab] || Object.keys(contextualGuide)).filter(k => contextualGuide[k]);
+  // Only show the guide sections relevant to the current tab, highlight the active one. On the
+  // Intervention tab the cards are per-intervention, so filter them to the active sector (ws_* /
+  // san_*) plus the shared custom-interventions card — the other sector's cards stay hidden.
+  const prefix = sector === 'sanitation' ? 'san_' : 'ws_';
+  const allKeys = (guideKeysByTab[tab] || Object.keys(contextualGuide))
+    .filter(k => contextualGuide[k])
+    .filter(k => tab !== 2 || k === 'custom_interventions' || k.startsWith(prefix));
 
   return (
     <div ref={scrollRef} style={{

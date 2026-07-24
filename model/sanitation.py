@@ -66,6 +66,15 @@ def calculate_sanitation(inputs, ctx, nrw_recovered_vol=None):
     cost_factor = cost_factor * cust_cf
     extra_cash = nrw_link_cash + cust_cash
     bracket_income = [br.income_monthly for br in inputs.income_distribution.brackets]
+    # Average monthly household income (hh_share-weighted; simple mean if shares blank) → tariff affordability cap.
+    _brs = inputs.income_distribution.brackets
+    _wsum = sum(float(br.hh_share or 0.0) for br in _brs)
+    if _wsum > 0:
+        avg_hh_income_monthly = sum(float(br.income_monthly or 0.0) * float(br.hh_share or 0.0) for br in _brs) / _wsum
+    elif _brs:
+        avg_hh_income_monthly = sum(float(br.income_monthly or 0.0) for br in _brs) / len(_brs)
+    else:
+        avg_hh_income_monthly = 0.0
     _mld_to_m3 = inputs.constants.days_in_year / inputs.constants.cubic_meter_liters
     # 4d adder (sheet r178 = gap*cost + G166*(treat%*NRW%*phys%)). Unlike water — which multiplies the
     # COST (r179 = ...+G168*factors ≈ 7,750) — sanitation multiplies G166 = I!G174 = the BASELINE SM
@@ -133,6 +142,8 @@ def calculate_sanitation(inputs, ctx, nrw_recovered_vol=None):
         tariff_current=float(getattr(si, 'tariff_current', 0.0) or 0.0),
         tariff_target=float(getattr(si, 'tariff_target', 0.0) or 0.0),
         tariff_volume_base_m3=float(getattr(si, 'tariff_volume_mld', 0.0) or 0.0) * _mld_to_m3,
+        tariff_afford_pct=float(getattr(si, 'tariff_afford_pct', 0.0) or 0.0),
+        tariff_afford_income_monthly=avg_hh_income_monthly,
         # Microfinance + means-based grant (affordability lever): same mechanic as water, with sanitation's
         # own willingness-to-pay %, loan terms, gap split and grant pool; connection cost = sanitation SM cost.
         afford_enabled=san_mf_on,
