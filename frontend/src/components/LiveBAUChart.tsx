@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { toPng } from 'html-to-image';
 import { C } from '../chartColors';
+import { linesFirstLegend } from './chartLegend';
 
 /**
  * BAU vs Target chart driven by the LIVE calculation engine (validated cell-by-cell against the
@@ -597,7 +598,9 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
             <Tooltip formatter={(value: any) => fmtVal(value)}
               labelFormatter={(label: any) => (per0.baseline_year != null && label === per0.baseline_year) ? `${label} — last historical year` : String(label)}
               contentStyle={{ fontSize: 11 }} />
-            <Legend wrapperStyle={{ fontSize: 10 }} />
+            {/* Legend lists the Total & Target lines first, then the BAU area fill (see chartLegend);
+                render order below is unchanged so the lines still draw over the area. */}
+            <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
             <Area type="monotone" dataKey={bauKey} fill={C.bauFill} stroke={C.bau} fillOpacity={0.55} dot={showDots ? { r: 1.8 } : false} legendType="rect" isAnimationActive={false}>
               <LabelList content={endpointLabel} />
             </Area>

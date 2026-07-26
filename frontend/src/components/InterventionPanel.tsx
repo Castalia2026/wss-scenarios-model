@@ -482,7 +482,7 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', margin: '0 0 8px' }}>Custom Interventions</h3>
           <div onClick={() => onSectionFocus?.('custom_interventions')}>
             <div style={{ fontSize: 11, color: '#155e75', background: '#ecfeff', border: '1px solid #a5f3fc', padding: '6px 8px', borderRadius: 4, marginBottom: 8, lineHeight: 1.5 }}>
-              Model levers outside the standard set. <b>New revenue source</b> — invest to produce an output whose net value funds new safely-managed service. <b>Cost reduction</b> — lower the per-household service cost. Pick each one's sector and tick its box to switch it on.
+              You can add interventions not covered above as custom interventions. Two types are supported: <b>New revenue source</b> — invest to produce an output whose net value funds new safely-managed service — and <b>Cost reduction</b> — lower the per-household service cost. Pick each one's sector and tick its box to switch it on.
             </div>
             {(inputs.custom_interventions || []).map((ci: any, idx: number) => {
               const updateCI = (field: string, val: any) => {
@@ -495,7 +495,7 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
                   <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 4 }}>
                     <input type="checkbox" checked={ci.enabled !== false} onChange={e => updateCI('enabled', e.target.checked)}
                       title="Switch this custom intervention on/off" style={{ width: 16, height: 16, accentColor: '#2563eb', cursor: 'pointer' }} />
-                    <input type="color" value={ci.color || '#9333ea'} onChange={e => updateCI('color', e.target.value)}
+                    <input type="color" value={ci.color || '#ae4f0e'} onChange={e => updateCI('color', e.target.value)}
                       style={{ width: 20, height: 20, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
                     <input type="text" value={ci.name} onChange={e => updateCI('name', e.target.value)}
                       style={{ flex: 1, border: '1px solid #ccc', borderRadius: 3, padding: '3px 6px', fontSize: 12, fontWeight: 600 }} />
@@ -566,7 +566,11 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
             })}
             <button onClick={() => {
               const existing = inputs.custom_interventions || [];
-              const colors = ['#9333ea','#f97316','#06b6d4','#84cc16','#f43f5e'];
+              // Custom bands stack alongside the built-in intervention bands, so these presets are
+              // chosen to stay distinct from the built-in palette (see chartColors INTV_PALETTE) and
+              // from each other, and to avoid the reserved blue (BAU) / green (target) — the old set
+              // had a lime-green and a cyan that clashed. Users can still fine-tune via the picker.
+              const colors = ['#9e17bf','#fb46a2','#c11632','#b6157d','#f23dd3'];
               onChange({ ...inputs, custom_interventions: [...existing, {
                 name: 'New revenue source', enabled: true, sector: sectorTab, intervention_type: 'new_revenue',
                 start_year: 2028, end_year: 2040,

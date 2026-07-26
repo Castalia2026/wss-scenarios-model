@@ -15,13 +15,21 @@ export const C = {
 // Per-intervention categorical palette for the intervention-impact chart's stacked bands.
 // Deliberately EXCLUDES blue (BAU) and green (target) so those meanings stay reserved.
 // Order matches the intervention lists in LiveInterventionChart.
+//
+// These eight hues were chosen by a colour-distance search (not by eye) that maximises the
+// MINIMUM separation between EVERY pair of bands — since any two can be compared side by side
+// in the legend, not only stack neighbours — while staying clear of the reserved blue/green.
+// Validated (dataviz validate_palette, white surface, --pairs all): worst-pair CVD ΔE ≈ 14.5
+// (target ≥ 12), min normal-vision ΔE ≈ 25, all ≥ 3:1 contrast. The previous set had two
+// near-identical clashes: budget-exec gold ≈ tariff amber (ΔE 1.5) and collection cyan ≈
+// tech teal, which is what made bands hard to tell apart.
 export const INTV_PALETTE = {
-  collection: '#0891b2', // cyan
-  budgetExec: '#ca8a04', // gold  (was green — conflicted with target)
-  capex: '#7c3aed',      // violet
-  techmix: '#0d9488',    // teal
-  nrw: '#be123c',        // rose  (was blue — conflicted with BAU)
-  tariff: '#d97706',     // amber
-  microfinance: '#db2777', // pink
-  custom: '#9333ea',     // purple (default for custom interventions)
+  collection: '#1a9ed6', // cyan       (the one cool anchor)
+  budgetExec: '#c58216', // gold       (pushed far from tariff)
+  capex: '#7238f8',      // violet
+  techmix: '#b814a0',    // magenta    (was teal — clashed with collection cyan)
+  nrw: '#fb464b',        // red
+  tariff: '#c355fb',     // orchid     (was amber — clashed with budget-exec gold)
+  microfinance: '#c5146a', // rose
+  custom: '#ae4f0e',     // burnt-orange (default for custom interventions; user-overridable)
 };

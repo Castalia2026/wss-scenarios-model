@@ -12,6 +12,7 @@ import {
  * old synthetic StaticCharts.InterventionImpactChart.
  */
 import { C, INTV_PALETTE as P } from '../chartColors';
+import { linesFirstLegend } from './chartLegend';
 
 type Intv = [key: string, label: string, color: string];   // toggle key, legend label, band colour
 // Band palette excludes blue (BAU) and green (target) so those meanings stay reserved (see chartColors).
@@ -138,11 +139,18 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
           <Tooltip formatter={(v: any) => sig(+v) + ' M'} contentStyle={{ fontSize: 11 }} />
-          <Legend wrapperStyle={{ fontSize: 10 }} />
-          {/* Grey BAU base, then one stacked band per contributing intervention. Animated transitions. */}
+          {/* Legend lists the Total-households line first, then the area fills (see chartLegend). Render
+              order below stays areas-then-line so the line still draws on top; only the legend is reordered. */}
+          <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
+          {/* Grey BAU base, then one stacked band per contributing intervention. Animated transitions.
+              Each band keeps a saturated same-colour top edge (width 1.75) so its boundary reads
+              crisply against the lighter translucent band stacked above it — a shape cue on top of
+              the hue. Stroke stays the band colour (not white) because recharts derives the legend
+              swatch from stroke; the CVD-validated palette (see chartColors) carries identity, and
+              the always-present legend is the secondary encoding. */}
           <Area type="monotone" dataKey="BAU (safely managed)" stackId="s" fill={C.bauFill} stroke={C.bau} fillOpacity={0.7} strokeWidth={1.5} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           {bands.map(([k, label, color]) => (
-            <Area key={k} type="monotone" dataKey={label} stackId="s" fill={color} stroke={color} fillOpacity={0.55} strokeWidth={1} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
+            <Area key={k} type="monotone" dataKey={label} stackId="s" fill={color} stroke={color} fillOpacity={0.6} strokeWidth={1.75} strokeOpacity={1} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           ))}
           {/* Total households — the coverage ceiling, drawn on top (not stacked). */}
           <Line type="monotone" dataKey="Total households" stroke={C.total} strokeWidth={1.5} strokeDasharray="6 4" dot={false} legendType="plainline" isAnimationActive animationDuration={600} />
