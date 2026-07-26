@@ -3,6 +3,7 @@ import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 import { C } from '../chartColors';
+import { linesFirstLegend } from './chartLegend';
 import ExportButtons from './ExportButtons';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
@@ -78,7 +79,9 @@ function FanChart({ title, subtitle, data, yLabel, fanFill, fanName, lines, fmt,
           </YAxis>
           <Tooltip formatter={(v: any) => (Array.isArray(v) ? `${fmt(+v[0])} – ${fmt(+v[1])}` : fmt(+v)) as any}
             labelFormatter={(l: any) => String(l)} contentStyle={{ fontSize: 11 }} />
-          <Legend wrapperStyle={{ fontSize: 10 }} />
+          {/* Legend lists the reference lines first, then the fan area (see chartLegend); render order
+              (area then lines) is unchanged so the lines still draw over the band. */}
+          <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
           <Area type="monotone" dataKey="fan" name={fanName} fill={fanFill} stroke="none" fillOpacity={0.4} legendType="rect" isAnimationActive={false} />
           {lines.map(l => (
             <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2}
@@ -382,7 +385,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
           <span style={{ fontSize: 11, color: '#64748b' }}>· {scopeName}</span>
         </div>
         <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #0ea5e9', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 12 }}>
-          <b>By {s.sum.endline}</b>, safely-managed coverage fans from <b>{pct(s.sum.bauCov)}</b> (BAU) to <b>{pct(s.sum.scnCov)}</b> with the current interventions — <b>{sig3(s.sum.addHH)} M</b> more households — against a target of <b>{pct(s.sum.tgtCov)}</b>. The cumulative financing gap narrows from <b>{sigB(s.sum.gapBauCum)}</b> to <b>{sigB(s.sum.gapScnCum)} B {cur}</b>.
+          <b>By {s.sum.endline}</b>, safely-managed coverage increases from <b>{pct(s.sum.bauCov)}</b> (BAU) to <b>{pct(s.sum.scnCov)}</b> with the current interventions — <b>{sig3(s.sum.addHH)} M</b> more households — against a target of <b>{pct(s.sum.tgtCov)}</b>. The cumulative financing gap narrows from <b>{sigB(s.sum.gapBauCum)}</b> to <b>{sigB(s.sum.gapScnCum)} B {cur}</b>.
         </div>
         {noFan && (
           <div style={{ fontSize: 10.5, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4, padding: '5px 9px', marginBottom: 10 }}>

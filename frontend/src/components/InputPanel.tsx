@@ -962,7 +962,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
           return (
             <div key={idx} style={{ border: '1px solid #d1d5db', borderRadius: 6, padding: '8px 10px', marginBottom: 8, background: '#faf5ff' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
-                <input type="color" value={ci.color || '#9333ea'} onChange={e => updateCI('color', e.target.value)}
+                <input type="color" value={ci.color || '#ae4f0e'} onChange={e => updateCI('color', e.target.value)}
                   style={{ width: 24, height: 24, border: 'none', cursor: 'pointer', borderRadius: 3 }} />
                 <input type="text" value={ci.name} onChange={e => updateCI('name', e.target.value)}
                   style={{ flex: 1, border: '1px solid #ccc', borderRadius: 3, padding: '3px 6px', fontSize: 12, fontWeight: 600 }} />
@@ -1015,7 +1015,9 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
         })}
         <button onClick={() => {
           const existing = inputs.custom_interventions || [];
-          const colors = ['#9333ea','#f97316','#06b6d4','#84cc16','#f43f5e'];
+          // Kept in sync with InterventionPanel — presets distinct from the built-in bands
+          // (chartColors INTV_PALETTE) and clear of the reserved blue/green.
+          const colors = ['#9e17bf','#fb46a2','#c11632','#b6157d','#f23dd3'];
           const newCI = {
             name: 'New Intervention', enabled: true, sector: 'water', intervention_type: 'fixed_annual',
             start_year: inputs.period.baseline_year + 3, end_year: inputs.period.baseline_year + 7,
