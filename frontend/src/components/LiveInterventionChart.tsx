@@ -121,6 +121,13 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
   // Data series behind the chart, for the "⤓ Excel" export: Year, BAU base, each band, and the ceiling.
   const exportHeaders = ['Year', 'BAU (safely managed)', ...bands.map(([, label]) => label), 'Total households'];
   const exportRows = data.map((r: any) => [r.year, r['BAU (safely managed)'], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
+  // Native Excel chart: grey BAU base + each contributing intervention band as stacked areas, ceiling as a line.
+  const chartSpec = {
+    category: 'Year', stacked: true,
+    areas: [{ name: 'BAU (safely managed)', color: C.bauFill }, ...bands.map(([, label, color]) => ({ name: label, color }))],
+    lines: [{ name: 'Total households', color: C.total, dash: true }],
+    yTitle: '# households (millions)', xTitle: 'Year',
+  };
   const fileBase = `${scopeLabel ? scopeLabel + '_' : ''}${sector}_intervention_impact`;
   return (
     <div>
@@ -129,7 +136,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
           {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
         </h3>
         <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — intervention impact`}
-          sheets={[{ name: `${sectorLabel} impact`, headers: exportHeaders, rows: exportRows }]} compact />
+          sheets={[{ name: `${sectorLabel} impact`, headers: exportHeaders, rows: exportRows }]} chartSpec={chartSpec} compact />
       </div>
       <div style={{ fontSize: 10, color: '#334155', background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra households an enabled intervention delivers.

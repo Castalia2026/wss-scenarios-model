@@ -1,13 +1,25 @@
 import React, { useState } from 'react';
 import { captureImage, downloadBlob, postForBlob } from './exportUtils';
 
-// Small "⤓ PNG / ⤓ JPG / ⤓ Excel" control for any chart. PNG/JPG capture the referenced chart node via
-// html-to-image; Excel posts the captured PNG plus the chart's data series to /api/export/chart, which
-// returns a workbook with the chart image on the first sheet and one data sheet per series.
-export default function ChartExport({ chartRef, filename, title, sheets, compact }: {
+// Describes how to draw a NATIVE, data-linked Excel chart from the exported data series: which columns are
+// stacked area bands vs reference lines (by their header name), plus colours and axis titles. The backend
+// binds each series to the data cells, so the Excel chart redraws when the data is edited.
+export type ChartSpec = {
+  category?: string;                                       // x-axis column header (default: first column)
+  stacked?: boolean;                                       // stack the area series
+  areas?: { name: string; color: string }[];              // area series, in stack order
+  lines?: { name: string; color: string; dash?: boolean }[];  // line (reference) series
+  yTitle?: string; xTitle?: string;
+};
+
+// Small "⤓ PNG / ⤓ JPG / ⤓ Excel" control for any chart. PNG/JPG capture the referenced chart node to an
+// image; Excel posts the chart's data series + a `chartSpec` to /api/export/chart, which returns a workbook
+// with the data table AND a live Excel chart bound to those cells (dynamic — edit the data, the chart moves).
+export default function ChartExport({ chartRef, filename, title, sheets, chartSpec, compact }: {
   chartRef: React.RefObject<any>;
   filename: string; title?: string;
   sheets: { name: string; headers: any[]; rows: any[][] }[];
+  chartSpec?: ChartSpec;
   compact?: boolean;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
@@ -25,11 +37,15 @@ export default function ChartExport({ chartRef, filename, title, sheets, compact
     finally { setBusy(null); }
   };
   const xlsx = async () => {
-    if (!chartRef.current) return;
     setBusy('xlsx');
     try {
-      const image = await captureImage(chartRef.current, 'png');
-      await postForBlob('/api/export/chart', { filename, title, image, sheets }, filename + '.xlsx');
+      // Native data-linked chart from chartSpec (no picture). Only fall back to a captured PNG if a caller
+      // hasn't supplied a spec, so the export still contains something.
+      const body: any = { filename, title, sheets, chartSpec };
+      if (!chartSpec && chartRef.current) {
+        try { body.image = await captureImage(chartRef.current, 'png'); } catch { /* data-only workbook */ }
+      }
+      await postForBlob('/api/export/chart', body, filename + '.xlsx');
     } catch { alert('Excel export failed. Please try again.'); }
     finally { setBusy(null); }
   };
@@ -37,7 +53,7 @@ export default function ChartExport({ chartRef, filename, title, sheets, compact
     <span style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
       <button style={btn} disabled={busy !== null} title="Download this chart as a PNG image" onClick={() => img('png')}>{busy === 'png' ? '…' : '⤓ PNG'}</button>
       <button style={btn} disabled={busy !== null} title="Download this chart as a JPG image" onClick={() => img('jpeg')}>{busy === 'jpeg' ? '…' : '⤓ JPG'}</button>
-      <button style={btn} disabled={busy !== null} title="Download this chart as Excel (chart image + its data series)" onClick={xlsx}>{busy === 'xlsx' ? '…' : '⤓ Excel'}</button>
+      <button style={btn} disabled={busy !== null} title="Download this chart as Excel — a live chart linked to its data (edit the data, the chart updates)" onClick={xlsx}>{busy === 'xlsx' ? '…' : '⤓ Excel'}</button>
     </span>
   );
 }

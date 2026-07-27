@@ -750,21 +750,21 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
             { label: 'GDP growth %', tip: 'Year-on-year real GDP growth (auto-calculated from the values the model uses).', computed: true, cells: years.map((_: number, i: number) => {
               const cur = resAt('gdp_real_local', i), prev = resAt('gdp_real_local', i - 1);
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : 'n/a'}</span>;
             }) },
             { label: `${scopeLabel} population (mill)`, tip: `Total ${scopeLower} population in millions. Historical years are inputs; blank forecast years fill in from the yearly growth rate, or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'pop_ts', i, false, years[i] > baseYr2, true)) },
             projRow('→ Population used (mill)', 'Auto-fill: population the model uses each year.', (i) => resAt('population', i), false),
             { label: 'Pop growth %', tip: 'Year-on-year population growth (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
               const cur = resAt('population', i), prev = resAt('population', i - 1);
               const g = (i > 0 && cur && prev) ? ((cur/prev)-1)*100 : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : '—'}</span>;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{i > 0 && cur ? g.toFixed(1)+'%' : 'n/a'}</span>;
             }) },
             { label: `${hhLbl} (mill)`, tip: `Total ${scopeLower} households in millions — DRIVES the model. Historical years are inputs; blank forecast years fill in from the yearly growth rate, or type your own.`, cells: years.map((_: number, i: number) => editCell('population', 'hh_ts', i, false, years[i] > baseYr2, true)) },
             projRow(`→ ${hhLbl} used (mill)`, 'Auto-fill: households the model uses each year.', (i) => resAt('total_hh', i), false),
             { label: 'Avg HH size', tip: 'Average household size = population ÷ households (auto-calculated).', computed: true, cells: years.map((_: number, i: number) => {
               const p = resAt('population', i) ?? 0; const h = resAt('total_hh', i) ?? 0;
               const sz = (h > 0 && p > 0) ? p / h : 0;
-              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(2) : '—'}</span>;
+              return <span style={{ fontSize: 10, color: '#94a3b8' }}>{sz > 0 ? sz.toFixed(2) : 'n/a'}</span>;
             }) },
           ];
           const budgetRows: YRow[] = [

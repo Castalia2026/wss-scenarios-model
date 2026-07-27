@@ -153,10 +153,13 @@ def export_table(payload: dict = Body(...)):
 
 @app.post("/api/export/chart")
 def export_chart(payload: dict = Body(...)):
-    """Generic chart → xlsx (embedded PNG + its data series). Body: {filename?, title?, image, sheets:[…]}."""
+    """Generic chart → xlsx with a NATIVE, data-linked Excel chart (edit the data → the chart redraws).
+    Body: {filename?, title?, sheets:[{name,headers,rows}], chartSpec:{category,stacked,areas,lines,x/yTitle}}.
+    `image` is still accepted as a legacy fallback (embeds the PNG when no chartSpec is given)."""
     from export_data import chart_xlsx
     fname = (payload.get('filename') or 'chart') + '.xlsx'
-    out = chart_xlsx(payload.get('title') or '', payload.get('image') or '', payload.get('sheets') or [])
+    out = chart_xlsx(payload.get('title') or '', payload.get('sheets') or [],
+                     payload.get('chartSpec'), payload.get('image'))
     return StreamingResponse(
         iter([out.getvalue()]),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
