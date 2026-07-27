@@ -336,7 +336,7 @@ class WaterInterventionInputs(BaseModel):
     nrw_target_pct: float = 0.15
     nrw_treatment_cost_pct_capex: float = 0.40   # #123 water treatment cost as % of total capex (BAU adder)
     nrw_physical_loss_pct: float = 0.50          # #124 physical losses as % of total NRW (only physical → new water)
-    nrw_lag_years: int = 1                       # #125 (kept; not applied by the simplified lever)
+    nrw_lag_years: int = 1                       # #125 years between the works/spend and the recovered-water benefit
     nrw_capex_unit_cost_usd: float = 510.0       # #126 USD(2023) per m3/day (legacy; superseded by the local unit below)
     # test2 simplified NRW lever inputs:
     nrw_system_input_vol: float = 146.0          # total water produced at nrw_start_year, MLD (million litres/day)
