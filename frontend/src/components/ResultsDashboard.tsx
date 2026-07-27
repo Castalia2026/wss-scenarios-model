@@ -7,6 +7,7 @@ import { linesFirstLegend } from './chartLegend';
 import ExportButtons from './ExportButtons';
 import ChartExport from './ChartExport';
 import TableExport from './TableExport';
+import { captureImage } from './exportUtils';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
 function round3(v: number): number { return (!isFinite(v) || v === 0) ? 0 : Number(v.toPrecision(3)); }
@@ -300,6 +301,18 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
   const pct = (f: number) => (f * 100).toFixed(1) + '%';
 
+  // Capture the four on-screen result charts (DOM order: water coverage, water gap, san coverage, san gap)
+  // as PNGs for the PowerPoint deck — the backend can't render recharts, so it embeds these.
+  const captureResultsCharts = async (): Promise<Record<string, string>> => {
+    const keys = ['water_coverage', 'water_gap', 'san_coverage', 'san_gap'];
+    const wraps = Array.from(document.querySelectorAll('.recharts-wrapper')) as HTMLElement[];
+    const out: Record<string, string> = {};
+    for (let i = 0; i < keys.length && i < wraps.length; i++) {
+      try { out[keys[i]] = await captureImage(wraps[i], 'png'); } catch { /* skip a chart that fails to capture */ }
+    }
+    return out;
+  };
+
   // ── Resources-and-households table (per sector) ────────────────────────────────────────────────
   const ImpactTable = ({ rows, hhCol }: { rows: Row[]; hhCol: string }) => {
     if (!rows || !rows.length) return null;
@@ -553,7 +566,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               }}>{l}</button>
             ))}
           </div>
-          <ExportButtons inputs={inputs} />
+          <ExportButtons inputs={inputs} pptxCharts={captureResultsCharts} />
         </div>
       </div>
 

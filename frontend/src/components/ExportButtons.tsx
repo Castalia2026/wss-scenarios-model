@@ -1,22 +1,32 @@
 import React, { useState } from 'react';
 
 // Download the current scenario (`inputs`) as Excel / PowerPoint / CSV. All three endpoints run the
-// live engine on the posted inputs, so the export always matches what's on screen.
+// live engine on the posted inputs, so the export always matches what's on screen. When `pptxCharts` is
+// supplied (the Results tab), the PowerPoint export first captures the on-screen charts and ships them so
+// the deck is pre-populated with the actual charts (the backend can't render recharts itself).
 const FORMATS = [
   { label: 'Excel', ext: 'xlsx', endpoint: '/api/export/xlsx', icon: '📗' },
   { label: 'PowerPoint', ext: 'pptx', endpoint: '/api/export/pptx', icon: '📊' },
   { label: 'CSV', ext: 'csv', endpoint: '/api/export/csv', icon: '📄' },
 ];
 
-export default function ExportButtons({ inputs, label = 'Export' }: { inputs: any; label?: string | null }) {
+export default function ExportButtons({ inputs, label = 'Export', pptxCharts }: {
+  inputs: any; label?: string | null; pptxCharts?: () => Promise<Record<string, string>>;
+}) {
   const [busy, setBusy] = useState<string | null>(null);
-  const download = (fmt: typeof FORMATS[number]) => {
+  const download = async (fmt: typeof FORMATS[number]) => {
     setBusy(fmt.ext);
-    fetch(fmt.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inputs || {}) })
-      .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
-      .then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `wss_scenario.${fmt.ext}`; a.click(); URL.revokeObjectURL(u); })
-      .catch(() => alert(`Export failed (${fmt.label}). Please try again.`))
-      .finally(() => setBusy(null));
+    try {
+      let body: any = inputs || {};
+      if (fmt.ext === 'pptx' && pptxCharts) {
+        try { body = { ...body, _charts: await pptxCharts() }; } catch { /* fall back to a chart-less deck */ }
+      }
+      const r = await fetch(fmt.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!r.ok) throw new Error(String(r.status));
+      const b = await r.blob();
+      const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `wss_scenario.${fmt.ext}`; a.click(); URL.revokeObjectURL(u);
+    } catch { alert(`Export failed (${fmt.label}). Please try again.`); }
+    finally { setBusy(null); }
   };
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
