@@ -101,8 +101,11 @@ function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, do
   const stackAreas = base ? [baseArea, ...bandAreas] : bandAreas;
   return (
     <div style={{ marginBottom: 12 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
-        <div>
+      {/* Fixed-height header so paired charts' plot areas line up horizontally regardless of subtitle length.
+          The title/subtitle column takes the full width (flex:1, minWidth:0 so it can wrap) and overflow is
+          clipped to the fixed height. */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, height: 50, overflow: 'hidden' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e3a5f', margin: '0 0 1px' }}>{title}</h4>
           {subtitle && <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>{subtitle}</div>}
         </div>
@@ -514,7 +517,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             data={covData} yLabel={isShare ? '% of population' : '# households (millions)'}
             base={covBase} bands={csBands} lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined}
             filename={`${scopeName}_${secKey}_coverage`} />
-          <StackChart title={`${label} — annual financing gap`} subtitle="Interventions stack up from zero (what each closes); the dashed line is the total BAU gap — the space up to it is the gap still remaining"
+          <StackChart title={`${label} — annual financing gap`} subtitle="Interventions stack up from zero; the space up to the dashed line (total BAU gap) is the gap remaining"
             data={gapData} yLabel={`Financing gap (B ${cur}/yr)`}
             bands={csBands} lines={gapLines} fmt={gapFmt}
             filename={`${scopeName}_${secKey}_financing_gap`} />
