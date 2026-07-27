@@ -213,10 +213,10 @@ export default function App() {
     if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
   }
 
-  // Data Inputs, BAU, Intervention Design and Results Dashboard are active; Export stays greyed out
-  // until it is wired to live intervention output.
-  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard', 'Export'];
-  const disabledTabs = new Set([4]);
+  // Exports now live throughout the tool (per-table, per-chart, and the whole-scenario Export buttons on
+  // the Intervention Design and Results tabs), so there is no separate Export tab.
+  const tabs = ['Data Inputs', 'BAU Scenario', 'Intervention Design', 'Results Dashboard'];
+  const disabledTabs = new Set<number>();
 
   return (
     <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif' }}>
@@ -473,44 +473,6 @@ export default function App() {
         {activeTab === 3 && (
           <ResultsDashboard geoScope={chartScope} scenarios={scenarios} inputs={inputs} altInputs={altInputs} onToggle={setToggle} />
         )}
-        {activeTab === 4 && (
-          <div style={{ flex: 1, overflowY: 'auto', padding: '32px 40px' }}>
-            <h2 style={{ fontSize: 18, color: '#1e3a5f', marginBottom: 16 }}>Export Outputs</h2>
-            <p style={{ fontSize: 13, color: '#64748b', marginBottom: 24 }}>Download your scenario results in various formats for reporting and further analysis.</p>
-            <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-              {[
-                { label: 'PowerPoint Presentation', desc: 'Slides with charts and summary tables', icon: '📊', ext: 'pptx', endpoint: '/api/export/pptx' },
-                { label: 'Excel Workbook', desc: 'Full data tables for offline analysis', icon: '📗', ext: 'xlsx', endpoint: '/api/export/xlsx' },
-                { label: 'CSV Data', desc: 'Raw data for import into other tools', icon: '📄', ext: 'csv', endpoint: '/api/export/csv' },
-              ].map(fmt => (
-                <button key={fmt.ext} onClick={() => {
-                  fetch(fmt.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inputs || {}) })
-                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `wss_results.${fmt.ext}`; a.click(); });
-                }} style={{
-                  padding: '20px 24px', border: '1px solid #e2e8f0', borderRadius: 10, background: '#fff',
-                  cursor: 'pointer', textAlign: 'left', width: 220, boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
-                }}>
-                  <div style={{ fontSize: 28, marginBottom: 8 }}>{fmt.icon}</div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e3a5f', marginBottom: 4 }}>{fmt.label}</div>
-                  <div style={{ fontSize: 11, color: '#64748b' }}>{fmt.desc}</div>
-                </button>
-              ))}
-            </div>
-            {scenarios.length > 0 && <>
-              <h3 style={{ fontSize: 15, color: '#1e3a5f', marginTop: 32, marginBottom: 12 }}>Export Individual Scenarios</h3>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {scenarios.map((s, i) => (
-                  <button key={i} onClick={() => {
-                    fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s.inputs) })
-                      .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${s.name}.pptx`; a.click(); });
-                  }} style={{ padding: '10px 16px', border: '1px solid #bae6fd', borderRadius: 6, background: '#f0f9ff', cursor: 'pointer', fontSize: 12, color: '#0369a1' }}>
-                    📑 {s.name}
-                  </button>
-                ))}
-              </div>
-            </>}
-          </div>
-        )}
 
         </div>
       </div>
@@ -599,11 +561,8 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
             <li style={{ marginBottom: 6 }}>
               <strong>Intervention Design</strong> — Pick Water Supply or Sanitation, switch each intervention on or off with its toggle, and set its parameters, which include collection efficiency, NRW reduction, budget execution improvement, capex efficiency (a unit-cost discount), optimised technology selection, tariff reform, and microfinance (with a self-finance carve-out and a means-based grant inside it). Add your own under <em>Custom Interventions</em> at the bottom. The impact graph updates live.
             </li>
-            <li style={{ marginBottom: 6 }}>
-              <strong>Results Dashboard</strong> — Compare BAU and intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap.
-            </li>
             <li style={{ marginBottom: 0 }}>
-              <strong>Export</strong> — Download your results as PowerPoint, Excel, or CSV.
+              <strong>Results Dashboard</strong> — Compare BAU and intervention scenarios. Toggle interventions and adjust the target years to see the impact on coverage and the financing gap. Export the whole scenario as PowerPoint, Excel, or CSV — or download any individual chart (PNG / JPG / Excel) or table (CSV / Excel) from its own button.
             </li>
           </ol>
 
@@ -630,7 +589,7 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
           <div style={{ padding: '12px 16px', background: '#f8fafc', borderRadius: 8, border: '1px solid #e2e8f0', lineHeight: 1.5 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>📋 Save Scenario</div>
             <div style={{ fontSize: 13, color: '#475569' }}>
-              Captures a snapshot of the current inputs for comparison — e.g. save "Ambitious 2040", change assumptions, save "Conservative 2040". Saved scenarios appear on the Results Dashboard and Export tab, where each can be downloaded as its own PowerPoint slide.
+              Captures a snapshot of the current inputs for comparison — e.g. save "Ambitious 2040", change assumptions, save "Conservative 2040". Saved scenarios appear on the Results Dashboard, where each can be downloaded as its own PowerPoint slide.
             </div>
           </div>
           </>}
