@@ -3,9 +3,10 @@ import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
   Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, LabelList,
 } from 'recharts';
-import { toPng } from 'html-to-image';
 import { C } from '../chartColors';
 import { linesFirstLegend } from './chartLegend';
+import ChartExport from './ChartExport';
+import TableExport from './TableExport';
 
 /**
  * BAU vs Target chart driven by the LIVE calculation engine (validated cell-by-cell against the
@@ -329,35 +330,14 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
 
   const fileBase = `${(scopeLabel ? scopeLabel + '_' : '')}${sector}_${rungLabel.replace(/\s+/g, '')}_bau`;
 
-  // CSV of the data table (forecast years).
-  const exportCsv = () => {
-    if (!tableRows.length) return;
-    const header = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Service Gap (M if HH)'];
-    if (showMoney) header.push('Financing gap (B ' + (endAnno?.cur || 'LCU') + '/yr)');
-    const lines = [header.join(',')];
-    tableRows.forEach((r: any) => {
-      const row: any[] = [r.year, round3(r.total), round3(r.bau), round3(r.tgt), round3(r.gapHH)];
-      if (showMoney) row.push(r.finGap == null ? '' : round3(r.finGap / 1000));
-      lines.push(row.join(','));
-    });
-    const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileBase + '.csv'; a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  const exportPng = async () => {
-    const node = chartRef.current;
-    if (!node) return;
-    try {
-      const dataUrl = await toPng(node, { backgroundColor: '#ffffff', pixelRatio: 2, cacheBust: true });
-      const a = document.createElement('a');
-      a.href = dataUrl; a.download = fileBase + '.png'; a.click();
-    } catch (e) {
-      setError('PNG export failed: ' + String(e));
-    }
-  };
+  // Data series behind the chart (what is plotted) — for the chart's ⤓ Excel export.
+  const chartHeaders = ['Year', bauKey, tgtKey, 'Total households'];
+  const chartRows = displayData.map((r: any) => [r.year, r[bauKey], r[tgtKey], r['Total households']]);
+  // Forecast data table (per year) — for its own ⤓ CSV / ⤓ Excel.
+  const tableHeaders = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Service Gap (M HH)',
+    ...(showMoney ? [`Financing gap (${endAnno?.cur || 'LCU'} M/yr)`] : [])];
+  const tableExportRows = tableRows.map((r: any) => [r.year, round3(r.total), round3(r.bau), round3(r.tgt), round3(r.gapHH),
+    ...(showMoney ? [r.finGap == null ? '' : round3(r.finGap)] : [])]);
 
   const toolBtn: React.CSSProperties = {
     padding: '4px 10px', fontSize: 11, border: '1px solid #cbd5e1', borderRadius: 6,
@@ -584,8 +564,8 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
             </>)}
           </div>
         )}
-        <button onClick={exportPng} style={toolBtn} title="Download this graph as a PNG image">⤓ PNG</button>
-        <button onClick={exportCsv} style={toolBtn} title="Download the data table as CSV">⤓ CSV</button>
+        <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — ${rungNameRaw}: BAU vs Target`}
+          sheets={[{ name: 'Chart data', headers: chartHeaders, rows: chartRows }]} />
       </div>
       <div ref={chartRef} style={{ position: 'relative' }}>
         <ComposedChart width={Math.max(1, wrapW)} height={380} data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
@@ -635,7 +615,10 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
       {/* ── Per-year data table (forecast years) ─────────────────────────────────────────────── */}
       {tableRows.length > 0 && (
         <div style={{ marginTop: 14 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>Forecast data (per year)</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 4 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#1e3a5f' }}>Forecast data (per year)</div>
+            <TableExport filename={fileBase} sheetName="Forecast" headers={tableHeaders} rows={tableExportRows} compact />
+          </div>
           <div style={{ overflowX: 'auto', border: '1px solid #e5e7eb', borderRadius: 4 }}>
             <table style={{ borderCollapse: 'separate', borderSpacing: 0, fontSize: 11, width: '100%' }}>
               <thead>

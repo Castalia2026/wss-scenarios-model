@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label,
 } from 'recharts';
+import ChartExport from './ChartExport';
 
 /**
  * Live intervention-impact chart. INCREMENTAL multi-pass compare: it POSTs /api/calculate once for the
@@ -116,11 +117,20 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
   }, [depKey]);
 
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
+  const chartRef = useRef<HTMLDivElement>(null);
+  // Data series behind the chart, for the "⤓ Excel" export: Year, BAU base, each band, and the ceiling.
+  const exportHeaders = ['Year', 'BAU (safely managed)', ...bands.map(([, label]) => label), 'Total households'];
+  const exportRows = data.map((r: any) => [r.year, r['BAU (safely managed)'], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
+  const fileBase = `${scopeLabel ? scopeLabel + '_' : ''}${sector}_intervention_impact`;
   return (
     <div>
-      <h3 style={{ fontSize: 14, marginBottom: 6, fontWeight: 600, color: '#1e3a5f' }}>
-        {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
-      </h3>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
+        <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600, color: '#1e3a5f' }}>
+          {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
+        </h3>
+        <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — intervention impact`}
+          sheets={[{ name: `${sectorLabel} impact`, headers: exportHeaders, rows: exportRows }]} compact />
+      </div>
       <div style={{ fontSize: 10, color: '#334155', background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
         Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra households an enabled intervention delivers.
       </div>
@@ -131,6 +141,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
           {summary.gapBau > 0 && <> (a <b>{Math.round((1 - summary.gapIntv / summary.gapBau) * 100)}%</b> reduction)</>}.
         </div>
       )}
+      <div ref={chartRef} style={{ background: '#fff' }}>
       <ResponsiveContainer width="100%" height={360}>
         <ComposedChart data={data} margin={{ top: 14, right: 24, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -156,6 +167,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
           <Line type="monotone" dataKey="Total households" stroke={C.total} strokeWidth={1.5} strokeDasharray="6 4" dot={false} legendType="plainline" isAnimationActive animationDuration={600} />
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

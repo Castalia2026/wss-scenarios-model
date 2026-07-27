@@ -1,10 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 import { C, INTV_PALETTE as P } from '../chartColors';
 import { linesFirstLegend } from './chartLegend';
 import ExportButtons from './ExportButtons';
+import ChartExport from './ChartExport';
+import TableExport from './TableExport';
 
 // ── formatting helpers (mirrors LiveBAUChart) ──────────────────────────────────────────────────
 function round3(v: number): number { return (!isFinite(v) || v === 0) ? 0 : Number(v.toPrecision(3)); }
@@ -69,17 +71,28 @@ type Contrib = { water: ContribSeries; sanitation: ContribSeries } | null;
 
 // A stacked-contribution chart: a base area at the bottom, one stacked band per intervention on top (so the
 // coloured stack IS each lever's marginal contribution), plus optional reference lines drawn over the top.
-function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, domain }: {
+function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, domain, filename }: {
   title: string; subtitle?: string; data: any[]; yLabel: string;
   base: { key: string; label: string; stroke: string; fill: string };
   bands: ContribBand[];
   lines: { key: string; name: string; color: string; dash?: string; width?: number }[];
-  fmt: (v: number) => string; domain?: [number, number];
+  fmt: (v: number) => string; domain?: [number, number]; filename: string;
 }) {
+  const chartRef = useRef<HTMLDivElement>(null);
+  // Data series behind the chart, for the "⤓ Excel" export: Year, base, each band, then the reference lines.
+  const exHeaders = ['Year', base.label, ...bands.map(b => b.label), ...lines.map(l => l.name)];
+  const exRows = data.map((r: any) => [r.year, r[base.key] ?? 0, ...bands.map(b => r[b.key] ?? 0), ...lines.map(l => r[l.key] ?? '')]);
   return (
     <div style={{ marginBottom: 12 }}>
-      <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e3a5f', margin: '0 0 1px' }}>{title}</h4>
-      {subtitle && <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>{subtitle}</div>}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
+        <div>
+          <h4 style={{ fontSize: 13, fontWeight: 600, color: '#1e3a5f', margin: '0 0 1px' }}>{title}</h4>
+          {subtitle && <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>{subtitle}</div>}
+        </div>
+        <ChartExport chartRef={chartRef} filename={filename} title={title}
+          sheets={[{ name: 'Data', headers: exHeaders, rows: exRows }]} compact />
+      </div>
+      <div ref={chartRef} style={{ background: '#fff' }}>
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={data} margin={{ top: 10, right: 24, bottom: 5, left: 12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
@@ -102,6 +115,7 @@ function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, do
           ))}
         </ComposedChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }
@@ -293,7 +307,13 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const totHH = rows.reduce((a, r) => a + (r.addHH || 0), 0);
     const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
     const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    const exHeaders = ['Intervention', `Resources generated (${cur} B)`, hhCol];
+    const exRows = [...rows.map(r => [r.label, r.resources == null ? '' : r.resources, r.addHH]), ['Total', totRes, totHH]];
     return (
+      <div>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+        <TableExport filename="contribution_by_intervention" sheetName="Interventions" headers={exHeaders} rows={exRows} compact />
+      </div>
       <div style={{ margin: '2px 0 4px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 680 }}>
         <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
           <thead>
@@ -319,6 +339,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
           </tbody>
         </table>
       </div>
+      </div>
     );
   };
 
@@ -329,9 +350,14 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
     const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
     const rows: [string, any][] = [['Water Supply', both.water.sum], ['Sanitation', both.sanitation.sum]];
+    const exHeaders = [`Sector · ${scopeName}`, 'Current (%)', `BAU ${end} (%)`, `Target ${end} (%)`, `With reforms ${end} (%)`];
+    const exRows = rows.map(([label, s]) => [label, +(s.curCov * 100).toFixed(2), +(s.bauCov * 100).toFixed(2), +(s.tgtCov * 100).toFixed(2), +(s.scnCov * 100).toFixed(2)]);
     return (
       <div style={{ marginBottom: 18 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f', marginBottom: 4 }}>Executive summary — safely-managed coverage (% of households)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f' }}>Executive summary — safely-managed coverage (% of households)</div>
+          <TableExport filename="executive_summary_coverage" sheetName="Exec summary" headers={exHeaders} rows={exRows} compact />
+        </div>
         <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 720 }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 460 }}>
             <thead><tr>
@@ -359,9 +385,14 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const InvestmentGapTable = ({ inv }: { inv: InvTable }) => {
     const th: React.CSSProperties = { padding: '6px 10px', fontSize: 10.5, fontWeight: 700, color: '#fff', background: '#0369a1', textAlign: 'right' };
     const td: React.CSSProperties = { padding: '5px 10px', fontSize: 11, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
+    const exHeaders = [`Investment gap (BAU, ${cur} B)`, ...inv.periods.map(p => p.label)];
+    const exRows = inv.rows.map(r => [r.label, ...r.vals.map(v => +v.toFixed(4))]);
     return (
       <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Investment gap (BAU, {cur} b)</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f' }}>Investment gap (BAU, {cur} b)</div>
+          <TableExport filename="investment_gap" sheetName="Investment gap" headers={exHeaders} rows={exRows} compact />
+        </div>
         <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6 }}>
           <table style={{ borderCollapse: 'collapse', width: '100%', minWidth: 420 }}>
             <thead><tr>
@@ -390,9 +421,14 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
       ['Basic service', unit.basic],
       ['Average capex per HH', avg],
     ];
+    const exHeaders = ['Service', `Unit cost per HH (${cur})`];
+    const exRows = rows.map(([label, v]) => [label, Math.round(v)]);
     return (
       <div style={{ marginTop: 8 }}>
-        <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Unit cost per household ({cur})</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f' }}>Unit cost per household ({cur})</div>
+          <TableExport filename="unit_cost_per_hh" sheetName="Unit cost" headers={exHeaders} rows={exRows} compact />
+        </div>
         <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 420 }}>
           <table style={{ borderCollapse: 'collapse', width: '100%' }}>
             <tbody>
@@ -448,10 +484,12 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
           <StackChart title={`${label} — safely-managed coverage`} subtitle="BAU base + each intervention's added households (target & ceiling shown as lines)"
             data={covData} yLabel={isShare ? '% of population' : '# households (millions)'}
-            base={covBase} bands={csBands} lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+            base={covBase} bands={csBands} lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined}
+            filename={`${scopeName}_${secKey}_coverage`} />
           <StackChart title={`${label} — annual financing gap`} subtitle="Grey = gap remaining · colours = closed by each intervention (stack height = BAU gap)"
             data={gapData} yLabel={`Financing gap (B ${cur}/yr)`}
-            base={gapBase} bands={csBands} lines={[]} fmt={gapFmt} />
+            base={gapBase} bands={csBands} lines={[]} fmt={gapFmt}
+            filename={`${scopeName}_${secKey}_financing_gap`} />
         </div>
         {rows && rows.length > 0 && (
           <div style={{ marginTop: 8 }}>
