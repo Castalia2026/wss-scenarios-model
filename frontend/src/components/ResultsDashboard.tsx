@@ -74,15 +74,31 @@ type Contrib = { water: ContribSeries; sanitation: ContribSeries } | null;
 // coloured stack IS each lever's marginal contribution), plus optional reference lines drawn over the top.
 function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, domain, filename }: {
   title: string; subtitle?: string; data: any[]; yLabel: string;
-  base: { key: string; label: string; stroke: string; fill: string };
+  base?: { key: string; label: string; stroke: string; fill: string };   // optional bottom area (coverage BAU)
   bands: ContribBand[];
   lines: { key: string; name: string; color: string; dash?: string; width?: number }[];
   fmt: (v: number) => string; domain?: [number, number]; filename: string;
 }) {
   const chartRef = useRef<HTMLDivElement>(null);
-  // Data series behind the chart, for the "⤓ Excel" export: Year, base, each band, then the reference lines.
-  const exHeaders = ['Year', base.label, ...bands.map(b => b.label), ...lines.map(l => l.name)];
-  const exRows = data.map((r: any) => [r.year, r[base.key] ?? 0, ...bands.map(b => r[b.key] ?? 0), ...lines.map(l => r[l.key] ?? '')]);
+  // Data series behind the chart, for the "⤓ Excel" export: Year, [base], each band, then the reference lines.
+  const exHeaders = ['Year', ...(base ? [base.label] : []), ...bands.map(b => b.label), ...lines.map(l => l.name)];
+  const exRows = data.map((r: any) => [r.year, ...(base ? [r[base.key] ?? 0] : []), ...bands.map(b => r[b.key] ?? 0), ...lines.map(l => r[l.key] ?? '')]);
+  // Native Excel chart: optional base area at the bottom, then the intervention bands stacked up, plus the lines.
+  const chartSpec = {
+    category: 'Year', stacked: true,
+    areas: [...(base ? [{ name: base.label, color: base.fill }] : []), ...bands.map(b => ({ name: b.label, color: b.color }))],
+    lines: lines.map(l => ({ name: l.name, color: l.color, dash: !!l.dash })),
+    yTitle: yLabel, xTitle: 'Year',
+  };
+  // Coverage: BAU base at the bottom then a band per intervention. Financing gap: no base — the intervention
+  // bands stack up from zero and a reference line marks the total BAU gap (the distance up to it is the gap left).
+  const baseArea = base ? (
+    <Area key={base.key} type="monotone" dataKey={base.key} name={base.label} stackId="s" fill={base.fill} stroke={base.stroke} fillOpacity={0.7} strokeWidth={1.25} legendType="rect" isAnimationActive={false} />
+  ) : null;
+  const bandAreas = bands.map(b => (
+    <Area key={b.key} type="monotone" dataKey={b.key} name={b.label} stackId="s" fill={b.color} stroke={b.color} fillOpacity={0.6} strokeWidth={1.5} strokeOpacity={1} legendType="rect" isAnimationActive={false} />
+  ));
+  const stackAreas = base ? [baseArea, ...bandAreas] : bandAreas;
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap' }}>
@@ -91,7 +107,7 @@ function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, do
           {subtitle && <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 5 }}>{subtitle}</div>}
         </div>
         <ChartExport chartRef={chartRef} filename={filename} title={title}
-          sheets={[{ name: 'Data', headers: exHeaders, rows: exRows }]} compact />
+          sheets={[{ name: 'Data', headers: exHeaders, rows: exRows }]} chartSpec={chartSpec} compact />
       </div>
       <div ref={chartRef} style={{ background: '#fff' }}>
       <ResponsiveContainer width="100%" height={280}>
@@ -104,12 +120,9 @@ function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, do
           <Tooltip formatter={(v: any) => fmt(+v) as any} labelFormatter={(l: any) => String(l)} contentStyle={{ fontSize: 11 }} />
           {/* Legend lists reference lines first, then the stacked area fills (see chartLegend). */}
           <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
-          {/* Base at the bottom of the stack, then one band per intervention (same colours as the
-              intervention-impact chart). Each band keeps a saturated same-colour top edge for delineation. */}
-          <Area type="monotone" dataKey={base.key} name={base.label} stackId="s" fill={base.fill} stroke={base.stroke} fillOpacity={0.7} strokeWidth={1.25} legendType="rect" isAnimationActive={false} />
-          {bands.map(b => (
-            <Area key={b.key} type="monotone" dataKey={b.key} name={b.label} stackId="s" fill={b.color} stroke={b.color} fillOpacity={0.6} strokeWidth={1.5} strokeOpacity={1} legendType="rect" isAnimationActive={false} />
-          ))}
+          {/* Coverage: BAU base at the bottom then a band per intervention. Financing gap: no base — the bands
+              stack up from zero and a reference line (in `lines`) marks the total BAU gap to close. */}
+          {stackAreas}
           {lines.map(l => (
             <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2}
               strokeDasharray={l.dash} dot={false} legendType="plainline" connectNulls isAnimationActive={false} />
@@ -258,7 +271,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               gapRow['Custom interventions'] = +(redC / 1000).toFixed(4);
               sumRed += redC;
             }
-            gapRow.__remain = +(Math.max(0, bauGap - sumRed) / 1000).toFixed(4);   // remaining gap → stack tops at BAU gap
+            gapRow.__remain = +(Math.max(0, bauGap - sumRed) / 1000).toFixed(4);   // remaining gap (kept for exports)
+            gapRow.__bau_gap = +(bauGap / 1000).toFixed(4);                        // total BAU gap → the target line to close
             covRows.push(covRow); gapRows.push(gapRow);
           });
           const all: ContribBand[] = en.map(d => ({ key: d.label, label: d.label, color: d.color }));
@@ -321,10 +335,10 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const th: React.CSSProperties = { padding: '7px 12px', fontSize: 11, fontWeight: 700, color: '#fff', background: '#0ea5e9', textAlign: 'right' };
     const td: React.CSSProperties = { padding: '6px 12px', fontSize: 11.5, borderBottom: '1px solid #eef2f7', textAlign: 'right' };
     const exHeaders = ['Intervention', `Resources generated (${cur} B)`, hhCol];
-    const exRows = [...rows.map(r => [r.label, r.resources == null ? '' : r.resources, r.addHH]), ['Total', totRes, totHH]];
+    const exRows = [...rows.map(r => [r.label, r.resources == null ? 'n/a' : r.resources, r.addHH]), ['Total', totRes, totHH]];
     return (
       <div>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 4, maxWidth: 680 }}>
         <TableExport filename="contribution_by_intervention" sheetName="Interventions" headers={exHeaders} rows={exRows} compact />
       </div>
       <div style={{ margin: '2px 0 4px', overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 6, maxWidth: 680 }}>
@@ -340,7 +354,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             {rows.map((r, i) => (
               <tr key={r.key} style={{ background: i % 2 ? '#f1f8fd' : '#fff' }}>
                 <td style={{ ...td, textAlign: 'left', color: '#334155' }}>{r.label}</td>
-                <td style={{ ...td, color: '#0369a1' }}>{r.resources == null ? '—' : sig3(r.resources)}</td>
+                <td style={{ ...td, color: '#0369a1' }}>{r.resources == null ? 'n/a' : sig3(r.resources)}</td>
                 <td style={{ ...td, color: '#0369a1' }}>{sig3(r.addHH)}</td>
               </tr>
             ))}
@@ -367,7 +381,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const exRows = rows.map(([label, s]) => [label, +(s.curCov * 100).toFixed(2), +(s.bauCov * 100).toFixed(2), +(s.tgtCov * 100).toFixed(2), +(s.scnCov * 100).toFixed(2)]);
     return (
       <div style={{ marginBottom: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4, maxWidth: 720 }}>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#1e3a5f' }}>Executive summary — safely-managed coverage (% of households)</div>
           <TableExport filename="executive_summary_coverage" sheetName="Exec summary" headers={exHeaders} rows={exRows} compact />
         </div>
@@ -438,7 +452,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     const exRows = rows.map(([label, v]) => [label, Math.round(v)]);
     return (
       <div style={{ marginTop: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 3, maxWidth: 420 }}>
           <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f' }}>Unit cost per household ({cur})</div>
           <TableExport filename="unit_cost_per_hh" sheetName="Unit cost" headers={exHeaders} rows={exRows} compact />
         </div>
@@ -474,9 +488,10 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
       { key: '__total', name: 'Total households', color: C.total, dash: '8 4', width: 1.25 },
       { key: '__target', name: 'Target', color: C.target, dash: '6 3', width: 2 },
     ];
-    // Gap stack: grey "remaining gap" base at the bottom, one gap-reduction band per intervention on top —
-    // the stack height traces the BAU financing gap, so the coloured part is what each lever closes.
-    const gapBase = { key: '__remain', label: 'Remaining gap (with interventions)', stroke: '#94a3b8', fill: '#e2e8f0' };
+    // Gap chart: NO base area — the intervention gap-reduction bands stack UP from zero (what the levers close),
+    // and a dashed line marks the total BAU financing gap. The vertical distance from the top of the stack up to
+    // that line is the gap still remaining to reach the fully-financed target.
+    const gapLines = [{ key: '__bau_gap', name: 'Total financing gap (BAU) — target to close', color: C.gap, dash: '6 3', width: 2 }];
     const noImpact = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
     const rows = secKey === 'water' ? table?.water : table?.sanitation;
     const hhCol = secKey === 'water' ? "Added HHs with treated, piped (HHs '000)" : "Added safely-managed HHs (HHs '000)";
@@ -499,9 +514,9 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             data={covData} yLabel={isShare ? '% of population' : '# households (millions)'}
             base={covBase} bands={csBands} lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined}
             filename={`${scopeName}_${secKey}_coverage`} />
-          <StackChart title={`${label} — annual financing gap`} subtitle="Grey = gap remaining · colours = closed by each intervention (stack height = BAU gap)"
+          <StackChart title={`${label} — annual financing gap`} subtitle="Interventions stack up from zero (what each closes); the dashed line is the total BAU gap — the space up to it is the gap still remaining"
             data={gapData} yLabel={`Financing gap (B ${cur}/yr)`}
-            base={gapBase} bands={csBands} lines={[]} fmt={gapFmt}
+            bands={csBands} lines={gapLines} fmt={gapFmt}
             filename={`${scopeName}_${secKey}_financing_gap`} />
         </div>
         {rows && rows.length > 0 && (
@@ -593,7 +608,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
 
       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: -6, marginBottom: 16 }}>
         Table: “Resources generated” is the finance each lever mobilises (revenue collected, tariff income, recovered-water
-        value, sewer revenue, or loans) — cost-side and budget-execution levers show “—” as they stretch existing budget
+        value, sewer revenue, or loans) — cost-side and budget-execution levers show “n/a” as they stretch existing budget
         rather than raise new money. “Added HHs” is each lever’s marginal safely-managed service. Enabled custom
         interventions appear as a single “Custom interventions” band on the charts above, but are not itemised in this table.
       </div>

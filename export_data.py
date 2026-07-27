@@ -9,6 +9,7 @@ financing-gap reduction. Customs are excluded from the itemisation (they still s
 import io
 import csv
 import copy
+import math
 import base64
 
 from demo_adapter import coerce_to_engine
@@ -133,7 +134,7 @@ def breakdown_table(inputs, sector_key, defs):
     headers = ['Intervention', 'Added safely-managed (M HH)', f'Resources generated ({cur} B)', f'Financing gap closed ({cur} B)']
     rows = []
     for label, add_hh, res, gap in intervention_breakdown(inputs, sector_key, defs):
-        rows.append([label, add_hh, ('—' if res is None else res), gap])
+        rows.append([label, add_hh, ('n/a' if res is None else res), gap])
     return headers, rows
 
 
@@ -177,20 +178,36 @@ def _safe_title(s):
     return (re.sub(r'[:\\/?*\[\]]', ' ', str(s or 'Sheet')).strip() or 'Sheet')[:31]
 
 
+def _col_width(header, cells):
+    """Compact column width: size to the DATA, letting a long header WRAP over several lines rather than
+    stretching the whole column to fit it on one row. Numeric / short columns stay narrow; only genuinely
+    long text DATA widens a column. Fixes the previously 'fat' exports where a long header like
+    'With reforms 2040 (%)' forced a column of short percentages out to ~23 units."""
+    data_len = max([0] + [len(str(c)) for c in cells])
+    words = str(header).split()
+    longest_word = max([len(w) for w in words]) if words else 0   # header wraps → only its longest word must fit
+    base = max(data_len, longest_word)
+    return min(40, max(7, base + 1.5))
+
+
 def _write_sheet(wb, title, headers, rows):
     from openpyxl.styles import Font, PatternFill, Alignment
     ws = wb.create_sheet(title=_safe_title(title))
     hdr_fill = PatternFill('solid', fgColor='0EA5E9')
     hdr_font = Font(bold=True, color='FFFFFF')
+    hdr_align = Alignment(horizontal='center', vertical='center', wrap_text=True)   # wrap keeps columns narrow
     ws.append([str(h) for h in headers])
     for c in ws[1]:
-        c.fill = hdr_fill; c.font = hdr_font; c.alignment = Alignment(horizontal='center')
+        c.fill = hdr_fill; c.font = hdr_font; c.alignment = hdr_align
     for row in rows:
         ws.append(list(row))
+    hdr_lines = 1
     for i, h in enumerate(headers, 1):
-        cell_lens = [len(str(row[i - 1])) for row in rows if i - 1 < len(row)]   # rows may be ragged
-        width = max([len(str(h))] + cell_lens)
-        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = min(46, max(10, width + 2))
+        cells = [row[i - 1] for row in rows if i - 1 < len(row)]   # rows may be ragged
+        w = _col_width(h, cells)
+        ws.column_dimensions[ws.cell(row=1, column=i).column_letter].width = w
+        hdr_lines = max(hdr_lines, math.ceil(len(str(h)) / max(1.0, w - 1)))   # lines this header wraps into
+    ws.row_dimensions[1].height = min(74, 15 * hdr_lines + 5)   # tall enough to show the wrapped header
     ws.freeze_panes = 'A2'
     return ws
 
@@ -211,24 +228,121 @@ def table_xlsx(sheets):
     return _save(wb)
 
 
-def chart_xlsx(title, image_data_url, sheets):
-    """A workbook whose first sheet embeds the chart PNG, followed by one sheet per data series table."""
+# ── native (data-linked) chart for the per-chart "⤓ Excel" export ─────────────────────────────────────
+# Rather than pasting a static PNG, we write the chart's data table and add a REAL Excel chart bound to those
+# cells: an AreaChart for the stacked bands + a LineChart for the reference lines, sharing ONE pair of axes.
+# Edit a number in the data table and the chart redraws — the export is dynamic, not a picture.
+_EMU_PT = 12700   # EMUs per point (openpyxl line widths are in EMUs)
+
+
+def _hexcolor(c):
+    """'#1a9ed6' / '1a9ed6' → 'RRGGBB' (6 hex), tolerant of missing/short input."""
+    return (str(c or '').lstrip('#').upper() or '888888')[:6].ljust(6, '0')
+
+
+def _native_chart(ws, title, spec, headers, nrows):
+    """Add a data-linked Area(+Line) chart to `ws`, whose series reference the columns of the table already
+    written at A1. `spec` = {category, stacked, areas:[{name,color}], lines:[{name,color,dash}], x/yTitle}."""
+    from openpyxl.chart import AreaChart, LineChart, Reference, Series
+    from openpyxl.chart.marker import Marker
+    from openpyxl.chart.shapes import GraphicalProperties
+    from openpyxl.drawing.line import LineProperties
+    from openpyxl.utils import get_column_letter
+
+    def col_of(name):
+        try:
+            return headers.index(name) + 1
+        except ValueError:
+            return None
+
+    cat_name = spec.get('category') or (headers[0] if headers else None)
+    cat_col = col_of(cat_name) or 1
+    cats = Reference(ws, min_col=cat_col, min_row=2, max_row=1 + nrows)
+
+    def add_series(chart, name, style):
+        col = col_of(name)
+        if not col:
+            return
+        ref = Reference(ws, min_col=col, min_row=1, max_row=1 + nrows)   # incl. header row → title_from_data
+        s = Series(ref, title_from_data=True)
+        style(s)
+        chart.series.append(s)
+
+    areas = spec.get('areas') or []
+    lines = spec.get('lines') or []
+
+    area_chart = None
+    if areas:
+        area_chart = AreaChart()
+        area_chart.grouping = 'stacked' if spec.get('stacked') else 'standard'
+        for a in areas:
+            def style(s, a=a):
+                h = _hexcolor(a.get('color'))
+                gp = GraphicalProperties(solidFill=h)
+                gp.line = LineProperties(solidFill=h)
+                s.graphicalProperties = gp
+            add_series(area_chart, a.get('name'), style)
+        area_chart.set_categories(cats)
+
+    line_chart = None
+    if lines:
+        line_chart = LineChart()
+        for l in lines:
+            def style(s, l=l):
+                h = _hexcolor(l.get('color'))
+                lp = LineProperties(solidFill=h, w=int(2.25 * _EMU_PT))
+                if l.get('dash'):
+                    lp.prstDash = 'dash'
+                gp = GraphicalProperties(); gp.line = lp
+                s.graphicalProperties = gp
+                s.marker = Marker(symbol='none')
+                s.smooth = False
+            add_series(line_chart, l.get('name'), style)
+        line_chart.set_categories(cats)
+
+    chart = area_chart or line_chart
+    if chart is None:
+        return
+    if area_chart is not None and line_chart is not None:
+        chart += line_chart   # area + line share one default axis pair (catAx 10 / valAx 100)
+    chart.title = title or None
+    if spec.get('yTitle'):
+        chart.y_axis.title = spec['yTitle']
+    chart.x_axis.title = spec.get('xTitle') or cat_name
+    chart.x_axis.delete = False
+    chart.y_axis.delete = False
+    chart.height = 10.5   # cm
+    chart.width = 21
+    if chart.legend is not None:
+        chart.legend.position = 'b'
+        chart.legend.overlay = False
+    ws.add_chart(chart, get_column_letter(len(headers) + 2) + '1')   # anchor just right of the data
+
+
+def chart_xlsx(title, sheets, chart_spec=None, image_data_url=None):
+    """Workbook for the per-chart export. With `chart_spec` the first sheet holds the chart's data table AND a
+    live Excel chart bound to those cells (dynamic). Falls back to embedding the PNG when only an image is
+    supplied (legacy callers)."""
     from openpyxl import Workbook
-    from openpyxl.drawing.image import Image as XLImage
     wb = Workbook(); wb.remove(wb.active)
-    chart_ws = wb.create_sheet(title=_safe_title(title or 'Chart'))
-    if title:
-        chart_ws['A1'] = title
-        from openpyxl.styles import Font
-        chart_ws['A1'].font = Font(bold=True, size=13)
-    if image_data_url and ',' in image_data_url:
+    primary = sheets[0] if sheets else {'name': 'Chart data', 'headers': [], 'rows': []}
+    headers = [str(h) for h in (primary.get('headers') or [])]
+    rows = primary.get('rows') or []
+    ws = _write_sheet(wb, primary.get('name') or 'Chart data', headers, rows)
+    if chart_spec and headers and rows:
+        try:
+            _native_chart(ws, title, chart_spec, headers, len(rows))
+        except Exception:
+            pass   # never fail the download over a chart-drawing hiccup — the data sheet is still there
+    elif image_data_url and ',' in image_data_url:
+        from openpyxl.drawing.image import Image as XLImage
+        from openpyxl.utils import get_column_letter
         raw = base64.b64decode(image_data_url.split(',', 1)[1])
         img = XLImage(io.BytesIO(raw))
-        # scale to a sensible width (px), keeping aspect
         if img.width:
             scale = min(1.0, 900.0 / img.width)
             img.width = int(img.width * scale); img.height = int(img.height * scale)
-        chart_ws.add_image(img, 'A3')
-    for s in sheets:
+        ws.add_image(img, get_column_letter(len(headers) + 2) + '1')
+    for s in sheets[1:]:
         _write_sheet(wb, s.get('name', 'Data'), s.get('headers', []), s.get('rows', []))
     return _save(wb)

@@ -333,6 +333,13 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
   // Data series behind the chart (what is plotted) — for the chart's ⤓ Excel export.
   const chartHeaders = ['Year', bauKey, tgtKey, 'Total households'];
   const chartRows = displayData.map((r: any) => [r.year, r[bauKey], r[tgtKey], r['Total households']]);
+  // Native Excel chart: BAU as a filled area, Target (solid) and the households ceiling (dashed) as lines.
+  const chartSpec = {
+    category: 'Year', stacked: false,
+    areas: [{ name: bauKey, color: C.bauFill }],
+    lines: [{ name: tgtKey, color: C.target }, { name: 'Total households', color: C.total, dash: true }],
+    yTitle: isShare ? '% of population' : '# households (millions)', xTitle: 'Year',
+  };
   // Forecast data table (per year) — for its own ⤓ CSV / ⤓ Excel.
   const tableHeaders = ['Year', 'Total households (M)', `${rungNameRaw} BAU (M)`, `Target ${rungLabel} (M)`, 'Service Gap (M HH)',
     ...(showMoney ? [`Financing gap (${endAnno?.cur || 'LCU'} M/yr)`] : [])];
@@ -565,7 +572,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
           </div>
         )}
         <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — ${rungNameRaw}: BAU vs Target`}
-          sheets={[{ name: 'Chart data', headers: chartHeaders, rows: chartRows }]} />
+          sheets={[{ name: 'Chart data', headers: chartHeaders, rows: chartRows }]} chartSpec={chartSpec} />
       </div>
       <div ref={chartRef} style={{ position: 'relative' }}>
         <ComposedChart width={Math.max(1, wrapW)} height={380} data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
@@ -636,7 +643,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: C.bau }}>{sig3(r.bau)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#15803d' }}>{sig3(r.tgt)}</td>
                     <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b45309', fontWeight: 600 }}>{sig3(r.gapHH)}</td>
-                    {showMoney && <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b91c1c' }}>{r.finGap == null ? '—' : sigB(r.finGap)}</td>}
+                    {showMoney && <td style={{ padding: '4px 10px', textAlign: 'right', color: '#b91c1c' }}>{r.finGap == null ? 'n/a' : sigB(r.finGap)}</td>}
                   </tr>
                 ))}
               </tbody>
