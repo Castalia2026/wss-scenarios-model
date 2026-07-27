@@ -113,8 +113,11 @@ def export_csv(inputs: dict = Body(...)):
 @app.post("/api/export/pptx")
 def export_pptx(inputs: dict = Body(...)):
     from export_pptx import create_pptx
+    # The Results deck export sends the on-screen chart PNGs under `_charts` (the backend can't render
+    # recharts). Pull them out before running the engine so they don't reach the input coercion.
+    charts = inputs.pop('_charts', None) if isinstance(inputs, dict) else None
     result = calculate(coerce_to_engine(inputs))
-    output = create_pptx(result, inputs)
+    output = create_pptx(result, inputs, charts)
     return StreamingResponse(
         iter([output.getvalue()]),
         media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation',
