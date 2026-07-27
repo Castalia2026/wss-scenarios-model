@@ -99,46 +99,12 @@ def run_calculation(inputs: dict = Body(...)):
 
 @app.post("/api/export/csv")
 def export_csv(inputs: dict = Body(...)):
-    result = calculate(coerce_to_engine(inputs))
-
-    years = result['years']
-    total_hh = result['total_hh']
-    ws = result['water_supply']
-    san = result['sanitation']
-
-    columns = [
-        'Year', 'Total_HH',
-        'WS_BAU_Serv1', 'WS_Target_Serv1', 'WS_Service_Gap',
-        'WS_Investment_Need', 'WS_BAU_Investment', 'WS_Financing_Gap',
-        'SAN_BAU_Serv1', 'SAN_Target_Serv1', 'SAN_Service_Gap',
-        'SAN_Investment_Need', 'SAN_BAU_Investment', 'SAN_Financing_Gap',
-    ]
-
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(columns)
-
-    for i, year in enumerate(years):
-        writer.writerow([
-            year,
-            total_hh[i],
-            ws['bau_hh_serv'][0][i],
-            ws['target_hh_serv'][0][i],
-            ws['service_gap'][i],
-            ws['investment_need'][i],
-            ws['bau_investment'][i],
-            ws['financing_gap'][i],
-            san['bau_hh_serv'][0][i],
-            san['target_hh_serv'][0][i],
-            san['service_gap'][i],
-            san['investment_need'][i],
-            san['bau_investment'][i],
-            san['financing_gap'][i],
-        ])
-
-    output.seek(0)
+    # Enriched: per-year forecast for both sectors (BAU / target / with-interventions coverage, service gap,
+    # investment need, and BOTH financing gaps) + the per-intervention contribution breakdown.
+    from export_data import scenario_csv
+    text = scenario_csv(inputs)
     return StreamingResponse(
-        iter([output.getvalue()]),
+        iter([text]),
         media_type='text/csv',
         headers={'Content-Disposition': 'attachment; filename="wss_results.csv"'},
     )
@@ -158,33 +124,40 @@ def export_pptx(inputs: dict = Body(...)):
 
 @app.post("/api/export/xlsx")
 def export_xlsx(inputs: dict = Body(...)):
-    from openpyxl import Workbook
-    result = calculate(coerce_to_engine(inputs))
-    wb = Workbook()
-
-    for sector_key, sector_name in [('water_supply', 'Water Supply'), ('sanitation', 'Sanitation')]:
-        ws = wb.create_sheet(title=sector_name)
-        sec = result[sector_key]
-        headers = ['Year', 'Total HH', 'Target Serv1', 'BAU Serv1', 'Service Gap',
-                   'Investment Need', 'BAU Investment', 'Financing Gap']
-        ws.append(headers)
-        for i, year in enumerate(result['years']):
-            ws.append([
-                year, result['total_hh'][i],
-                sec['target_hh_serv'][0][i], sec['bau_hh_serv'][0][i], sec['service_gap'][i],
-                sec['investment_need'][i], sec['bau_investment'][i], sec['financing_gap'][i],
-            ])
-
-    if 'Sheet' in wb.sheetnames:
-        del wb['Sheet']
-
-    output = io.BytesIO()
-    wb.save(output)
-    output.seek(0)
+    # Enriched multi-sheet workbook: per-sector forecast (incl. both financing gaps) + per-intervention breakdown.
+    from export_data import scenario_xlsx
+    out = scenario_xlsx(inputs)
     return StreamingResponse(
-        iter([output.getvalue()]),
+        iter([out.getvalue()]),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         headers={'Content-Disposition': 'attachment; filename="wss_results.xlsx"'},
+    )
+
+
+@app.post("/api/export/table")
+def export_table(payload: dict = Body(...)):
+    """Generic table → xlsx for the per-table export buttons. Body: {filename?, sheets:[{name,headers,rows}]}."""
+    from export_data import table_xlsx
+    sheets = payload.get('sheets') or []
+    fname = (payload.get('filename') or 'table') + '.xlsx'
+    out = table_xlsx(sheets)
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{fname}"'},
+    )
+
+
+@app.post("/api/export/chart")
+def export_chart(payload: dict = Body(...)):
+    """Generic chart → xlsx (embedded PNG + its data series). Body: {filename?, title?, image, sheets:[…]}."""
+    from export_data import chart_xlsx
+    fname = (payload.get('filename') or 'chart') + '.xlsx'
+    out = chart_xlsx(payload.get('title') or '', payload.get('image') or '', payload.get('sheets') or [])
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': f'attachment; filename="{fname}"'},
     )
 
 
