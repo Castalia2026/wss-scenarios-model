@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
-import { C } from '../chartColors';
+import { C, INTV_PALETTE as P } from '../chartColors';
 import { linesFirstLegend } from './chartLegend';
 import ExportButtons from './ExportButtons';
 
@@ -25,25 +25,26 @@ function buildPeriods(years: number[], baseYr: number): { label: string; lo: num
 const sumRange = (arr: number[], years: number[], lo: number, hi: number) =>
   years.reduce((a, y, i) => a + (y >= lo && y <= hi ? (arr[i] || 0) : 0), 0);
 
-// ── intervention lists (key → label; resourceKey names the scenario cash stream it mobilises, if any) ──
-type IntvDef = { key: string; label: string; resourceKey?: string };
+// ── intervention lists (key → label; resourceKey names the scenario cash stream it mobilises, if any;
+//    color = its band colour, shared with the intervention-impact chart via chartColors INTV_PALETTE) ──
+type IntvDef = { key: string; label: string; resourceKey?: string; color: string };
 const WATER_INTV: IntvDef[] = [
-  { key: 'ws_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash' },
-  { key: 'ws_nrw_enabled', label: 'NRW reduction', resourceKey: 'scenario_nrw_net' },
-  { key: 'ws_capital_efficiency_enabled', label: 'Budget execution improvement' },
-  { key: 'ws_costeff_enabled', label: 'Capex efficiency (unit cost)' },
-  { key: 'ws_techmix_enabled', label: 'Optimised technology selection' },
-  { key: 'ws_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash' },
-  { key: 'ws_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume' },
+  { key: 'ws_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash', color: P.collection },
+  { key: 'ws_nrw_enabled', label: 'NRW reduction', resourceKey: 'scenario_nrw_net', color: P.nrw },
+  { key: 'ws_capital_efficiency_enabled', label: 'Budget execution improvement', color: P.budgetExec },
+  { key: 'ws_costeff_enabled', label: 'Capex efficiency (unit cost)', color: P.capex },
+  { key: 'ws_techmix_enabled', label: 'Optimised technology selection', color: P.techmix },
+  { key: 'ws_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash', color: P.tariff },
+  { key: 'ws_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume', color: P.microfinance },
 ];
 const SAN_INTV: IntvDef[] = [
-  { key: 'san_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash' },
-  { key: 'san_capital_efficiency_enabled', label: 'Budget execution improvement' },
-  { key: 'san_costeff_enabled', label: 'Capex efficiency (unit cost)' },
-  { key: 'san_techmix_enabled', label: 'Optimised technology selection' },
-  { key: 'san_nrw_link_enabled', label: 'NRW-linked sanitation revenue', resourceKey: 'scenario_nrw_link_cash' },
-  { key: 'san_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash' },
-  { key: 'san_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume' },
+  { key: 'san_collection_efficiency_enabled', label: 'Increased collection efficiency', resourceKey: 'scenario_collection_cash', color: P.collection },
+  { key: 'san_capital_efficiency_enabled', label: 'Budget execution improvement', color: P.budgetExec },
+  { key: 'san_costeff_enabled', label: 'Capex efficiency (unit cost)', color: P.capex },
+  { key: 'san_techmix_enabled', label: 'Optimised technology selection', color: P.techmix },
+  { key: 'san_nrw_link_enabled', label: 'NRW-linked sanitation revenue', resourceKey: 'scenario_nrw_link_cash', color: P.nrw },
+  { key: 'san_tariff_enabled', label: 'Tariff reform', resourceKey: 'scenario_tariff_cash', color: P.tariff },
+  { key: 'san_microfinance_enabled', label: 'Microfinance', resourceKey: 'scenario_mf_loan_volume', color: P.microfinance },
 ];
 
 interface Props {
@@ -55,14 +56,23 @@ interface Props {
 }
 
 type InvTable = { periods: { label: string; lo: number; hi: number }[]; rows: { label: string; vals: number[]; strong?: boolean }[] };
-type Series = { cov: any[]; gap: any[]; sum: any; inv: InvTable; unit: { sm: number; basic: number } };
+type Series = { sum: any; inv: InvTable; unit: { sm: number; basic: number } };
 type Both = { water: Series; sanitation: Series } | null;
 type Row = { key: string; label: string; addHH: number; resources: number | null };
 
-// A "fan" chart: a shaded band (dataKey "fan" = [low, high]) that widens over the forecast between the
-// BAU projection and the with-interventions scenario, with reference lines traced on top.
-function FanChart({ title, subtitle, data, yLabel, fanFill, fanName, lines, fmt, domain }: {
-  title: string; subtitle?: string; data: any[]; yLabel: string; fanFill: string; fanName: string;
+// Per-intervention stacked breakdown for a sector. covRows/gapRows are per-year rows keyed by each band's
+// label (plus reserved keys __bau/__total/__target for coverage and __remain for the gap). `bands` lists the
+// interventions that actually contribute (each with its INTV_PALETTE colour), in stack order.
+type ContribBand = { key: string; label: string; color: string };
+type ContribSeries = { covRows: any[]; gapRows: any[]; bands: ContribBand[] };
+type Contrib = { water: ContribSeries; sanitation: ContribSeries } | null;
+
+// A stacked-contribution chart: a base area at the bottom, one stacked band per intervention on top (so the
+// coloured stack IS each lever's marginal contribution), plus optional reference lines drawn over the top.
+function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, domain }: {
+  title: string; subtitle?: string; data: any[]; yLabel: string;
+  base: { key: string; label: string; stroke: string; fill: string };
+  bands: ContribBand[];
   lines: { key: string; name: string; color: string; dash?: string; width?: number }[];
   fmt: (v: number) => string; domain?: [number, number];
 }) {
@@ -77,12 +87,15 @@ function FanChart({ title, subtitle, data, yLabel, fanFill, fanName, lines, fmt,
           <YAxis tick={{ fontSize: 10 }} domain={domain} tickFormatter={fmt}>
             <Label value={yLabel} angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
-          <Tooltip formatter={(v: any) => (Array.isArray(v) ? `${fmt(+v[0])} – ${fmt(+v[1])}` : fmt(+v)) as any}
-            labelFormatter={(l: any) => String(l)} contentStyle={{ fontSize: 11 }} />
-          {/* Legend lists the reference lines first, then the fan area (see chartLegend); render order
-              (area then lines) is unchanged so the lines still draw over the band. */}
+          <Tooltip formatter={(v: any) => fmt(+v) as any} labelFormatter={(l: any) => String(l)} contentStyle={{ fontSize: 11 }} />
+          {/* Legend lists reference lines first, then the stacked area fills (see chartLegend). */}
           <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
-          <Area type="monotone" dataKey="fan" name={fanName} fill={fanFill} stroke="none" fillOpacity={0.4} legendType="rect" isAnimationActive={false} />
+          {/* Base at the bottom of the stack, then one band per intervention (same colours as the
+              intervention-impact chart). Each band keeps a saturated same-colour top edge for delineation. */}
+          <Area type="monotone" dataKey={base.key} name={base.label} stackId="s" fill={base.fill} stroke={base.stroke} fillOpacity={0.7} strokeWidth={1.25} legendType="rect" isAnimationActive={false} />
+          {bands.map(b => (
+            <Area key={b.key} type="monotone" dataKey={b.key} name={b.label} stackId="s" fill={b.color} stroke={b.color} fillOpacity={0.6} strokeWidth={1.5} strokeOpacity={1} legendType="rect" isAnimationActive={false} />
+          ))}
           {lines.map(l => (
             <Line key={l.key} type="monotone" dataKey={l.key} name={l.name} stroke={l.color} strokeWidth={l.width ?? 2}
               strokeDasharray={l.dash} dot={false} legendType="plainline" connectNulls isAnimationActive={false} />
@@ -100,6 +113,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
   const [both, setBoth] = useState<Both>(null);
   const [table, setTable] = useState<{ water: Row[]; sanitation: Row[] } | null>(null);
+  const [contrib, setContrib] = useState<Contrib>(null);   // per-intervention stacked series
   const [error, setError] = useState<string | null>(null);
 
   // Datasets for the chosen scope (national = urban + rural summed, when rural data exists).
@@ -136,16 +150,6 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
           const tgt = sum((r, i) => secOf(r).target_hh[0][i]);
           const bauGap = sum((r, i) => (secOf(r).financing_gap || [])[i] || 0);
           const scnGap = sum((r, i) => (secOf(r).scenario_financing_gap || [])[i] || 0);
-          const cov = years.map((y, i) => {
-            const tot = totalHH[i];
-            const b = Math.min(tot, bau[i]), s = Math.min(tot, scn[i]), t = Math.min(tot, tgt[i]);
-            return { year: y, total: +tot.toFixed(4), bau: +b.toFixed(4), scn: +s.toFixed(4), tgt: +t.toFixed(4),
-              fan: [+Math.min(b, s).toFixed(4), +Math.max(b, s).toFixed(4)] as [number, number] };
-          });
-          const gap = years.map((y, i) => {
-            const b = bauGap[i] || 0, s = scnGap[i] || 0;
-            return { year: y, bauGap: b, scnGap: s, fan: [Math.min(b, s), Math.max(b, s)] as [number, number] };
-          });
           const tEnd = totalHH[endIdx] || 0;
           const covPct = (a: number[]) => tEnd > 0 ? Math.min(tEnd, a[endIdx]) / tEnd : 0;
           const cumGap = (a: number[]) => years.reduce((s2, y, i) => s2 + (y > baseYr ? (a[i] || 0) : 0), 0);
@@ -169,7 +173,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             invRow('Financing gap (C − D)', bauGap, true),
           ] };
           const unit = { sm: secOf(resList[0]).cost_per_hh || 0, basic: secOf(resList[0]).cost_basic || 0 };
-          return { cov, gap, inv, unit, sum: {
+          return { inv, unit, sum: {
             endline: years[endIdx], curCov, bauCov: covPct(bau), scnCov: covPct(scn), tgtCov: covPct(tgt),
             addHH: Math.max(0, Math.min(tEnd, scn[endIdx]) - Math.min(tEnd, bau[endIdx])),
             gapBauCum: cumGap(bauGap), gapScnCum: cumGap(scnGap),
@@ -182,33 +186,79 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     return () => clearTimeout(h);
   }, [depKey]);
 
-  // ── Per-intervention table: cumulative passes over the ENABLED built-in toggles isolate each lever's
-  //    marginal safely-managed households (Δ scenario_hh) and its mobilised resources (Δ its cash stream).
-  //    Customs are excluded from this itemisation (they still feed the fan above). ─────────────────────
+  // ── Per-intervention breakdown: cumulative passes over the ENABLED built-in toggles isolate each lever's
+  //    marginal safely-managed households (Δ scenario_hh) and gap reduction (Δ scenario_financing_gap) per
+  //    YEAR, plus its mobilised resources at the endline. Feeds both the endline table AND the stacked
+  //    per-intervention charts. Enabled customs are folded into one final pass so the stack still tops out
+  //    at the true with-interventions scenario (shown as a single "Custom interventions" band). ───────────
   useEffect(() => {
-    if (!datasets.length || !datasets[0]) { setTable(null); return; }
+    if (!datasets.length || !datasets[0]) { setTable(null); setContrib(null); return; }
     const enW = WATER_INTV.filter(d => toggles[d.key]);
     const enS = SAN_INTV.filter(d => toggles[d.key]);
-    const enabled = [...enW, ...enS];
-    if (!enabled.length) { setTable({ water: [], sanitation: [] }); return; }
+    const enabled = [...enW, ...enS];                              // global cumulative order (water then san)
+    const hasCustoms = datasets.some((inp: any) => (inp.custom_interventions || []).some((c: any) => c && c.enabled !== false));
     const h = setTimeout(() => {
       const off = Object.fromEntries(Object.keys(toggles).map(k => [k, false]));
-      const sets: any[] = [{ ...off }];                                  // pass 0 = BAU (all off)
+      const sets: any[] = [{ ...off }];                            // pass 0 = BAU (all off)
       let acc: any = { ...off };
-      enabled.forEach(d => { acc = { ...acc, [d.key]: true }; sets.push({ ...acc }); });
-      const fetchPass = (tg: any) => Promise.all(datasets.map((inp: any) =>
+      enabled.forEach(d => { acc = { ...acc, [d.key]: true }; sets.push({ ...acc }); });   // +1 pass per lever
+      const fetchPass = (tg: any, useCustoms: boolean) => Promise.all(datasets.map((inp: any) =>
         fetch('/api/calculate', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...inp, toggles: tg, custom_interventions: [] }) }).then(r => r.json())));
-      Promise.all(sets.map(fetchPass)).then(passes => {           // passes[p] = results[] (one per dataset)
+          body: JSON.stringify({ ...inp, toggles: tg, custom_interventions: useCustoms ? (inp.custom_interventions || []) : [] }) }).then(r => r.json())));
+      const specs = sets.map(tg => ({ tg, customs: false }));
+      if (hasCustoms) specs.push({ tg: acc, customs: true });      // final pass = all built-ins on + real customs
+      Promise.all(specs.map(s => fetchPass(s.tg, s.customs))).then(passes => {   // passes[p] = results[] (one/dataset)
         const years: number[] = passes[0][0].years;
         const per = datasets[0]?.period || {};
         const baseYr = per.baseline_year ?? years[0];
         const endIdx = years.length - 1;
-        const smEnd = (rl: any[], sk: string) => rl.reduce((a, r) => a + (r[sk].scenario_hh[0][endIdx] || 0), 0);
+        const nBuiltin = enabled.length;                           // passes[1..nBuiltin] built-in; passes[nBuiltin+1] = customs
+        const smY = (rl: any[], sk: string, i: number) => rl.reduce((a, r) => a + (r[sk].scenario_hh[0][i] || 0), 0);
+        const gapY = (rl: any[], sk: string, i: number) => rl.reduce((a, r) => a + ((r[sk].scenario_financing_gap || [])[i] || 0), 0);
+        const totY = (i: number) => passes[0].reduce((a: number, r: any) => a + (r.total_hh[i] || 0), 0);
+        const tgtY = (sk: string, i: number) => passes[0].reduce((a: number, r: any) => a + (r[sk].target_hh[0][i] || 0), 0);
         const cashCum = (rl: any[], sk: string, f: string) => rl.reduce((a, r) =>
           a + (r[sk][f] || []).reduce((s: number, v: number, i: number) => s + (years[i] > baseYr ? (v || 0) : 0), 0), 0);
-        const rowsFor = (defs: IntvDef[], sk: string): Row[] => defs.map(d => {
-          const idx = enabled.findIndex(e => e.key === d.key);       // position in the cumulative sequence
+        const idxOf = (d: IntvDef) => enabled.findIndex(e => e.key === d.key);   // cumulative position of a lever
+
+        // ── stacked per-year series for one sector ──
+        const buildContrib = (defs: IntvDef[], sk: string): ContribSeries => {
+          const en = defs.filter(d => toggles[d.key]);
+          const covRows: any[] = [], gapRows: any[] = [];
+          years.forEach((y, i) => {
+            const covRow: any = { year: y, __bau: +smY(passes[0], sk, i).toFixed(4), __total: +totY(i).toFixed(4), __target: +tgtY(sk, i).toFixed(4) };
+            const bauGap = gapY(passes[0], sk, i);
+            const gapRow: any = { year: y };
+            let sumRed = 0;
+            en.forEach(d => {
+              const idx = idxOf(d);
+              covRow[d.label] = +Math.max(0, smY(passes[idx + 1], sk, i) - smY(passes[idx], sk, i)).toFixed(4);
+              const red = Math.max(0, gapY(passes[idx], sk, i) - gapY(passes[idx + 1], sk, i));
+              gapRow[d.label] = +(red / 1000).toFixed(4);          // M → B
+              sumRed += red;
+            });
+            if (hasCustoms) {
+              covRow['Custom interventions'] = +Math.max(0, smY(passes[nBuiltin + 1], sk, i) - smY(passes[nBuiltin], sk, i)).toFixed(4);
+              const redC = Math.max(0, gapY(passes[nBuiltin], sk, i) - gapY(passes[nBuiltin + 1], sk, i));
+              gapRow['Custom interventions'] = +(redC / 1000).toFixed(4);
+              sumRed += redC;
+            }
+            gapRow.__remain = +(Math.max(0, bauGap - sumRed) / 1000).toFixed(4);   // remaining gap → stack tops at BAU gap
+            covRows.push(covRow); gapRows.push(gapRow);
+          });
+          const all: ContribBand[] = en.map(d => ({ key: d.label, label: d.label, color: d.color }));
+          if (hasCustoms) all.push({ key: 'Custom interventions', label: 'Custom interventions', color: P.custom });
+          // keep only bands that actually move either chart (an enabled-but-unparameterised lever adds 0)
+          const bands = all.filter(b => covRows.some(r => (r[b.key] || 0) > 1e-4) || gapRows.some(r => (r[b.key] || 0) > 1e-4));
+          return { covRows, gapRows, bands };
+        };
+        setContrib({ water: buildContrib(WATER_INTV, 'water_supply'), sanitation: buildContrib(SAN_INTV, 'sanitation') });
+
+        // ── endline resources-and-households table (built-in levers only) ──
+        if (!enabled.length) { setTable({ water: [], sanitation: [] }); return; }
+        const smEnd = (rl: any[], sk: string) => smY(rl, sk, endIdx);
+        const rowsFor = (defs: IntvDef[], sk: string): Row[] => defs.filter(d => toggles[d.key]).map(d => {
+          const idx = idxOf(d);
           const after = passes[idx + 1], before = passes[idx];
           const addHH = Math.max(0, smEnd(after, sk) - smEnd(before, sk)) * 1000;      // millions HH → thousands
           const resources = d.resourceKey
@@ -216,8 +266,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
             : null;
           return { key: d.key, label: d.label, addHH, resources };
         });
-        setTable({ water: rowsFor(enW, 'water_supply'), sanitation: rowsFor(enS, 'sanitation') });
-      }).catch(() => { /* leave the previous table on a transient fetch error */ });
+        setTable({ water: rowsFor(WATER_INTV, 'water_supply'), sanitation: rowsFor(SAN_INTV, 'sanitation') });
+      }).catch(() => { /* leave the previous view on a transient fetch error */ });
     }, 400);
     return () => clearTimeout(h);
   }, [depKey, JSON.stringify(toggles)]);
@@ -225,9 +275,12 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const isShare = unitMode === 'share';
   const covFmt = isShare ? (v: number) => Math.round(v * 100) + '%' : (v: number) => sig3(v);
   const gapFmt = (v: number) => sigB(v);
-  const asShare = (rows: any[]) => rows.map(r => {
-    const tot = r.total || 0; const d = (v: number) => tot > 0 ? v / tot : 0;
-    return { year: r.year, total: tot > 0 ? 1 : 0, bau: d(r.bau), scn: d(r.scn), tgt: d(r.tgt), fan: [d(r.fan[0]), d(r.fan[1])] };
+  // Coverage stack in % mode: divide the base, every band, and the target/ceiling by that year's total.
+  const asShareStack = (rows: any[], bands: ContribBand[]) => rows.map(r => {
+    const tot = r.__total || 0; const d = (v: number) => tot > 0 ? v / tot : 0;
+    const o: any = { year: r.year, __total: tot > 0 ? 1 : 0, __bau: d(r.__bau || 0), __target: d(r.__target || 0) };
+    bands.forEach(b => { o[b.key] = d(r[b.key] || 0); });
+    return o;
   });
 
   const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
@@ -361,21 +414,21 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     if (!both) return null;
     const s = secKey === 'water' ? both.water : both.sanitation;
     const label = secKey === 'water' ? 'Water Supply' : 'Sanitation';
-    const covRows = isShare ? asShare(s.cov) : s.cov;
-    // Tool-wide colour convention (see chartColors): BLUE = BAU, GREEN = target, ORANGE = with interventions.
-    // Order matters — later lines draw on top. Total (grey ceiling) first, then BAU, interventions, and
-    // Target LAST so the green target line is never hidden behind the grey ceiling where they coincide.
+    const cs = secKey === 'water' ? contrib?.water : contrib?.sanitation;
+    const csBands = cs?.bands ?? [];
+    const covData = cs ? (isShare ? asShareStack(cs.covRows, csBands) : cs.covRows) : [];
+    const gapData = cs?.gapRows ?? [];
+    // Coverage stack: BAU base (blue) at the bottom, one intervention band on top, then the ceiling & target
+    // reference lines (grey Total dashed, green Target dashed) drawn over the stack.
+    const covBase = { key: '__bau', label: 'BAU (safely managed)', stroke: C.bau, fill: C.bauFill };
     const covLines = [
-      { key: 'total', name: 'Total households', color: C.total, dash: '8 4', width: 1.25 },
-      { key: 'bau', name: 'BAU', color: C.bau, width: 2 },
-      { key: 'scn', name: 'With interventions', color: C.scenario, width: 2.5 },
-      { key: 'tgt', name: 'Target', color: C.target, dash: '6 3', width: 2 },
+      { key: '__total', name: 'Total households', color: C.total, dash: '8 4', width: 1.25 },
+      { key: '__target', name: 'Target', color: C.target, dash: '6 3', width: 2 },
     ];
-    const gapLines = [
-      { key: 'bauGap', name: 'BAU financing gap', color: C.bau, width: 2.5 },
-      { key: 'scnGap', name: 'With interventions', color: C.scenario, width: 2.5 },
-    ];
-    const noFan = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
+    // Gap stack: grey "remaining gap" base at the bottom, one gap-reduction band per intervention on top —
+    // the stack height traces the BAU financing gap, so the coloured part is what each lever closes.
+    const gapBase = { key: '__remain', label: 'Remaining gap (with interventions)', stroke: '#94a3b8', fill: '#e2e8f0' };
+    const noImpact = s.sum.addHH < 1e-4 && Math.abs(s.sum.gapBauCum - s.sum.gapScnCum) < 1e-4;
     const rows = secKey === 'water' ? table?.water : table?.sanitation;
     const hhCol = secKey === 'water' ? "Added HHs with treated, piped (HHs '000)" : "Added safely-managed HHs (HHs '000)";
     return (
@@ -387,18 +440,18 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: '3px solid #0ea5e9', borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 12 }}>
           <b>By {s.sum.endline}</b>, safely-managed coverage increases from <b>{pct(s.sum.bauCov)}</b> (BAU) to <b>{pct(s.sum.scnCov)}</b> with the current interventions — <b>{sig3(s.sum.addHH)} M</b> more households — against a target of <b>{pct(s.sum.tgtCov)}</b>. The cumulative financing gap narrows from <b>{sigB(s.sum.gapBauCum)}</b> to <b>{sigB(s.sum.gapScnCum)} B {cur}</b>.
         </div>
-        {noFan && (
+        {noImpact && (
           <div style={{ fontSize: 10.5, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4, padding: '5px 9px', marginBottom: 10 }}>
-            No interventions are active for {label.toLowerCase()}. Toggle some on above to open the fan and fill the table.
+            No interventions are active for {label.toLowerCase()}. Toggle some on above to break down the impact by intervention.
           </div>
         )}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 8 }}>
-          <FanChart title={`${label} — safely-managed coverage`} subtitle="Blue = BAU · orange = with interventions · green = target"
-            data={covRows} yLabel={isShare ? '% of population' : '# households (millions)'}
-            fanFill={C.range} fanName="BAU → interventions range" lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
-          <FanChart title={`${label} — annual financing gap`} subtitle="Blue = BAU · orange = with interventions"
-            data={s.gap} yLabel={`Financing gap (B ${cur}/yr)`}
-            fanFill={C.range} fanName="Gap closed by interventions" lines={gapLines} fmt={gapFmt} />
+          <StackChart title={`${label} — safely-managed coverage`} subtitle="BAU base + each intervention's added households (target & ceiling shown as lines)"
+            data={covData} yLabel={isShare ? '% of population' : '# households (millions)'}
+            base={covBase} bands={csBands} lines={covLines} fmt={covFmt} domain={isShare ? [0, 1] : undefined} />
+          <StackChart title={`${label} — annual financing gap`} subtitle="Grey = gap remaining · colours = closed by each intervention (stack height = BAU gap)"
+            data={gapData} yLabel={`Financing gap (B ${cur}/yr)`}
+            base={gapBase} bands={csBands} lines={[]} fmt={gapFmt} />
         </div>
         {rows && rows.length > 0 && (
           <div style={{ marginTop: 8 }}>
@@ -440,7 +493,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div>
           <h2 style={{ fontSize: 17, color: '#1e3a5f', margin: 0 }}>Results — intervention impact (live)</h2>
           <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
-            Fan charts show the range from business-as-usual to your designed intervention scenario, widening over the forecast.
+            The charts stack the BAU baseline with each enabled intervention's own contribution, so you can see how much every lever adds to coverage and closes the financing gap.
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
@@ -490,8 +543,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
       <div style={{ fontSize: 10, color: '#94a3b8', marginTop: -6, marginBottom: 16 }}>
         Table: “Resources generated” is the finance each lever mobilises (revenue collected, tariff income, recovered-water
         value, sewer revenue, or loans) — cost-side and budget-execution levers show “—” as they stretch existing budget
-        rather than raise new money. “Added HHs” is each lever’s marginal safely-managed service. Custom interventions
-        feed the fan charts but are not itemised here.
+        rather than raise new money. “Added HHs” is each lever’s marginal safely-managed service. Enabled custom
+        interventions appear as a single “Custom interventions” band on the charts above, but are not itemised in this table.
       </div>
 
       {scenarios.length > 0 && (
