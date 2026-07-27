@@ -246,7 +246,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                tariff_current=0.0, tariff_target=0.0, tariff_volume_base_m3=0.0,
                nrw_enabled=False, nrw_start=0, nrw_target_year=0, nrw_current=0.0, nrw_target=0.0,
                nrw_physical=0.5, nrw_vol_m3yr=0.0, nrw_vol_m3day=0.0, nrw_water_per_upgrade=0.0,
-               nrw_value_unit=0.0, nrw_capex_unit_m3day=0.0, nrw_vol_growth=None,
+               nrw_value_unit=0.0, nrw_capex_unit_m3day=0.0, nrw_vol_growth=None, nrw_lag=0,
                afford_enabled=False, grant_enabled=False, afford_start=0, afford_end=0,
                afford_pct_income=0.0, afford_interest=0.0, afford_tenor=0, afford_partial_share=0.0,
                afford_upfront_payable_ratio=0.0, afford_takeup=0.0, afford_gap_shares=None,
@@ -517,19 +517,26 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
             else:
                 rate = nrw_target if y >= nrw_start else nrw_current
             nrw_reduction[t] = max(0.0, nrw_current - rate)
+        # Benefit lag: the recovered water (and its value) shows up nrw_lag years AFTER the works that
+        # deliver it, so there is a real delay between spending (fixing capex, charged on the works schedule)
+        # and the benefit. Other levers bake this delay into their start year; NRW models it explicitly.
+        # lag = 0 reproduces the no-delay behaviour exactly.
+        lag = max(0, int(nrw_lag))
         for t in range(n):
-            red = nrw_reduction[t]
+            red = nrw_reduction[t]                                   # reduction the WORKS deliver this year (drives capex)
+            red_ben = nrw_reduction[t - lag] if t - lag >= 0 else 0.0  # reduction actually IN EFFECT now (works done `lag` ago)
             # System input volume scales off the NRW start year — with POPULATION by default, or a fixed
             # compound rate when nrw_vol_growth is set (same treatment as the collection-efficiency and
             # tariff volumes), so a growing system recovers more water for the same NRW percentage.
             vf = _vol_factor(t, nrw_start, nrw_vol_growth)
-            recovered_yr = red * nrw_vol_m3yr * vf                   # total recovered water (million m³/yr)
+            recovered_yr = red_ben * nrw_vol_m3yr * vf               # recovered water now in effect (million m³/yr)
             recovered_phys = nrw_physical * recovered_yr             # only physical losses → deliverable water
-            nrw_recovered_phys[t] = recovered_phys                   # exposed so sanitation can charge for it
+            nrw_recovered_phys[t] = recovered_phys                   # exposed so sanitation can charge for it (also lagged)
             nrw_upgrade_cum[t] = (recovered_phys / nrw_water_per_upgrade) if nrw_water_per_upgrade > 0 else 0.0
             value = nrw_value_unit * recovered_yr                    # recurring value of the recovered water
-            # Fixing capex tracks the INCREMENTAL recovered capacity, which grows both as the losses are cut
-            # and as the system itself grows — holding the target on a bigger network keeps costing a little.
+            # Fixing capex tracks the INCREMENTAL recovered capacity on the WORKS schedule (NO lag) — you pay
+            # as the losses are cut, and it grows as the system itself grows, so holding the target on a bigger
+            # network keeps costing a little.
             cap_now = red * nrw_vol_m3day * vf
             cap_prev = (nrw_reduction[t - 1] * nrw_vol_m3day * _vol_factor(t - 1, nrw_start, nrw_vol_growth)) if t > 0 else 0.0
             capex = nrw_capex_unit_m3day * max(0.0, cap_now - cap_prev) / 1_000_000.0   # millions
@@ -915,6 +922,7 @@ def calculate_water_supply(inputs, ctx):
         nrw_value_unit=nrw_value_unit,
         nrw_capex_unit_m3day=float(getattr(nrw, 'nrw_capex_unit_cost_local', 0.0) or 0.0),
         nrw_vol_growth=(float(nrw.nrw_vol_growth) if getattr(nrw, 'nrw_vol_growth', None) is not None else None),
+        nrw_lag=int(getattr(nrw, 'nrw_lag_years', 0) or 0),
         # Microfinance + means-based grant (affordability lever): finance affordable gap HH with connection
         # loans (mf_on), and buy the loan down for those who can't service it in full (grant_on). Uses the
         # global income distribution + this sector's willingness-to-pay %, loan terms, gap split and grant pool.

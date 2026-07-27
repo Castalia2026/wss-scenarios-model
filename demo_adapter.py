@@ -496,6 +496,9 @@ def to_engine(fe: dict) -> ModelInputs:
         nrw_physical_loss_pct=float(wi.get('nrw_physical_loss_pct', 0.50) or 0.50),
         nrw_start_year=int(wi.get('nrw_start_year', 0) or 0),
         nrw_target_year=int(wi.get('nrw_target_year', 0) or 0),
+        # Benefit lag (years): delay between the works/spend and the recovered water showing up. A cleared
+        # field (null) → 0 (no lag); absent (old profile) → the schema default. 0 is a legitimate value.
+        nrw_lag_years=int(wi.get('nrw_lag_years', 1) or 0),
         # NRW reduction lever (simplified): recovered physical water → basic→SM upgrades + a money ledger.
         nrw_system_input_vol=float(wi.get('nrw_system_input_vol', 0.0) or 0.0),
         # Blank/absent → None (scale with population); a number → fixed compound growth.
