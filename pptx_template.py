@@ -15,7 +15,8 @@ import copy
 import re
 from typing import Dict, Iterable, List, Optional
 
-from pptx.oxml.ns import qn
+from pptx.oxml import parse_xml
+from pptx.oxml.ns import nsdecls, qn
 from pptx.util import Emu
 
 TOKEN_RE = re.compile(r'\[[^\[\]]{1,120}\]')
@@ -530,6 +531,81 @@ def set_chart(shape, categories: List[str], series: List[tuple], number_format: 
     for name, values in series:
         cd.add_series(name, [(None if v is None else float(v)) for v in values], number_format)
     shape.chart.replace_data(cd)
+
+
+def _insert_ordered(parent, el, successors: tuple) -> None:
+    """Insert `el` before the first of `successors` that is present, else append.
+
+    Chart XML is sequence-validated: an element in the wrong slot makes PowerPoint declare the file
+    damaged rather than ignore it, so new children cannot simply be appended."""
+    for tag in successors:
+        nxt = parent.find(qn(tag))
+        if nxt is not None:
+            nxt.addprevious(el)
+            return
+    parent.append(el)
+
+
+def hide_zero_data_labels(chart, threshold: float = 0.5) -> None:
+    """Drop the data label of every point that would print as 0.
+
+    A stacked column whose segment is empty still labels it — a bare '0' floating on the axis. There
+    is no "hide zeros" switch: PowerPoint records a hand-deleted label as `<c:dLbl><c:delete val="1"/>`
+    for that point, which is what this writes. `threshold` is half of the last displayed digit, so
+    values that merely ROUND to zero go too (a '000 chart labels 0.4 as '0')."""
+    for plot in chart.plots:
+        for ser in plot.series:
+            for i, v in enumerate(ser.values):
+                if v is None or abs(v) >= threshold:
+                    continue
+                dLbl = ser._element.get_or_add_dLbl(i)
+                for child in list(dLbl):          # c:delete is exclusive with the rest of c:dLbl
+                    if child.tag != qn('c:idx'):
+                        dLbl.remove(child)
+                dLbl.append(parse_xml('<c:delete %s val="1"/>' % nsdecls('c')))
+
+
+def set_data_label_color(chart, hexes) -> None:
+    """Recolour each series' data labels, positionally (`None` leaves a series alone).
+
+    The template picked its label colours for the fills IT shipped with; once the tool repaints a
+    series (see `_color_series`) those colours can land on a fill they were never chosen against —
+    the gap series' dark blue on red, for one. Colour is set on the label run's `a:defRPr`, which is
+    where the template holds its size/weight/typeface, so only the fill changes."""
+    allser = [s for p in chart.plots for s in p.series]
+    for ser, hx in zip(allser, hexes):
+        if not hx:
+            continue
+        dLbls = ser._element.find(qn('c:dLbls'))
+        if dLbls is None:
+            continue
+        for defRPr in dLbls.iter(qn('a:defRPr')):
+            for old in defRPr.findall(qn('a:solidFill')):
+                defRPr.remove(old)
+            # a:solidFill is the first child of a:defRPr in the DrawingML text-run-properties order.
+            defRPr.insert(0, parse_xml('<a:solidFill %s><a:srgbClr val="%s"/></a:solidFill>'
+                                       % (nsdecls('a'), str(hx).lstrip('#').upper())))
+
+
+# c:catAx children run in a fixed order; these are the two we insert and what may follow them.
+_TICK_SKIP_SUCCESSORS = {
+    'c:tickLblSkip': ('c:tickMarkSkip', 'c:noMultiLvlLbl', 'c:extLst'),
+    'c:tickMarkSkip': ('c:noMultiLvlLbl', 'c:extLst'),
+}
+
+
+def set_category_label_step(chart, step: int) -> None:
+    """Label (and tick) every `step`-th category, counting from the first — Excel's "interval between
+    labels". `step <= 1` leaves the chart alone, so callers can pass a computed step unconditionally."""
+    if step <= 1:
+        return
+    for ax in chart._chartSpace.iter(qn('c:catAx')):
+        for tag, successors in _TICK_SKIP_SUCCESSORS.items():
+            el = ax.find(qn(tag))
+            if el is None:
+                el = parse_xml('<%s %s val="1"/>' % (tag, nsdecls('c')))
+                _insert_ordered(ax, el, successors)
+            el.set('val', str(step))
 
 
 def replace_shape_with_picture(slide, shape, image_stream) -> None:

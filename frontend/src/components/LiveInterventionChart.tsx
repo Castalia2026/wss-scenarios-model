@@ -13,6 +13,7 @@ import ChartExport from './ChartExport';
  * old synthetic StaticCharts.InterventionImpactChart.
  */
 import { C, INTV_PALETTE as P } from '../chartColors';
+import { yearAxisInterval } from '../chartAxis';
 import { linesFirstLegend } from './chartLegend';
 
 type Intv = [key: string, label: string, color: string];   // toggle key, legend label, band colour
@@ -152,7 +153,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
       <ResponsiveContainer width="100%" height={360}>
         <ComposedChart data={data} margin={{ top: 14, right: 24, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+          <XAxis dataKey="year" tick={{ fontSize: 10 }} interval={yearAxisInterval(data)} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => sig(v)}>
             <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>

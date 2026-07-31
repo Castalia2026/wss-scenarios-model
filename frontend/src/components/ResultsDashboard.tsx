@@ -4,6 +4,7 @@ import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
 import { C, INTV_PALETTE as P } from '../chartColors';
+import { yearAxisInterval } from '../chartAxis';
 import { linesFirstLegend } from './chartLegend';
 import ExportButtons from './ExportButtons';
 import ChartExport from './ChartExport';
@@ -117,7 +118,7 @@ function StackChart({ title, subtitle, data, base, bands, lines, fmt, yLabel, do
       <ResponsiveContainer width="100%" height={280}>
         <ComposedChart data={data} margin={{ top: 10, right: 24, bottom: 5, left: 12 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+          <XAxis dataKey="year" tick={{ fontSize: 10 }} interval={yearAxisInterval(data)} />
           <YAxis tick={{ fontSize: 10 }} domain={domain} tickFormatter={fmt}>
             <Label value={yLabel} angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>

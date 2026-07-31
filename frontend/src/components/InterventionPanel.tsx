@@ -589,7 +589,8 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
       {/* Right: LIVE intervention impact chart (two-pass BAU vs intervention) for the area being edited. */}
       <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: '24px 28px', background: '#fff', borderLeft: '1px solid #e2e8f0' }}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 10 }}>
-          <ExportButtons inputs={inputs} />
+          {/* Excel / CSV only — the slide deck belongs to the finished scenario, so it lives on Results. */}
+          <ExportButtons inputs={inputs} pptx={false} />
         </div>
         <LiveInterventionChart inputs={inputs} sector={sectorTab} scopeLabel={scopeLabel} />
       </div>

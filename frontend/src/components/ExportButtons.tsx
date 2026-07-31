@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 
-// Download the current scenario (`inputs`) as Excel / PowerPoint / CSV. All three endpoints run the
+// Download the current scenario (`inputs`) as Excel / PowerPoint / CSV (PowerPoint only where `pptx`
+// is left on — the Results Dashboard). All three endpoints run the
 // live engine on the posted inputs, so the export always matches what's on screen. When `pptxCharts` is
 // supplied (the Results tab), the PowerPoint export first captures the on-screen charts and ships them so
 // the deck is pre-populated with the actual charts (the backend can't render recharts itself).
@@ -10,13 +11,16 @@ const FORMATS = [
   { label: 'CSV', ext: 'csv', endpoint: '/api/export/csv', icon: '📄' },
 ];
 
-export default function ExportButtons({ inputs, label = 'Export', pptxCharts, areas }: {
+export default function ExportButtons({ inputs, label = 'Export', pptxCharts, areas, pptx = true }: {
   inputs: any; label?: string | null; pptxCharts?: () => Promise<Record<string, string>>;
   // Every area the user actually entered, e.g. { urban, rural } or { national }. When supplied, the
   // PowerPoint export fills the branded template and covers all three scopes in one deck; the engine
   // is per-area, so National is summed server-side from whichever areas are present.
   areas?: Record<string, any>;
+  // The deck reports the finished scenario, so it is offered on the Results Dashboard only.
+  pptx?: boolean;
 }) {
+  const formats = pptx ? FORMATS : FORMATS.filter(f => f.ext !== 'pptx');
   const [busy, setBusy] = useState<string | null>(null);
   const download = async (fmt: typeof FORMATS[number]) => {
     setBusy(fmt.ext);
@@ -42,7 +46,7 @@ export default function ExportButtons({ inputs, label = 'Export', pptxCharts, ar
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
       {label && <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>{label}:</span>}
-      {FORMATS.map(f => (
+      {formats.map(f => (
         <button key={f.ext} onClick={() => download(f)} disabled={busy !== null} title={`Download the current scenario as ${f.label}`}
           style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', fontSize: 11.5,
             border: '1px solid #cbd5e1', borderRadius: 6, background: busy === f.ext ? '#eef2ff' : '#fff',

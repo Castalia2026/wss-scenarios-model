@@ -240,6 +240,49 @@ def _hexcolor(c):
     return (str(c or '').lstrip('#').upper() or '888888')[:6].ljust(6, '0')
 
 
+# How far apart the labels on a year x-axis should sit. A 15-to-25-year run labelled every year is an
+# unreadable smear, so label every fifth one counting from the first. Shared with the PowerPoint deck
+# (export_deck) and mirrored on screen in the frontend, so all three surfaces agree.
+YEAR_LABEL_EVERY = 5
+YEAR_LABEL_MIN = 10       # below this many years they all fit; leave them alone
+
+
+def year_label_step(categories, every=YEAR_LABEL_EVERY, minimum=YEAR_LABEL_MIN):
+    """`every` for a long run of CONSECUTIVE years, else 1 (label them all).
+
+    The consecutive test is what protects the charts whose categories are chosen reference years —
+    2025/2030/2040 is already sparse and every label matters."""
+    try:
+        years = [int(c) for c in categories]
+    except (TypeError, ValueError):
+        return 1
+    if len(years) < minimum or any(b - a != 1 for a, b in zip(years, years[1:])):
+        return 1
+    return every
+
+
+def _no_overlay(title):
+    """openpyxl writes <c:title> without <c:overlay>, and Excel treats a missing overlay as TRUE — the title is
+    then painted ON TOP of the chart instead of reserving space, so axis titles land over their own tick labels
+    (and the chart title over the plot). Say 'no' explicitly."""
+    if title is not None:
+        title.overlay = False
+    return title
+
+
+def _axis_title(axis, text, vertical=False):
+    """Set an axis title, keep it off the plot, and fix its text rotation. Assigning `axis.title = 'x'` alone
+    writes an empty <a:bodyPr/>, which Excel reads as rot=0 — the value-axis title would then run horizontally."""
+    if not text:
+        axis.title = None
+        return
+    axis.title = str(text)
+    _no_overlay(axis.title)
+    body = axis.title.tx.rich.bodyPr
+    body.rot = -5400000 if vertical else 0   # 60000ths of a degree: -90° reads bottom-to-top
+    body.vert = 'horz'                       # characters upright within that rotation
+
+
 def _native_chart(ws, title, spec, headers, nrows):
     """Add a data-linked Area(+Line) chart to `ws`, whose series reference the columns of the table already
     written at A1. `spec` = {category, stacked, areas:[{name,color}], lines:[{name,color,dash}], x/yTitle}."""
@@ -306,11 +349,21 @@ def _native_chart(ws, title, spec, headers, nrows):
     if area_chart is not None and line_chart is not None:
         chart += line_chart   # area + line share one default axis pair (catAx 10 / valAx 100)
     chart.title = title or None
-    if spec.get('yTitle'):
-        chart.y_axis.title = spec['yTitle']
-    chart.x_axis.title = spec.get('xTitle') or cat_name
-    chart.x_axis.delete = False
-    chart.y_axis.delete = False
+    _no_overlay(chart.title)
+    # Axis titles sit outside the plot (see _no_overlay) and read the right way up (see _axis_title). openpyxl
+    # also leaves the category axis at its inherited axPos='l'; pin it to the bottom.
+    _axis_title(chart.y_axis, spec.get('yTitle'), vertical=True)
+    _axis_title(chart.x_axis, spec.get('xTitle') or cat_name)
+    for ax, pos in ((chart.x_axis, 'b'), (chart.y_axis, 'l')):
+        ax.axPos = pos
+        ax.delete = False
+        ax.majorGridlines = None   # no gridlines (NumericAxis defaults to drawing them)
+        ax.minorGridlines = None
+    # Thin a dense year axis down to every fifth label (Excel's "interval between labels").
+    step = year_label_step(ws.cell(row=r, column=cat_col).value for r in range(2, 2 + nrows))
+    if step > 1:
+        chart.x_axis.tickLblSkip = step
+        chart.x_axis.tickMarkSkip = step
     chart.height = 10.5   # cm
     chart.width = 21
     if chart.legend is not None:

@@ -4,6 +4,7 @@ import {
   Legend, ResponsiveContainer, ComposedChart, Line, Label, ReferenceLine, LabelList,
 } from 'recharts';
 import { C } from '../chartColors';
+import { yearAxisInterval } from '../chartAxis';
 import { linesFirstLegend } from './chartLegend';
 import ChartExport from './ChartExport';
 import TableExport from './TableExport';
@@ -577,7 +578,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
       <div ref={chartRef} style={{ position: 'relative' }}>
         <ComposedChart width={Math.max(1, wrapW)} height={380} data={displayData} margin={{ top: 14, right: 70, bottom: 5, left: 10 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="year" tick={{ fontSize: 10 }} />
+            <XAxis dataKey="year" tick={{ fontSize: 10 }} interval={yearAxisInterval(displayData)} />
             <YAxis tick={{ fontSize: 10 }} domain={isShare ? [0, 1] : undefined}
               tickFormatter={isShare ? (v: number) => Math.round(v * 100) + '%' : (v: number) => sig3(v)}>
               <Label value={isShare ? '% of population' : '# households (millions)'} angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />

@@ -19,11 +19,12 @@ from pptx.dml.color import RGBColor
 from pptx.util import Emu
 
 import deck_data as DD
+from export_data import year_label_step          # one year-axis rule for the deck and the xlsx charts
 from pptx_template import (chart_groups, clone_slide, delete_slide_obj, delete_table_columns,
                            delete_table_rows, clone_table_row, drop_prompt_shapes, find_shape,
-                           fit_table, index_of, iter_shapes, replace_tokens, set_cell, set_chart,
-                           set_column_weights,
-                           set_group_series_counts, set_text)
+                           fit_table, hide_zero_data_labels, index_of, iter_shapes, replace_tokens,
+                           set_category_label_step, set_cell, set_chart, set_column_weights,
+                           set_data_label_color, set_group_series_counts, set_text)
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'deck_templates')
 TEMPLATE_A = os.path.join(TEMPLATE_DIR, 'urban_rural_national.pptx')
@@ -190,6 +191,12 @@ def _fill_service_gap(slide, b):
               [('Covered under BAU', [v * 1000 for v in g['covered']]),
                ('Service gap to target', [v * 1000 for v in g['gap']])])
     _color_series(sh.chart, [COVERED_FILL, GAP_FILL])
+    # Both columns are saturated fills, so both label sets read white. (The template styles the gap
+    # series' labels dark blue, which is close to illegible once they sit on GAP_FILL red.)
+    set_data_label_color(sh.chart, ['FFFFFF', 'FFFFFF'])
+    # At the baseline year the target path starts from BAU, so the gap there is zero by construction
+    # and its label is noise — drop any label that would read '0'.
+    hide_zero_data_labels(sh.chart)
 
 
 def _fill_investment(slide, b, cur):
@@ -231,6 +238,8 @@ def _fill_interventions(slide, b, cur):
             set_group_series_counts(sh.chart, [len(areas), len(lines)])
         set_chart(sh, [str(y) for y in ch['years']], areas + lines)
         _color_series(sh.chart, [BAU_FILL] + [c for _, c, _ in ch['bands']] + [TARGET_LINE] * len(lines))
+        # Baseline-to-target is 15+ columns; label every fifth year rather than every one.
+        set_category_label_step(sh.chart, year_label_step(ch['years']))
 
     t = _table(slide, 'Table 501')
     if t is not None:
