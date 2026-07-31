@@ -565,28 +565,6 @@ def hide_zero_data_labels(chart, threshold: float = 0.5) -> None:
                 dLbl.append(parse_xml('<c:delete %s val="1"/>' % nsdecls('c')))
 
 
-def set_data_label_color(chart, hexes) -> None:
-    """Recolour each series' data labels, positionally (`None` leaves a series alone).
-
-    The template picked its label colours for the fills IT shipped with; once the tool repaints a
-    series (see `_color_series`) those colours can land on a fill they were never chosen against —
-    the gap series' dark blue on red, for one. Colour is set on the label run's `a:defRPr`, which is
-    where the template holds its size/weight/typeface, so only the fill changes."""
-    allser = [s for p in chart.plots for s in p.series]
-    for ser, hx in zip(allser, hexes):
-        if not hx:
-            continue
-        dLbls = ser._element.find(qn('c:dLbls'))
-        if dLbls is None:
-            continue
-        for defRPr in dLbls.iter(qn('a:defRPr')):
-            for old in defRPr.findall(qn('a:solidFill')):
-                defRPr.remove(old)
-            # a:solidFill is the first child of a:defRPr in the DrawingML text-run-properties order.
-            defRPr.insert(0, parse_xml('<a:solidFill %s><a:srgbClr val="%s"/></a:solidFill>'
-                                       % (nsdecls('a'), str(hx).lstrip('#').upper())))
-
-
 # c:catAx children run in a fixed order; these are the two we insert and what may follow them.
 _TICK_SKIP_SUCCESSORS = {
     'c:tickLblSkip': ('c:tickMarkSkip', 'c:noMultiLvlLbl', 'c:extLst'),

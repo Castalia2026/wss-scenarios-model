@@ -24,7 +24,7 @@ from pptx_template import (chart_groups, clone_slide, delete_slide_obj, delete_t
                            delete_table_rows, clone_table_row, drop_prompt_shapes, find_shape,
                            fit_table, hide_zero_data_labels, index_of, iter_shapes, replace_tokens,
                            set_category_label_step, set_cell, set_chart, set_column_weights,
-                           set_data_label_color, set_group_series_counts, set_text)
+                           set_group_series_counts, set_text)
 
 TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'deck_templates')
 TEMPLATE_A = os.path.join(TEMPLATE_DIR, 'urban_rural_national.pptx')
@@ -47,9 +47,11 @@ IDX_APPENDIX_A, IDX_APPENDIX_B = 43, 44
 SCOPE_TITLE = {'urban': 'Urban', 'rural': 'Rural', 'national': 'National'}
 SECTOR_TITLE = {'water_supply': 'water', 'sanitation': 'sanitation'}
 
+# The interventions chart is coloured from the tool's palette, because its bands ARE the tool's
+# interventions and must read the same as the on-screen chart. The service-gap chart is not: it has
+# two fixed series the template already styles, so it keeps the template's own colours (see
+# _fill_service_gap).
 BAU_FILL = 'BFDBFE'
-GAP_FILL = 'B91C1C'
-COVERED_FILL = '2563EB'
 TARGET_LINE = '16A34A'
 
 
@@ -190,10 +192,10 @@ def _fill_service_gap(slide, b):
     set_chart(sh, [str(y) for y in g['years']],
               [('Covered under BAU', [v * 1000 for v in g['covered']]),
                ('Service gap to target', [v * 1000 for v in g['gap']])])
-    _color_series(sh.chart, [COVERED_FILL, GAP_FILL])
-    # Both columns are saturated fills, so both label sets read white. (The template styles the gap
-    # series' labels dark blue, which is close to illegible once they sit on GAP_FILL red.)
-    set_data_label_color(sh.chart, ['FFFFFF', 'FFFFFF'])
+    # No recolouring here: the template ships this chart already styled — deep teal covered / pale
+    # cyan gap, each with a label colour chosen to read on its own fill — and `set_chart` maps that
+    # formatting onto the new data positionally. Restyle the chart in the template and the export
+    # follows; painting the tool's palette over it, as this used to, would fight the design.
     # At the baseline year the target path starts from BAU, so the gap there is zero by construction
     # and its label is noise — drop any label that would read '0'.
     hide_zero_data_labels(sh.chart)
