@@ -789,6 +789,12 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         'budget_allocated': allocated.tolist(),        # allocated capital budget (manual input, ≥ used)
         'capex_efficiency_baseline': e0_auto,          # baseline efficiency = used ÷ allocated (=1/mean exec ratio)
         'capex_efficiency': eff.tolist(),              # per-year efficiency actually applied
+        # Per-year EFFECTIVE safely-managed connection cost, after the cost-side levers' factor. In the
+        # BAU pass cf is all-1.0 so this is just cost_sm repeated; in a scenario pass it carries the
+        # capex-efficiency / optimised-technology discount. Exported so the deck can price each
+        # cost-side lever as (BAU unit cost − scenario unit cost) × households connected, rather than
+        # re-deriving the ramp outside the engine where it would drift from this logic.
+        'cost_sm_t': cost_sm_t.tolist(),
         'bau_hh': bau.tolist(),
         'target_hh': tgt.tolist(),
         'opening_stock': opening_stock,
