@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { BUNDLE_KEY, isBundle, areasOf } from './areaBundle';
 import InputPanel from './components/InputPanel';
 import InterventionPanel from './components/InterventionPanel';
 import ResultsDashboard from './components/ResultsDashboard';
@@ -44,8 +45,21 @@ export default function App() {
     fetch('/api/profiles').then(r => r.json()).then(setProfileList).catch(() => {});
   };
 
+  // Restore the last working session (all areas + entry mode) before falling back to the defaults,
+  // so a refresh no longer silently drops whatever was entered for Rural or National.
   useEffect(() => {
-    fetchDefaults().then(setInputs).catch(() => {});
+    let session: any = null;
+    try { session = JSON.parse(localStorage.getItem('wss_working_bundle') || 'null'); } catch { /* corrupt — ignore */ }
+    if (session?.inputs) {
+      setAltInputs(session.altInputs || {});
+      const sc = session.scope || {};
+      if (sc.scopeMode) setScopeMode(sc.scopeMode);
+      if (typeof sc.areaUrban === 'boolean') setAreaUrban(sc.areaUrban);
+      if (typeof sc.areaRural === 'boolean') setAreaRural(sc.areaRural);
+      setInputs(session.inputs);
+    } else {
+      fetchDefaults().then(setInputs).catch(() => {});
+    }
     refreshProfiles();
     const saved = localStorage.getItem('wss_demo_scenarios');
     if (saved) setScenarios(JSON.parse(saved));
@@ -74,6 +88,46 @@ export default function App() {
     setInputs(resizeMacroArrays(newInputs));
   }, [resizeMacroArrays]);
 
+  // ── Area bundle ────────────────────────────────────────────────────────────────────────────────
+  // `inputs` only ever holds the PRIMARY (urban, or the sole dataset); Rural and National live in
+  // `altInputs`, and the entry mode lives in three more state flags. Persisting `inputs` alone —
+  // which is what profiles, scenarios and reloads used to do — therefore threw away every area but
+  // the first, so a two-area scenario could not survive a save or a refresh. Everything is packed
+  // into one versioned envelope instead; bare-inputs payloads (old profiles, /api/defaults) still
+  // load, they just carry no extra areas.
+  const packBundle = useCallback(() => ({
+    [BUNDLE_KEY]: 1,
+    inputs,
+    altInputs,
+    scope: { scopeMode, areaUrban, areaRural },
+  }), [inputs, altInputs, scopeMode, areaUrban, areaRural]);
+
+  // Autosave the working bundle (debounced) so a refresh keeps every area, not just the primary.
+  useEffect(() => {
+    if (!inputs) return;
+    const h = setTimeout(() => {
+      try { localStorage.setItem('wss_working_bundle', JSON.stringify(packBundle())); }
+      catch { /* quota exceeded — the session just won't be restorable */ }
+    }, 800);
+    return () => clearTimeout(h);
+  }, [packBundle, inputs]);
+
+  const applyBundle = useCallback((obj: any) => {
+    if (!obj) return;
+    if (!isBundle(obj)) {                       // legacy / defaults: a bare inputs object
+      setAltInputs({});
+      handleSetInputs(obj);
+      return;
+    }
+    setAltInputs(obj.altInputs || {});
+    const sc = obj.scope || {};
+    if (sc.scopeMode) setScopeMode(sc.scopeMode);
+    if (typeof sc.areaUrban === 'boolean') setAreaUrban(sc.areaUrban);
+    if (typeof sc.areaRural === 'boolean') setAreaRural(sc.areaRural);
+    if (sc.scopeMode === 'urban_rural' && sc.areaUrban === false) setSubArea('rural');
+    handleSetInputs(obj.inputs);
+  }, [handleSetInputs]);
+
   // Resolve the scope into the concrete area being edited and what the graphs/outputs should show.
   const both = scopeMode === 'urban_rural' && areaUrban && areaRural;
   const onlyRural = scopeMode === 'urban_rural' && !areaUrban && areaRural;
@@ -87,6 +141,26 @@ export default function App() {
     : both ? 'urban_rural'
     : onlyRural ? 'rural'
     : 'urban';
+
+  // Materialise a secondary area's dataset the moment the user opens it for entry.
+  //
+  // The input forms fall back to `altInputs[scope] ?? inputs`, so the Rural tab renders Urban's
+  // numbers and reads as already filled — but until something is EDITED no rural dataset exists, and
+  // everything downstream (the national roll-up, the slide deck) correctly treats rural as absent.
+  // The result is an export that silently omits an area the user believes they entered. Seeding the
+  // dataset on first visit makes what is on screen and what is exported the same thing. Seeded from
+  // the primary, which is what the form was already showing, so nothing visibly changes.
+  // Seeding on SELECTION, not on first visit to the tab: choosing "Urban + Rural (national total)"
+  // is the statement that the analysis has two areas, and the deck has to match that choice whether
+  // or not the Rural tab was ever opened. Tying it to the visit meant a user who selected both areas
+  // and went straight to Results exported an urban-only deck.
+  useEffect(() => {
+    if (!inputs) return;
+    const need = scopeMode === 'national' ? 'national' : (areaRural ? 'rural' : null);
+    if (!need) return;
+    setAltInputs(prev => prev[need] ? prev : { ...prev, [need]: JSON.parse(JSON.stringify(inputs)) });
+  }, [scopeMode, areaRural, inputs]);
+
   // §2a start-year change re-anchors EVERY area's positional (index-by-year) series, so a SHARED
   // analysis period keeps urban & rural aligned. Mirrors InputPanel's shiftYearSeries.
   const shiftAreaArrays = useCallback((obj: any, delta: number) => {
@@ -173,7 +247,8 @@ export default function App() {
   const saveScenario = () => {
     const name = prompt('Name this scenario:');
     if (!name) return;
-    const updated = [...scenarios, { name, inputs: JSON.parse(JSON.stringify(inputs)) }];
+    // Store the whole area bundle so a saved scenario restores Rural/National too, not just urban.
+    const updated = [...scenarios, { name, inputs: JSON.parse(JSON.stringify(packBundle())) }];
     setScenarios(updated);
     localStorage.setItem('wss_demo_scenarios', JSON.stringify(updated));
   };
@@ -229,9 +304,9 @@ export default function App() {
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
           <select onChange={async (e) => {
             const val = e.target.value;
-            if (val === '__blank') { const res = await fetch('/api/defaults/blank'); setInputs(await res.json()); }
-            else if (val === '__default') { const res = await fetch('/api/defaults'); setInputs(await res.json()); }
-            else if (val) { const res = await fetch(`/api/profiles/${val}`); setInputs(await res.json()); }
+            if (val === '__blank') { const res = await fetch('/api/defaults/blank'); applyBundle(await res.json()); }
+            else if (val === '__default') { const res = await fetch('/api/defaults'); applyBundle(await res.json()); }
+            else if (val) { const res = await fetch(`/api/profiles/${val}`); applyBundle(await res.json()); }
             e.target.value = '';
           }} style={{ padding: '4px 8px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.3)', background: '#1e3a5f', color: '#fff', fontSize: 11, cursor: 'pointer' }}>
             <option value="" style={{ background: '#fff', color: '#333' }}>Load Profile...</option>
@@ -245,7 +320,7 @@ export default function App() {
           <button onClick={async () => {
             const name = prompt('Save profile as:');
             if (!name) return;
-            await fetch(`/api/profiles/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(inputs) });
+            await fetch(`/api/profiles/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(packBundle()) });
             refreshProfiles(); alert(`Profile "${name}" saved!`);
           }} style={headerBtnStyle}>💾 Save Profile</button>
           <button onClick={saveScenario} style={headerBtnStyle}>📋 Save Scenario</button>
@@ -259,14 +334,14 @@ export default function App() {
           <span style={{ color: '#0369a1', fontWeight: 600 }}>Saved scenarios:</span>
           {scenarios.map((s, i) => (
             <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <button onClick={() => handleSetInputs(JSON.parse(JSON.stringify(s.inputs)))}
+              <button onClick={() => applyBundle(JSON.parse(JSON.stringify(s.inputs)))}
                 style={{ padding: '2px 8px', border: '1px solid #bae6fd', borderRadius: 3, background: '#e0f2fe', color: '#0369a1', cursor: 'pointer', fontSize: 10 }}>
                 {s.name}
               </button>
               <button onClick={() => {
-                // Export individual scenario slide
-                fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(s.inputs) })
-                  .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${s.name}_slide.pptx`; a.click(); });
+                // Export this scenario as the branded deck, covering every area it was saved with.
+                fetch('/api/export/deck', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ areas: areasOf(s.inputs) }) })
+                  .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${s.name}_slides.pptx`; a.click(); URL.revokeObjectURL(u); });
               }} style={{ padding: '1px 4px', border: '1px solid #bae6fd', borderRadius: 2, background: '#fff', cursor: 'pointer', fontSize: 9, color: '#0369a1' }}>📑</button>
               <button onClick={() => deleteScenario(i)}
                 style={{ padding: '1px 4px', border: '1px solid #fecaca', borderRadius: 2, background: '#fee2e2', cursor: 'pointer', fontSize: 9, color: '#dc2626' }}>✕</button>

@@ -254,6 +254,16 @@ def _sector_with_scenario(calc_fn, bau_inputs, scn_inputs, ctx, any_toggle_on, b
     bau['scenario_mf_loan_volume'] = scn.get('mf_loan_volume', [])      # microfinance loan volume mobilised (scenario)
     bau['scenario_nrw_recovered_phys_vol'] = scn.get('nrw_recovered_phys_vol', [])  # water: recovered physical vol (scenario)
     bau['scenario_nrw_link_cash'] = scn.get('nrw_link_cash', [])        # sanitation: water-NRW-linked sewer revenue (scenario)
+    # The cost-side and budget-execution levers raise no cash, so the deck prices them off these two
+    # instead. Both are already computed by the scenario pass — exposing them avoids re-deriving the
+    # ramps in the export layer, where they would drift from the engine's own logic.
+    #
+    # `available_capex` is the effective capex reaching service (allocated budget × execution
+    # efficiency). It must come from the SCENARIO pass: the top-level `bau_available` is the fixed BAU
+    # counterfactual, identical in every cumulative pass, so a budget-execution lever measured against
+    # it would always score zero.
+    bau['scenario_available_capex'] = scn.get('bau_available', [])      # effective capex reaching service (scenario)
+    bau['scenario_cost_sm_t'] = scn.get('cost_sm_t', [])                # effective SM unit cost per year (scenario)
     return _ui_aliases(bau)
 
 

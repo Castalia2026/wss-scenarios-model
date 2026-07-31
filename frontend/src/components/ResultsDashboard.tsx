@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { areasOf as scenarioAreas, liveAreas } from '../areaBundle';
 import {
   Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ComposedChart, ResponsiveContainer, Label,
 } from 'recharts';
@@ -142,6 +143,11 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     geoScope === 'urban' ? 'urban' : geoScope === 'rural' ? 'rural' : 'national'
   );
   const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
+  // Areas to ship to the slide-deck export. The deck covers every scope in one file, so this follows
+  // the ENTRY mode (how the user filled the data in), not the Scope dropdown above, which only
+  // chooses what this tab displays. In national-entry mode the national dataset lives in altInputs
+  // and `inputs` is still the urban primary, so read it explicitly rather than exporting urban.
+  const deckAreas = React.useMemo(() => liveAreas(geoScope, inputs, altInputs), [geoScope, inputs, altInputs]);
   const [both, setBoth] = useState<Both>(null);
   const [table, setTable] = useState<{ water: Row[]; sanitation: Row[] } | null>(null);
   const [contrib, setContrib] = useState<Contrib>(null);   // per-intervention stacked series
@@ -584,7 +590,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               }}>{l}</button>
             ))}
           </div>
-          <ExportButtons inputs={inputs} pptxCharts={captureResultsCharts} />
+          <ExportButtons inputs={inputs} pptxCharts={captureResultsCharts} areas={deckAreas} />
         </div>
       </div>
 
@@ -624,10 +630,11 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               <div key={i} style={{ border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 14px', background: '#f8fafc' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#1e3a5f', marginBottom: 4 }}>{sc.name}</div>
                 <button onClick={() => {
-                  fetch('/api/export/pptx', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sc.inputs) })
-                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${sc.name}.pptx`; a.click(); });
+                  // A saved scenario stores every area it was entered with, so export the full deck.
+                  fetch('/api/export/deck', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ areas: scenarioAreas(sc.inputs) }) })
+                    .then(r => r.blob()).then(b => { const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `${sc.name}.pptx`; a.click(); URL.revokeObjectURL(u); });
                 }} style={{ fontSize: 10, padding: '3px 8px', border: '1px solid #d1d5db', borderRadius: 3, background: '#fff', cursor: 'pointer', color: '#374151' }}>
-                  📑 Export slide
+                  📑 Export slides
                 </button>
               </div>
             ))}

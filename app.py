@@ -125,6 +125,36 @@ def export_pptx(inputs: dict = Body(...)):
     )
 
 
+@app.post("/api/export/deck")
+def export_deck_api(payload: dict = Body(...)):
+    """Branded PowerPoint deck, built by filling the shipped .pptx template.
+
+    Body: {"areas": {"urban": <inputs>, "rural": <inputs>, "national": <inputs>}}. Only the areas the
+    user actually entered should be present — the deck drops the slides for any scope that is absent,
+    and derives National by summing Urban + Rural when both are given. `inputs` alone is accepted as a
+    single-area fallback so older callers keep working."""
+    from export_deck import build_deck
+    if 'areas' in payload:
+        # An explicit but empty `areas` is a caller bug, not a request for a default deck — falling
+        # through to the single-area path here would quietly export a deck built from stock defaults.
+        areas = {k: v for k, v in (payload.get('areas') or {}).items() if v}
+    else:
+        single = payload.get('inputs') or payload
+        single.pop('_charts', None)
+        areas = {'national': single} if single else {}
+    if not areas:
+        return {"error": "no area inputs supplied"}
+    # One line recording which scopes the deck was built from. A deck missing a scope is almost always
+    # a payload that never carried it, and that is otherwise invisible from the output alone.
+    print(f"[export/deck] areas={list(areas)}", flush=True)
+    out = build_deck(areas)
+    return StreamingResponse(
+        iter([out.getvalue()]),
+        media_type='application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        headers={'Content-Disposition': 'attachment; filename="wss_scenarios.pptx"'},
+    )
+
+
 @app.post("/api/export/xlsx")
 def export_xlsx(inputs: dict = Body(...)):
     # Enriched multi-sheet workbook: per-sector forecast (incl. both financing gaps) + per-intervention breakdown.

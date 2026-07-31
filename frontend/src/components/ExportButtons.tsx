@@ -10,18 +10,29 @@ const FORMATS = [
   { label: 'CSV', ext: 'csv', endpoint: '/api/export/csv', icon: '📄' },
 ];
 
-export default function ExportButtons({ inputs, label = 'Export', pptxCharts }: {
+export default function ExportButtons({ inputs, label = 'Export', pptxCharts, areas }: {
   inputs: any; label?: string | null; pptxCharts?: () => Promise<Record<string, string>>;
+  // Every area the user actually entered, e.g. { urban, rural } or { national }. When supplied, the
+  // PowerPoint export fills the branded template and covers all three scopes in one deck; the engine
+  // is per-area, so National is summed server-side from whichever areas are present.
+  areas?: Record<string, any>;
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const download = async (fmt: typeof FORMATS[number]) => {
     setBusy(fmt.ext);
     try {
       let body: any = inputs || {};
-      if (fmt.ext === 'pptx' && pptxCharts) {
-        try { body = { ...body, _charts: await pptxCharts() }; } catch { /* fall back to a chart-less deck */ }
+      let endpoint = fmt.endpoint;
+      if (fmt.ext === 'pptx') {
+        const entered = Object.entries(areas || {}).filter(([, v]) => v);
+        if (entered.length) {
+          endpoint = '/api/export/deck';
+          body = { areas: Object.fromEntries(entered) };
+        } else if (pptxCharts) {
+          try { body = { ...body, _charts: await pptxCharts() }; } catch { /* chart-less deck */ }
+        }
       }
-      const r = await fetch(fmt.endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const r = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error(String(r.status));
       const b = await r.blob();
       const u = URL.createObjectURL(b); const a = document.createElement('a'); a.href = u; a.download = `wss_scenario.${fmt.ext}`; a.click(); URL.revokeObjectURL(u);
