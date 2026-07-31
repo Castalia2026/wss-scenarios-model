@@ -533,7 +533,26 @@ def _rebuild_contents(slide, entries, exec_slide_no):
 
 # ── main ────────────────────────────────────────────────────────────────────────────────────────
 
+def _check_template(path: str) -> None:
+    """Fail with an actionable message when the template is an unfetched Git LFS pointer.
+
+    The .pptx is stored in LFS, so a clone or deploy on a machine without git-lfs leaves a ~130-byte
+    text stub in its place. python-pptx then raises PackageNotFoundError, which reads like a missing
+    file rather than an un-hydrated one and sends you looking in the wrong direction."""
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"Deck template missing: {path}")
+    if os.path.getsize(path) < 1024:
+        with open(path, 'rb') as f:
+            head = f.read(64)
+        if head.startswith(b'version https://git-lfs'):
+            raise RuntimeError(
+                f"Deck template at {path} is an unfetched Git LFS pointer, not the .pptx. "
+                f"Install git-lfs and run `git lfs pull` (or `git lfs checkout`) in the repo."
+            )
+
+
 def build_deck(area_inputs: Dict[str, dict], template_path: str = TEMPLATE_A) -> io.BytesIO:
+    _check_template(template_path)
     d = DD.build(area_inputs)
     cur = d['currency']
     prs = Presentation(template_path)
