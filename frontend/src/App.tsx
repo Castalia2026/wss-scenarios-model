@@ -645,9 +645,6 @@ function OnboardingModal({ onClose }: { onClose: () => void }) {
             <div style={{ flex: 1, padding: '8px 14px', background: '#f0f4ff', borderRadius: 8, fontSize: 12, color: '#312e81', border: '1px solid #c7d2fe', lineHeight: 1.45 }}>
               <strong>Tip:</strong> Reopen this anytime via <strong>"📖 Tool Overview"</strong> in the top-right, and see <strong>Saving your work</strong> above for how to save and load.
             </div>
-            <div style={{ flex: 1, padding: '8px 14px', background: '#fef3c7', borderRadius: 8, fontSize: 12, color: '#92400e', lineHeight: 1.45 }}>
-              <strong>Note:</strong> This is an interactive prototype. The Results Dashboard shows static example charts.
-            </div>
           </div>
           </>}
 

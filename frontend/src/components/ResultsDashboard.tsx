@@ -154,16 +154,30 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
   const [contrib, setContrib] = useState<Contrib>(null);   // per-intervention stacked series
   const [error, setError] = useState<string | null>(null);
 
+  // The dataset the user actually filled in. Same asymmetry deckAreas handles above: in national-ENTRY
+  // mode the dataset being edited lives in altInputs.national and `inputs` is still the urban primary
+  // seed, so it has to be read explicitly — otherwise everything on this tab (charts, tables, the
+  // intervention toggles and the whole-scenario exports) reports seed numbers the user never entered.
+  const primary = useMemo(
+    () => (geoScope === 'national' ? (altInputs?.['national'] ?? inputs) : inputs),
+    [geoScope, inputs, altInputs]);
+  // National entry has no urban/rural split to look at, so the Scope dropdown collapses to National
+  // (below) and every view resolves to that single dataset.
+  const effScope = geoScope === 'national' ? 'national' : viewScope;
+
   // Datasets for the chosen scope (national = urban + rural summed, when rural data exists).
   const datasets = useMemo(() => {
+    // Selecting urban+rural seeds altInputs.rural and switching to national entry does not clear it, so
+    // national entry returns its one dataset rather than summing in an area that is no longer in play.
+    if (geoScope === 'national') return [primary];
     const rural = altInputs?.['rural'];
-    if (viewScope === 'urban') return [inputs];
-    if (viewScope === 'rural') return [rural ?? inputs];
-    return rural ? [inputs, rural] : [inputs];        // national
-  }, [inputs, altInputs, viewScope]);
+    if (effScope === 'urban') return [primary];
+    if (effScope === 'rural') return [rural ?? primary];
+    return rural ? [primary, rural] : [primary];      // national
+  }, [primary, geoScope, altInputs, effScope]);
 
   const cur = datasets[0]?.country_config?.currency || 'LCU';
-  const toggles = inputs?.toggles || {};
+  const toggles = primary?.toggles || {};
   const depKey = JSON.stringify(datasets);
 
   // ── Fan charts: BAU vs the user's full designed scenario (interventions + customs) ──────────────
@@ -313,7 +327,8 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
 
   const isShare = unitMode === 'share';
   const covFmt = isShare ? (v: number) => Math.round(v * 100) + '%' : (v: number) => sig3(v);
-  const gapFmt = (v: number) => sigB(v);
+  // gapRows are ALREADY in billions (÷1000 when built), so format with sig3 — sigB would divide twice.
+  const gapFmt = (v: number) => sig3(v);
   // Coverage stack in % mode: divide the base, every band, and the target/ceiling by that year's total.
   const asShareStack = (rows: any[], bands: ContribBand[]) => rows.map(r => {
     const tot = r.__total || 0; const d = (v: number) => tot > 0 ? v / tot : 0;
@@ -322,7 +337,7 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
     return o;
   });
 
-  const scopeName = viewScope === 'rural' ? 'Rural' : viewScope === 'urban' ? 'Urban' : 'National';
+  const scopeName = effScope === 'rural' ? 'Rural' : effScope === 'urban' ? 'Urban' : 'National';
   const pct = (f: number) => (f * 100).toFixed(1) + '%';
 
   // Capture the four on-screen result charts (DOM order: water coverage, water gap, san coverage, san gap)
@@ -575,11 +590,19 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#475569' }}>Scope</span>
-            <select value={viewScope} onChange={e => setViewScope(e.target.value as any)}
-              style={{ padding: '5px 26px 5px 8px', borderRadius: 5, border: '1px solid #94a3b8', fontSize: 12, background: '#fff', cursor: 'pointer' }}>
-              <option value="urban">Urban</option>
-              <option value="rural">Rural</option>
-              <option value="national">National</option>
+            {/* National entry is one dataset with no urban/rural split, so the only honest view is National —
+                offering Urban/Rural there would label the same national numbers as an area's. */}
+            <select value={effScope} onChange={e => setViewScope(e.target.value as any)}
+              disabled={geoScope === 'national'}
+              title={geoScope === 'national' ? 'The data was entered as a single national dataset — there is no urban/rural breakdown to view.' : undefined}
+              style={{ padding: '5px 26px 5px 8px', borderRadius: 5, border: '1px solid #94a3b8', fontSize: 12,
+                background: geoScope === 'national' ? '#f1f5f9' : '#fff', color: geoScope === 'national' ? '#64748b' : undefined,
+                cursor: geoScope === 'national' ? 'not-allowed' : 'pointer' }}>
+              {geoScope === 'national' ? <option value="national">National</option> : (<>
+                <option value="urban">Urban</option>
+                <option value="rural">Rural</option>
+                <option value="national">National</option>
+              </>)}
             </select>
           </div>
           <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
@@ -591,7 +614,9 @@ export default function ResultsDashboard({ geoScope, scenarios, inputs, altInput
               }}>{l}</button>
             ))}
           </div>
-          <ExportButtons inputs={inputs} pptxCharts={captureResultsCharts} areas={deckAreas} />
+          {/* Excel/CSV post one dataset and run the engine on it, so they take the edited primary (the
+              national dataset in national-entry mode); the deck still covers every entered area. */}
+          <ExportButtons inputs={primary} pptxCharts={captureResultsCharts} areas={deckAreas} />
         </div>
       </div>
 
