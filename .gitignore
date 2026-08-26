@@ -4,3 +4,9 @@ __pycache__/
 .claude/
 refernce/
 *.tsbuildinfo
+
+# Word lock files
+~$*
+
+# doc tooling deps
+tools/node_modules/

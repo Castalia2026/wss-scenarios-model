@@ -1,0 +1,1 @@
+{ "name": "wss-doc-tools", "private": true, "type": "module", "dependencies": { "docx": "^9.0.0" } }
