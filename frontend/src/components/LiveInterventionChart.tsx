@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ComposedChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Label,
 } from 'recharts';
@@ -47,6 +47,9 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
   const [bands, setBands] = useState<Intv[]>([]);   // interventions that actually contribute, in stack order
   const [summary, setSummary] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  // Unit toggle, matching the BAU chart and the Results dashboard: absolute households or share of
+  // population. The engine always returns household counts; share mode is a pure display conversion.
+  const [unitMode, setUnitMode] = useState<'count' | 'share'>('count');
 
   const depKey = JSON.stringify(inputs) + '|' + sector;
   useEffect(() => {
@@ -119,15 +122,31 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
 
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
   const chartRef = useRef<HTMLDivElement>(null);
+  const isShare = unitMode === 'share';
+  // Share mode divides the BAU base, every intervention band and the ceiling by that year's total
+  // households, so the stack still adds up and the ceiling becomes a flat 100%. One household size
+  // is used throughout the model, so the household share is also the share of population.
+  const displayData = useMemo(() => {
+    if (!isShare) return data;
+    return data.map((r: any) => {
+      const tot = r['Total households'] || 0;
+      const d = (v: number) => (tot > 0 ? (+v || 0) / tot : 0);
+      const o: any = { year: r.year, 'Total households': tot > 0 ? 1 : 0, 'BAU (safely managed)': d(r['BAU (safely managed)']) };
+      bands.forEach(([, label]) => { o[label] = d(r[label]); });
+      return o;
+    });
+  }, [data, bands, isShare]);
+  const fmtAxis = (v: number) => (isShare ? Math.round(v * 100) + '%' : sig(v));
+  const fmtVal = (v: number) => (isShare ? (v * 100).toFixed(1) + '%' : sig(v) + ' M');
   // Data series behind the chart, for the "⤓ Excel" export: Year, BAU base, each band, and the ceiling.
   const exportHeaders = ['Year', 'BAU (safely managed)', ...bands.map(([, label]) => label), 'Total households'];
-  const exportRows = data.map((r: any) => [r.year, r['BAU (safely managed)'], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
+  const exportRows = displayData.map((r: any) => [r.year, r['BAU (safely managed)'], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
   // Native Excel chart: grey BAU base + each contributing intervention band as stacked areas, ceiling as a line.
   const chartSpec = {
     category: 'Year', stacked: true,
     areas: [{ name: 'BAU (safely managed)', color: C.bauFill }, ...bands.map(([, label, color]) => ({ name: label, color }))],
     lines: [{ name: 'Total households', color: C.total, dash: true }],
-    yTitle: '# households (millions)', xTitle: 'Year',
+    yTitle: isShare ? '% of population' : '# households (millions)', xTitle: 'Year',
   };
   const fileBase = `${scopeLabel ? scopeLabel + '_' : ''}${sector}_intervention_impact`;
   return (
@@ -136,11 +155,22 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
         <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600, color: '#1e3a5f' }}>
           {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
         </h3>
-        <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — intervention impact`}
-          sheets={[{ name: `${sectorLabel} impact`, headers: exportHeaders, rows: exportRows }]} chartSpec={chartSpec} compact />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
+            {([['count', '# Households'], ['share', '% of population']] as const).map(([m, l]) => (
+              <button key={m} onClick={() => setUnitMode(m)} style={{
+                padding: '4px 9px', fontSize: 10.5, border: 'none', cursor: 'pointer',
+                background: unitMode === m ? '#2563eb' : '#fff', color: unitMode === m ? '#fff' : '#475569',
+                fontWeight: unitMode === m ? 700 : 500,
+              }}>{l}</button>
+            ))}
+          </div>
+          <ChartExport chartRef={chartRef} filename={fileBase} title={`${sectorLabel} — intervention impact`}
+            sheets={[{ name: `${sectorLabel} impact`, headers: exportHeaders, rows: exportRows }]} chartSpec={chartSpec} compact />
+        </div>
       </div>
       <div style={{ fontSize: 10, color: '#334155', background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra households an enabled intervention delivers.
+        Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra coverage an enabled intervention delivers. Switch between absolute households and share of population above.
       </div>
       {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       {summary && (
@@ -151,13 +181,13 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
       )}
       <div ref={chartRef} style={{ background: '#fff' }}>
       <ResponsiveContainer width="100%" height={360}>
-        <ComposedChart data={data} margin={{ top: 14, right: 24, bottom: 5, left: 10 }}>
+        <ComposedChart data={displayData} margin={{ top: 14, right: 24, bottom: 5, left: 10 }}>
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="year" tick={{ fontSize: 10 }} interval={yearAxisInterval(data)} />
-          <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => sig(v)}>
-            <Label value="# households (millions)" angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
+          <YAxis tick={{ fontSize: 10 }} domain={isShare ? [0, 1] : undefined} tickFormatter={fmtAxis}>
+            <Label value={isShare ? '% of population' : '# households (millions)'} angle={-90} position="insideLeft" style={{ fontSize: 10, fill: '#64748b' }} />
           </YAxis>
-          <Tooltip formatter={(v: any) => sig(+v) + ' M'} contentStyle={{ fontSize: 11 }} />
+          <Tooltip formatter={(v: any) => fmtVal(+v)} contentStyle={{ fontSize: 11 }} />
           {/* Legend lists the Total-households line first, then the area fills (see chartLegend). Render
               order below stays areas-then-line so the line still draws on top; only the legend is reordered. */}
           <Legend wrapperStyle={{ fontSize: 10 }} content={linesFirstLegend} />
