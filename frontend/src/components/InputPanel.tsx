@@ -291,15 +291,27 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   const bauSector = bauSectorProp || bauSectorLocal;
   // The sector toggle is rendered in two places: above the Budget section on Data Inputs (so the split
   // control below it follows the chosen sector) and above section 6 on the BAU tab. Defined once here.
+  // A compact segmented control in a card, so it reads as part of the section stack rather than two
+  // full-width slabs. Sized to its content, so it looks the same in the wide Data-Inputs column and
+  // the narrow BAU panel.
   const sectorToggle = (
-    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-      {(['water', 'sanitation'] as const).map(sct => (
-        <button key={sct} onClick={() => setBauSector(sct)} style={{
-          flex: 1, padding: '8px 16px', border: 'none', borderRadius: 6, cursor: 'pointer',
-          background: bauSector === sct ? '#2563eb' : '#e5e7eb',
-          color: bauSector === sct ? '#fff' : '#374151', fontWeight: 600, fontSize: 13,
-        }}>{sct === 'water' ? 'Water Supply' : 'Sanitation'}</button>
-      ))}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap',
+      background: '#fff', border: '1px solid #e2e8f0', borderRadius: 8,
+      padding: '8px 14px', marginBottom: 10 }}>
+      <span style={{ fontSize: 12, fontWeight: 600, color: '#475569' }}>Sector</span>
+      <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
+        {(['water', 'sanitation'] as const).map(sct => (
+          <button key={sct} onClick={() => setBauSector(sct)} style={{
+            padding: '6px 22px', border: 'none', cursor: 'pointer',
+            background: bauSector === sct ? '#2563eb' : '#fff',
+            color: bauSector === sct ? '#fff' : '#475569',
+            fontWeight: bauSector === sct ? 700 : 500, fontSize: 12.5,
+          }}>{sct === 'water' ? 'Water Supply' : 'Sanitation'}</button>
+        ))}
+      </div>
+      <span style={{ fontSize: 10.5, color: '#94a3b8' }}>
+        Sections below are entered one sector at a time.
+      </span>
     </div>
   );
   const setBauSector = onBauSectorChange || setBauSectorLocal;
