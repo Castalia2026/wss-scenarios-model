@@ -149,24 +149,37 @@ function SplitControl({ inputs, onChange, section, sector }: {
   };
   const cell: React.CSSProperties = { padding: '4px 6px', border: '1px solid #93C5FD', background: '#EFF6FF', borderRadius: 3, fontSize: 12, color: '#1E3A5F', outline: 'none', width: 66 };
   return (
-    <div style={{ border: '1px solid #bfdbfe', background: '#f8fbff', borderRadius: 6, padding: '8px 11px', marginBottom: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Investment split by service level</div>
-      <div style={{ fontSize: 10.5, color: '#475569', marginBottom: 7, lineHeight: 1.5 }}>
-        How new {sector} investment is divided once replacement is funded. The safely-managed share upgrades
-        households from basic and below; the basic share upgrades households from limited and below. Each is
-        bought at its own unit cost. The default sends everything to safely managed.
+    <div style={{ gridColumn: '1 / -1', border: '1px solid #bfdbfe', background: '#f8fbff',
+      borderRadius: 6, padding: '10px 14px', marginTop: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap', marginBottom: 8 }}>
+        <span style={{ fontSize: 12.5, fontWeight: 700, color: '#1e3a5f' }}>Investment split by service level</span>
+        <span style={{ fontSize: 10.5, color: '#64748b' }}>
+          How new {sector} investment is divided once replacement is funded. The safely-managed share
+          upgrades households from basic and below; the basic share upgrades households from limited and
+          below. Each is bought at its own unit cost.
+        </span>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 11.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
           Safely managed
-          <NumInput style={cell} value={sm} onValue={v => setBasic(100 - (v ?? 0))} /> %
+          <NumInput style={cell} value={sm} onValue={v => setBasic(100 - (v ?? 0))} />
+          <span style={{ color: '#64748b' }}>%</span>
         </label>
-        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+        <label style={{ fontSize: 11.5, color: '#334155', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}>
           Basic
-          <NumInput style={cell} value={basic} onValue={v => setBasic(v ?? 0)} /> %
+          <NumInput style={cell} value={basic} onValue={v => setBasic(v ?? 0)} />
+          <span style={{ color: '#64748b' }}>%</span>
         </label>
-        <input type="range" min={0} max={100} step={1} value={basic} onChange={e => setBasic(+e.target.value)}
-          style={{ flex: 1, minWidth: 140, accentColor: '#2563eb' }} title="Drag to shift investment toward basic service" />
+        <div style={{ flex: 1, minWidth: 260, display: 'flex', alignItems: 'center', gap: 9 }}>
+          <span style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap' }}>all safely managed</span>
+          <input type="range" min={0} max={100} step={1} value={basic} onChange={e => setBasic(+e.target.value)}
+            style={{ flex: 1, accentColor: '#2563eb' }} title="Drag to shift investment toward basic service" />
+          <span style={{ fontSize: 10, color: '#94a3b8', whiteSpace: 'nowrap' }}>all basic</span>
+        </div>
+      </div>
+      <div style={{ fontSize: 10.5, color: '#475569', marginTop: 7 }}>
+        Currently <b>{sm}%</b> of new {sector} investment buys safely-managed service and <b>{basic}%</b> buys
+        basic service. This drives the business-as-usual projection, not only the designed scenario.
       </div>
     </div>
   );
