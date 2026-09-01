@@ -367,6 +367,19 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
     const bx = Math.min(x, overlay.width - 8);
     const tick = 6;
     const midY = (yTop + yBot) / 2;
+    // Closed -> collapse to a small reopen marker at the bracket, exactly as a target call-out does.
+    // The bracket, the arrows, the dashed leader and the label box all go with it, so nothing red is
+    // left behind on the plot.
+    const key = `g-${endAnno.year}`;
+    if (closedFlags.has(key)) {
+      return (
+        <g onClick={() => toggleFlag(key, true)} style={{ cursor: 'pointer' }}>
+          <title>{`Reopen the Financing gap ${endAnno.year} call-out`}</title>
+          <circle cx={bx} cy={midY} r={8} fill="#fff" stroke="#b91c1c" strokeWidth={1.5} />
+          <text x={bx} y={midY + 3.5} textAnchor="middle" fontSize={9} fontWeight={700} fill="#b91c1c">↕</text>
+        </g>
+      );
+    }
     const money = endAnno.finGap == null ? null : `${sigB(endAnno.finGap)} B ${endAnno.cur}/yr`;
     const gapHHtxt = `${sig3(endAnno.gapHH)} M HH`;
     // Label box to the left of the bracket.
@@ -394,6 +407,11 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
           ? <><text x={boxX + 8} y={boxY + 27} fontSize={10} fontWeight={700} fill="#7f1d1d">{money}</text>
               <text x={boxX + 8} y={boxY + 39} fontSize={9} fill="#334155">{gapHHtxt} shortfall</text></>
           : <text x={boxX + 8} y={boxY + 25} fontSize={10} fontWeight={700} fill="#7f1d1d">{gapHHtxt} shortfall</text>}
+        <g onClick={() => toggleFlag(key, false)} style={{ cursor: 'pointer' }}>
+          <title>Close</title>
+          <circle cx={boxX + boxW - 11} cy={boxY + 11} r={7} fill="#fff" stroke="#cbd5e1" />
+          <text x={boxX + boxW - 11} y={boxY + 14} textAnchor="middle" fontSize={9} fontWeight={700} fill="#64748b">✕</text>
+        </g>
       </g>
     );
   };
@@ -530,7 +548,7 @@ export default function LiveBAUChart({ inputs, inputsList, sector, scopeLabel, r
       })()}
       {targetPoints.length > 0 && (
         <div style={{ fontSize: 10.5, color: '#64748b', marginBottom: 6 }}>
-          🎯 Target call-outs are drawn on the chart. Click a call-out's ✕ to close it, or click its marker to reopen; use 🎯 Targets to choose which show.
+          🎯 Target call-outs and the financing-gap box are drawn on the chart. Click a box's ✕ to close it, or click its marker to reopen; use 🎯 Targets to choose which targets show.
         </div>
       )}
       {/* Toolbar: Y-axis unit toggle + per-chart exports */}
