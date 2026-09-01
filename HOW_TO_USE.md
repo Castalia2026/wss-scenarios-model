@@ -124,9 +124,8 @@ The Guide panel gives field-by-field help for whatever section is open. It is av
 first three tabs and opens from the vertical **📋 Guide** button on the right edge. The button
 reads **✕ Close** while the panel is open. There is no Guide on the Results Dashboard.
 
-The panel holds one collapsible card per form section. Click a card to expand it. Most cards carry
-a **How to find it** list naming the datasets a user should go to, and a **Sources:** line with
-links.
+The panel holds one collapsible card per form section. Click a card to expand it. Most cards
+recommend data sources under **How to find it**, with links under **Sources**.
 
 The panel follows the form. Opening a section on the left focuses the matching card and opens the
 panel if it was closed. One quirk is worth knowing: after closing the panel with **✕ Close**,
@@ -349,6 +348,11 @@ level, and IBNET publishes utility benchmarks where local figures are missing.
 **How the data should be entered.** The capital cost per household is built from **two technology
 mixes**, one for safely managed service and one for basic. For each technology, enter its share of
 the mix and its cost per household. The model uses each table's share-weighted total.
+
+The tool checks the shares for you. A table that does not total 100 percent turns its share cells
+red and raises a warning naming the table, because a mix summing to less than 100 percent
+understates the unit cost and so overstates how many households the budget reaches. Fix the shares
+before reading any result.
 
 The two sectors behave differently, and the difference confuses new users:
 

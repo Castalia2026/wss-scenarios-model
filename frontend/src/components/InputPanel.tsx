@@ -406,6 +406,8 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
     const weighted = m.reduce((a: number, t: any) => a + (+t.share || 0) * (+t.cost || 0), 0);
     const ok = Math.abs(shareSum - 1) < 0.001;
     const cellStyle: React.CSSProperties = { padding: '4px 6px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, color: '#3A4452', outline: 'none' };
+    // Shares that do not total 100% make the weighted cost wrong, so the share cells turn red until fixed.
+    const shareCell: React.CSSProperties = ok ? cellStyle : { ...cellStyle, border: '1px solid #dc2626', background: '#fef2f2' };
     const upd = (i: number, patch: any) => setCostMix(section, mixKey, engineField, m.map((x: any, j: number) => j === i ? { ...x, ...patch } : x));
     return (
       <div style={{ gridColumn: '1 / -1', marginTop: 4 }}>
@@ -417,7 +419,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
               <tr key={i}>
                 <td><input type="text" style={{ ...cellStyle, width: 188 }} value={t.name || ''}
                   onChange={e => upd(i, { name: e.target.value })} /></td>
-                <td><NumInput style={{ ...cellStyle, width: 62 }}
+                <td><NumInput style={{ ...shareCell, width: 62 }}
                   value={(t.share == null || Number.isNaN(+t.share)) ? undefined : Math.round((+t.share) * 1e6) / 1e4}
                   onValue={v => upd(i, { share: v === undefined ? undefined : v / 100 })} /></td>
                 <td><NumInput style={{ ...cellStyle, width: 96 }} commas

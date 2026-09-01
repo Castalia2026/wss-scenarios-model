@@ -286,6 +286,30 @@ export default function App() {
     };
     if (checkTargets(inputs.water_service, 'serv', 'Water') === 0) warnings.push('No water target year set — fill a full forecast service-level column (Σ 100%) in the table.');
     if (checkTargets(inputs.sanitation_service, 'sserv', 'Sanitation') === 0) warnings.push('No sanitation target year set — fill a full forecast service-level column (Σ 100%) in the table.');
+    // Technology-mix shares. A table summing to less than 100% quietly understates the unit cost, which
+    // overstates how many households the budget reaches, so it is raised here rather than left to a
+    // footnote under the table.
+    const checkMix = (mix: any, label: string) => {
+      const rows = (mix || []).filter((t: any) => t && typeof t === 'object');
+      if (!rows.length) return;
+      const sum = rows.reduce((a: number, t: any) => a + (+t.share || 0), 0);
+      if (Math.abs(sum - 1) >= 0.001) {
+        warnings.push(`${label} technology mix shares sum to ${(sum * 100).toFixed(1)}% — they must total 100%, or the unit cost will be wrong.`);
+      }
+    };
+    checkMix(inputs.water_costs?.sm_tech_mix, 'Water safely-managed');
+    checkMix(inputs.water_costs?.basic_tech_mix, 'Water basic');
+    checkMix(inputs.sanitation_costs?.sm_tech_mix, 'Sanitation safely-managed');
+    checkMix(inputs.sanitation_costs?.basic_tech_mix, 'Sanitation basic');
+    // The optimised-technology lever's own mixes, checked only where that lever is switched on.
+    if (inputs.toggles?.ws_techmix_enabled) {
+      checkMix(inputs.water_interventions?.techmix_sm_tech_mix, 'Water optimised-technology safely-managed');
+      checkMix(inputs.water_interventions?.techmix_basic_tech_mix, 'Water optimised-technology basic');
+    }
+    if (inputs.toggles?.san_techmix_enabled) {
+      checkMix(inputs.sanitation_interventions?.techmix_sm_tech_mix, 'Sanitation optimised-technology safely-managed');
+      checkMix(inputs.sanitation_interventions?.techmix_basic_tech_mix, 'Sanitation optimised-technology basic');
+    }
   }
 
   // Exports now live throughout the tool (per-table, per-chart, and the whole-scenario Export buttons on
