@@ -149,7 +149,8 @@ and a **Sources:** link, which for service levels is the WHO/UNICEF JMP househol
 
 The first tab collects everything the model needs before it can project anything. Work down the
 five numbered sections in order. Sections 1 and 2 apply to the whole analysis and are shared across
-areas. Sections 3 onward are specific to the area named in the **Entering data for** buttons, and a
+areas. The **Water Supply / Sanitation** toggle sits between sections 4 and 5, because everything
+from the budget onward is entered one sector at a time. Sections 3 onward are specific to the area named in the **Entering data for** buttons, and a
 pin note on screen states which area is being edited.
 
 Every year-by-year table uses the same three-color convention, shown in the legend at the top of
@@ -288,9 +289,11 @@ Type in any cell to override that year. Blanks fill from the model.
 
 #### Investment split by service level
 
-Two further controls sit beneath the budget table, one for water supply and one for sanitation. They
-are inputs rather than interventions, and they belong here because they drive the business-as-usual
-projection, not only the designed scenario.
+A further control sits beneath the budget table. It is an input rather than an intervention, and it
+belongs here because it drives the business-as-usual projection, not only the designed scenario.
+
+The split is set per sector. The **Water Supply / Sanitation** toggle directly above the budget
+section chooses which sector the control is editing, so switch sectors and set it twice.
 
 **What they do.** Once replacement is funded, the remaining capital is divided between two service
 levels. The **safely managed** share upgrades households from basic and below. The **basic** share
@@ -321,9 +324,10 @@ at, so any move away from the default will read as pure loss.
 
 ![The budget section with the investment split](docs/images/fig-2-5b-budget-split.png)
 
-**Figure 2.8. The investment split, beneath the budget table.** One control per sector. Each pair of
-percentage fields always totals 100, and the slider moves both at once. The default of 100 percent
-safely managed reproduces a model that only ever buys the top service level.
+**Figure 2.8. The investment split, beneath the budget table.** The sector toggle sits above the
+budget section, so the control below it follows whichever sector is selected. The pair of percentage
+fields always totals 100, and the slider moves both at once. The default of 100 percent safely
+managed reproduces a model that only ever buys the top service level.
 
 ---
 

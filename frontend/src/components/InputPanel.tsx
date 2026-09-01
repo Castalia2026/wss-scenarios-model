@@ -289,6 +289,19 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
   const [countries, setCountries] = useState<{name:string, currency:string}[]>([]);
   const [bauSectorLocal, setBauSectorLocal] = useState<'water' | 'sanitation'>('water');
   const bauSector = bauSectorProp || bauSectorLocal;
+  // The sector toggle is rendered in two places: above the Budget section on Data Inputs (so the split
+  // control below it follows the chosen sector) and above section 6 on the BAU tab. Defined once here.
+  const sectorToggle = (
+    <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
+      {(['water', 'sanitation'] as const).map(sct => (
+        <button key={sct} onClick={() => setBauSector(sct)} style={{
+          flex: 1, padding: '8px 16px', border: 'none', borderRadius: 6, cursor: 'pointer',
+          background: bauSector === sct ? '#2563eb' : '#e5e7eb',
+          color: bauSector === sct ? '#fff' : '#374151', fontWeight: 600, fontSize: 13,
+        }}>{sct === 'water' ? 'Water Supply' : 'Sanitation'}</button>
+      ))}
+    </div>
+  );
   const setBauSector = onBauSectorChange || setBauSectorLocal;
   // Excel round-trip (download a template of the year-by-year table, fill offline, upload to populate).
   const [xlsxStatus, setXlsxStatus] = useState<{ kind: 'idle' | 'busy' | 'ok' | 'err'; msg?: string }>({ kind: 'idle' });
@@ -828,13 +841,18 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
                 <YearTable rows={econRows} years={years} baseYr2={baseYr2} />
               </Section>
 
+              {/* Sector choice ahead of the budget, so the split control below follows one sector
+                  instead of showing a pair. */}
+              {sectorToggle}
+
               <Section title="5. Budget" sectionKey="budget" onFocus={onSectionFocus}>
                 <div style={{ gridColumn: '1 / -1', fontSize: 11, color: '#475569', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6, padding: '8px 12px', marginBottom: 4 }}>
                   💰 <b>Two budgets per sector.</b> <b>Executed budget</b> = capital that actually gets put to work building service (new households × unit cost) — this drives the BAU. <b>Allocated budget</b> = the capital budget on paper (a manual input, normally larger). Their ratio is the <b>budget execution</b> (executed budget ÷ allocated budget) that the Budget-execution intervention improves. Type any cell to override that year; blanks fill from the model.
                 </div>
                 <YearTable rows={budgetRows} years={years} baseYr2={baseYr2} />
-                <SplitControl inputs={inputs} onChange={onChange} section="water_interventions" sector="water supply" />
-                <SplitControl inputs={inputs} onChange={onChange} section="sanitation_interventions" sector="sanitation" />
+                <SplitControl inputs={inputs} onChange={onChange}
+                  section={bauSector === 'water' ? 'water_interventions' : 'sanitation_interventions'}
+                  sector={bauSector === 'water' ? 'water supply' : 'sanitation'} />
               </Section>
             </>
           );
@@ -843,16 +861,7 @@ export default function InputPanel({ inputs, onChange, results, onCalculate, loa
       </>}
 
       {(isBAU || isInputs) && <>
-      {/* Sector toggle for BAU */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 16 }}>
-        {(['water', 'sanitation'] as const).map(s => (
-          <button key={s} onClick={() => setBauSector(s)} style={{
-            flex: 1, padding: '8px 16px', border: 'none', borderRadius: 6, cursor: 'pointer',
-            background: bauSector === s ? '#2563eb' : '#e5e7eb',
-            color: bauSector === s ? '#fff' : '#374151', fontWeight: 600, fontSize: 13,
-          }}>{s === 'water' ? 'Water Supply' : 'Sanitation'}</button>
-        ))}
-      </div>
+      {isBAU && sectorToggle}
 
       {/* ===== UNIT COSTS + TECHNICAL (merged, sector-dependent). Targets are now set in the §2 table. ===== */}
       {bauSector === 'water' && (
