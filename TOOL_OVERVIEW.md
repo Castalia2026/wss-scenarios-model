@@ -20,8 +20,8 @@ Three design decisions shape every result the tool produces:
 
 - **The tool models one area at a time.** National figures are the sum of a separate urban run and
   a separate rural run.[^2]
-- **The tool treats safely managed service as the goal.** Every intervention is measured by the
-  households it lifts to that level.[^3]
+- **The tool buys two service levels.** Investment is split between safely managed and basic, at a
+  share the user sets per sector, and each is bought at its own unit cost.[^3]
 - **The tool holds business as usual fixed.** The intervention scenario runs as a second,
   independent calculation, so switching an intervention on can never move the BAU curve.[^4]
 
@@ -117,18 +117,21 @@ complete data. Forecasting begins the year after.
 The *Service levels* section places every household on a five-level ladder. The levels come from
 the Joint Monitoring Programme: safely managed, basic, limited, unimproved, and no service.[^3]
 
-Only the top level is purchased. Budget and interventions alike are expressed as households lifted
-to safely managed. This single convention is what makes the later results comparable across
-interventions that work in completely different ways.
+The top two levels are purchased. Budget and interventions are expressed as households lifted to
+safely managed or to basic, and the split between the two is set on the Intervention Design tab.
+The three lowest levels are never bought directly. A household leaves them only by being upgraded
+to basic.
 
 The tool reads the historical trend off the record. Each level grows at the average year-on-year
 rate of its own household count, measured over the historical window.[^11] Two entered points
 produce the same answer as a simple compound growth rate, so richer data refines the curve without
 breaking the simple case.
 
-Basic service acts as the balancing item throughout.[^12] Safely managed comes from the
-calculation, the three lowest levels grow at their own rates, and basic takes whatever remains of
-the household total. The five levels therefore always sum to the population.
+Households move between named levels rather than being redistributed by an arithmetic rule.[^12]
+Money for safely managed moves them up from basic and below; money for basic moves them up from
+limited and below. Population growth then feeds the three lowest levels in their prior proportions,
+which is what keeps the five levels summing to the population. New households therefore arrive
+unserved and have to be reached, rather than appearing at basic for free.
 
 **Targets live in the same table.** Filling a whole future column so it totals 100 percent marks
 that year as a target.[^13] The tool accepts as many target years as the user wants, not just two.
@@ -210,9 +213,21 @@ new connections buy what is left. Figure 2 shows the order of priority.
                    The network also serves businesses and institutions
               |
               v
-   RESIDUAL        New safely managed connections
-                   Residual divided by the cost per connection
+   RESIDUAL        Split between the two purchased levels
+                   Safely-managed share -> upgrades households from basic and below
+                   Basic share          -> upgrades households from limited and below
+                   Each share divided by that level's own cost per connection
 ```
+
+**The residual is split between two service levels.** The user sets the share per sector, and the
+default sends everything to safely managed. The safely-managed share upgrades households from basic
+and below. The basic share upgrades households from limited and below. Each share buys households
+at its own unit cost, so the same money buys more basic connections than safely-managed ones.
+
+Both flows are drawn from the previous year's household counts, so no household climbs two levels
+and is paid for twice in one year. A share whose source households are exhausted rolls over to the
+other level rather than going unspent. The split is an assumption about how a sector spends rather
+than a lever a user switches on, so it moves the business-as-usual curve as well as the scenario.
 
 Replacement holds the first claim on capital. The tool depreciates the existing asset stock on a
 straight line over the asset life, 30 years by default, starting the first forecast year.[^21]
@@ -459,11 +474,13 @@ the user's judgment.
   revenue, which the model puts toward new connections. Forecasting operating cost properly would
   need utility-level data that rarely exists at national scale. The results therefore describe what
   a sector can build, not what it can afford to run.
-- **Safely managed service is the only level the model buys.** The model calculates safely managed
-  households from the budget. It grows the three lowest levels at their own historical rates, then
-  gives basic service whatever share of the population remains.[^12] Governments express their
-  targets in safely managed service, so that is the level a financing decision turns on. Basic
-  coverage is an arithmetic balance rather than a costed program.
+- **The model buys two service levels, and new households arrive at the bottom.** Investment is
+  split between safely managed and basic, and each is bought at its own unit cost.[^12] Households
+  move between named levels: money for basic moves them up from limited and below, money for safely
+  managed moves them up from basic and below. Population growth feeds the three lowest levels in
+  their prior proportions, so a growing population arrives unserved and has to be reached. Limited,
+  unimproved and no service are still never purchased directly. A household leaves them only by
+  being upgraded to basic.
 - **Sanitation is modeled the same way as water.** Both sectors run through one calculation, each
   with its own service levels, targets, unit costs, and budget share.[^50] A sanitation connection
   is a household reached at a unit cost, whatever technology stands behind it. One shared

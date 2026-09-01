@@ -404,13 +404,41 @@ never clears what was entered.
 
 ![The Intervention Design tab](docs/images/fig-2-9-interventions.png)
 
-**Figure 2.10. The Intervention Design tab with four water interventions switched on.** Each
-intervention has a checkbox that enables it and a **▾ Show** button that opens its parameters. The
-graph on the right stacks one coloured band per enabled intervention on the blue business-as-usual
-base, and the buttons above it switch the axis between households and share of population.
-Interventions left unticked draw no band.
+**Figure 2.10. The Intervention Design tab.** The investment split sits above the levers, because it
+governs all of them. Each intervention below has a checkbox that enables it and a **▾ Show** button
+that opens its parameters. Two graphs sit on the right, safely managed above and basic below, each
+stacking one coloured band per enabled intervention on its blue business-as-usual base, with buttons
+to switch the axis between households and share of population.
 
-### 2.4.1 Water Supply Interventions
+### 2.4.1 Investment split by service level
+
+**This is the first thing to set on the tab, and it is not an intervention.** It has no checkbox,
+because it is an assumption about how the sector spends rather than a lever you switch on. It
+therefore moves the business-as-usual curve as well as the designed scenario.
+
+**What it does.** Once replacement is funded, the remaining capital is divided between two service
+levels. The **safely managed** share upgrades households from basic and below. The **basic** share
+upgrades households from limited and below. Each share buys households at that level's own unit
+cost, so a given sum buys more basic connections than safely-managed ones.
+
+**How to set it.** Type into either percentage field or drag the slider. The pair always totals 100.
+The default sends everything to safely managed, which reproduces a model that only ever buys the top
+level.
+
+**What to expect.** Moving the slider toward basic lowers safely-managed coverage and raises basic
+coverage. Both gaps are priced, so the financing gap responds to both. There is usually an interior
+optimum rather than a corner. The sample dataset reaches its lowest total investment need at around
+a 50/50 split, because pushing further closes the basic gap but reopens the safely-managed one
+faster than it saves.
+
+Two mechanics worth knowing. Both flows are drawn from the previous year's household counts, so no
+household climbs two levels and is charged twice in one year. And a share whose source households
+have run out rolls over to the other level rather than going unspent, so no capital is wasted.
+
+**Set the split before reading anything else on the tab**, since every intervention below is
+measured on top of it.
+
+### 2.4.2 Water Supply Interventions
 
 **Where to find the data.** Almost everything on this tab comes from the water utility rather than
 from a statistical agency: the billing system for collected ratios and tariffs, the production and
@@ -434,9 +462,11 @@ in most cases a target year, which together set how fast the change is phased in
   should match the budget section on tab 1.
 - **Capex efficiency (unit cost).** Discounts the cost of a connection. Enter the start year,
   target year, and the capex efficiency improvement to be achieved.
-- **Optimised technology selection.** Re-specifies the technology mix used for safely managed
-  connections, which changes the unit cost in a single step from its start year. This one is
-  pre-filled as a no-op, so it produces no effect until the mix is actually changed.
+- **Optimised technology selection.** Opens **two mix editors**, one for safely managed and one for
+  basic, since both levels are purchased. Each re-specifies its mix and changes that level's unit
+  cost in a single step from the start year, and each shows the new cost against the BAU cost with
+  the percentage change. Both are pre-filled as a no-op, so the lever produces no effect until a mix
+  is actually changed.
 - **Tariff reform.** Raises the tariff. Enter the start and target years, the volume sold at the
   start year, and the current and target tariffs.
 - **Microfinance.** Finances households the budget cannot reach. Enter the connection fee, the
@@ -445,7 +475,7 @@ in most cases a target year, which together set how fast the change is phased in
   of the upfront fee. A **grant budget** field funds a one-time means-based grant pool for
   households who cannot service a full loan.
 
-### 2.4.2 Sanitation Interventions
+### 2.4.3 Sanitation Interventions
 
 **Where to find the data.** The sewerage utility or the municipal sanitation department. Where
 sanitation is not separately metered, the water utility's volumes and the wastewater collected
@@ -468,7 +498,7 @@ their water equivalents:
 - **Microfinance.** The same mechanism as water, with sanitation's own connection cost, loan terms,
   and grant pool.
 
-### 2.4.3 Custom Interventions
+### 2.4.4 Custom Interventions
 
 Interventions the tool does not provide can be added here. Click **+ Add Custom Intervention**,
 choose its sector, and tick its box to switch it on. Two types are supported:
@@ -483,13 +513,18 @@ Custom interventions drive the calculation exactly as the built-in ones do. They
 charts as a single combined band rather than one band each, and they are not itemized in the
 contribution tables on the Results Dashboard.
 
-### 2.4.4 How to navigate the graph
+### 2.4.5 How to navigate the graphs
 
-**How the output is produced.** The graph runs the calculation once with every intervention off,
+**There are two graphs, not one.** The first covers safely managed service and the second covers
+basic, because investment can be directed at either. They are built identically and each carries its
+own unit toggle and exports. Read them together: a split that moves households into basic shows a
+thinner safely-managed stack and a thicker basic one.
+
+**How the output is produced.** Each graph runs the calculation once with every intervention off,
 then once more for each intervention switched on, adding them one at a time. The households each
 run adds become that intervention's band.
 
-**How to read it.** The blue base is business-as-usual safely managed coverage. Each colored band
+**How to read it.** The blue base is business-as-usual coverage at that graph's service level. Each colored band
 stacked on top is the extra households one enabled intervention delivers. The top of the stack is
 the full designed scenario. A written **Impact** sentence above the chart states how many more
 households the enabled set serves by the final year and how far it cuts the cumulative financing
