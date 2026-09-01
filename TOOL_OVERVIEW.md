@@ -118,7 +118,7 @@ The *Service levels* section places every household on a five-level ladder. The 
 the Joint Monitoring Programme: safely managed, basic, limited, unimproved, and no service.[^3]
 
 The top two levels are purchased. Budget and interventions are expressed as households lifted to
-safely managed or to basic, and the split between the two is set on the Intervention Design tab.
+safely managed or to basic, and the split between the two is set with the budget inputs on Tab 1.
 The three lowest levels are never bought directly. A household leaves them only by being upgraded
 to basic.
 

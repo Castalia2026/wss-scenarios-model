@@ -109,43 +109,6 @@ function InterventionToggle({ label, checked, onChange, children, onFocus }: {
 // from the BAU mix). Its weighted cost becomes the new SM service cost from the start year onward. Only
 // the SM cost drives new service in the engine, so this is the SM mix only. The mix lives in the payload
 // (techmix_sm_tech_mix); the adapter collapses it to techmix_sm_cost. Equal to the BAU mix ⇒ zero effect.
-// Share of NEW investment (after replacement) directed at BASIC service. The remainder buys safely
-// managed service. Both fields edit the same underlying number, so they always total 100%.
-function SplitControl({ inputs, onChange, section, sector }: {
-  inputs: any; onChange: (i: any) => void; section: 'water_interventions' | 'sanitation_interventions'; sector: string;
-}) {
-  const iv = inputs[section] || {};
-  const basic = Math.round(((+iv.basic_share || 0) * 1000)) / 10;      // percent, 1dp
-  const sm = Math.round((100 - basic) * 10) / 10;
-  const setBasic = (pct: number) => {
-    const v = Math.min(100, Math.max(0, isFinite(pct) ? pct : 0));
-    onChange({ ...inputs, [section]: { ...iv, basic_share: v / 100 } });
-  };
-  const cell: React.CSSProperties = { padding: '4px 6px', border: '1px solid #93C5FD', background: '#EFF6FF', borderRadius: 3, fontSize: 12, color: '#1E3A5F', outline: 'none', width: 66 };
-  return (
-    <div style={{ border: '1px solid #bfdbfe', background: '#f8fbff', borderRadius: 6, padding: '8px 11px', marginBottom: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Investment split by service level</div>
-      <div style={{ fontSize: 10.5, color: '#475569', marginBottom: 7, lineHeight: 1.5 }}>
-        How new {sector} investment is divided once replacement is funded. The safely-managed share upgrades
-        households from basic and below; the basic share upgrades households from limited and below. Each is
-        bought at its own unit cost. The default sends everything to safely managed.
-      </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-          Safely managed
-          <NumInput style={cell} value={sm} onValue={v => setBasic(100 - (v ?? 0))} /> %
-        </label>
-        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
-          Basic
-          <NumInput style={cell} value={basic} onValue={v => setBasic(v ?? 0)} /> %
-        </label>
-        <input type="range" min={0} max={100} step={1} value={basic} onChange={e => setBasic(+e.target.value)}
-          style={{ flex: 1, minWidth: 140, accentColor: '#2563eb' }} title="Drag to shift investment toward basic service" />
-      </div>
-    </div>
-  );
-}
-
 function MixTable({ mix, bauMix, setMix, CUR, rungLabel }: {
   mix: any[]; bauMix: any[]; setMix: (m: any[]) => void; CUR: string; rungLabel: string;
 }) {
@@ -373,9 +336,6 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {/* ===== WATER SUPPLY INTERVENTIONS ===== */}
         {sectorTab === 'water' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Water Supply Interventions</h3>
-          {/* Investment split: a scenario-wide assumption, not a toggled lever, so it has no checkbox
-              and it moves the BAU curve too. Default 100% safely managed reproduces the old model. */}
-          <SplitControl inputs={inputs} onChange={onChange} section="water_interventions" sector="water supply" />
 
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_ce')}>
@@ -463,9 +423,6 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {/* ===== SANITATION INTERVENTIONS ===== */}
         {sectorTab === 'sanitation' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Sanitation Interventions</h3>
-          {/* Investment split: a scenario-wide assumption, not a toggled lever, so it has no checkbox
-              and it moves the BAU curve too. Default 100% safely managed reproduces the old model. */}
-          <SplitControl inputs={inputs} onChange={onChange} section="sanitation_interventions" sector="sanitation" />
 
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.san_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('san_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_ce')}>
