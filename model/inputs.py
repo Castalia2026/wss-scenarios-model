@@ -377,6 +377,16 @@ class WaterInterventionInputs(BaseModel):
     # cost (0 → no change / keep the BAU cost). Applied via the same cost_factor hook. Toggle ws_techmix_enabled.
     techmix_start_year: int = 2027
     techmix_sm_cost: float = 0.0             # new real weighted SM connection cost (0 → keep the BAU cost)
+    # ── Investment split between service levels (test2) ────────────────────────────────────────────
+    # Share of NEW investment (after replacement) directed at BASIC service for households at
+    # limited-and-below. The remainder buys SAFELY MANAGED service for households at basic-and-below.
+    # 0.0 = every currency unit goes to safely managed, which is the default and the pre-split model.
+    # This is a scenario-wide assumption rather than a toggled lever, so it moves the BAU curve too.
+    basic_share: float = 0.0
+    # New weighted BASIC connection cost from techmix_start_year (0 -> keep the BAU basic cost), the
+    # basic-rung counterpart of techmix_sm_cost.
+    techmix_basic_cost: float = 0.0
+
 
     # Tariff reform (#129-#135) — simplified: raise the tariff linearly from current→target over
     # start→target year; the extra revenue (volume × tariff rise) is recycled into capex for new service.
@@ -442,6 +452,16 @@ class SanitationInterventionInputs(BaseModel):
     # techmix_sm_cost is the new real weighted SM cost (0 → keep the BAU cost). Toggle san_techmix_enabled.
     techmix_start_year: int = 2027
     techmix_sm_cost: float = 0.0
+
+    # ── Investment split between service levels (test2) ────────────────────────────────────────────
+    # Share of NEW investment (after replacement) directed at BASIC service for households at
+    # limited-and-below. The remainder buys SAFELY MANAGED service for households at basic-and-below.
+    # 0.0 = every currency unit goes to safely managed, which is the default and the pre-split model.
+    # This is a scenario-wide assumption rather than a toggled lever, so it moves the BAU curve too.
+    basic_share: float = 0.0
+    # New weighted BASIC connection cost from techmix_start_year (0 -> keep the BAU basic cost), the
+    # basic-rung counterpart of techmix_sm_cost.
+    techmix_basic_cost: float = 0.0
 
     # ── NRW-linked sanitation revenue (test2, cross-sector) — the PHYSICAL water recovered by the WATER
     # NRW-reduction lever returns to the sewer as wastewater the sanitation utility can charge for. Revenue

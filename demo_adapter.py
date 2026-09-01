@@ -42,12 +42,14 @@ _POP = [2.423388,2.477757119096809,2.533346018563647,2.5901820643791393,2.648293
 _HH = [0.61,0.6292760000000001,0.6491611216000001,0.6696746130425602,0.6908363308147051,0.7126667588684498,0.7351870284486929,0.7584189385476716,0.7823849770057781,0.8071083422791607,0.8326129658951823,0.8589235356174701,0.8860655193429823,0.9140651897542206]
 _WS_START = [0.56560166762623,0.3403983323737703,0.026,0.058,0.01]
 _WS_BASE  = [0.513729462650536,0.386270537349464,0.032,0.059,0.009]
+# Sample targets keep a real BASIC share at the final target year. A 100%-safely-managed target leaves
+# nothing for basic investment to aim at, so the investment split would only ever look harmful.
 _WS_T1 = [0.66,0.34,0,0,0]
-_WS_T2 = [1,0,0,0,0]
+_WS_T2 = [0.75,0.25,0,0,0]
 _SAN_START = [0.0288,0.97,0.0001,0.001,0.0001]
 _SAN_BASE  = [0.07774752344348565,0.909252476556514,0.008,0.003,0.002]
 _SAN_T1 = [0.66,0.34,0,0,0]
-_SAN_T2 = [1,0,0,0,0]
+_SAN_T2 = [0.75,0.25,0,0,0]
 _WS_COST_SM, _WS_COST_BASIC = 96878.0, 86875.59308914324
 _SAN_COST_SM = 105050.23373368701
 
@@ -267,6 +269,9 @@ def _default_ws_intervention():
             # Optimised technology selection: pre-fill the editor with the BAU SM mix (weighted = BAU cost, so
             # zero effect until the user re-weights it). techmix_sm_cost is derived from this mix in to_engine.
             'techmix_start_year':2026,'techmix_sm_tech_mix':[dict(t) for t in _WS_SM_MIX],
+            'techmix_basic_tech_mix':[dict(t) for t in _WS_BASIC_MIX],
+            # Investment split: share of new capital directed at BASIC service. 0 = all safely managed.
+            'basic_share':0.0,
             'tariff_start_year':2026,'tariff_target_year':2035,'tariff_volume_mld':87.6,
             'tariff_current':32.0,'tariff_target':40.0,
             **_afford_defaults()}
@@ -278,6 +283,8 @@ def _default_san_intervention():
             # Capex efficiency (unit-cost discount) + optimised technology selection (see water for the mechanic).
             'costeff_start_year':2026,'costeff_target_year':2035,'costeff_current_pct':0.0,'costeff_target_pct':0.20,
             'techmix_start_year':2026,'techmix_sm_tech_mix':[dict(t) for t in _SAN_SM_MIX],
+            'techmix_basic_tech_mix':[dict(t) for t in _SAN_BASIC_MIX],
+            'basic_share':0.0,
             # NRW-linked sanitation revenue: charge a (partly-collected) sewer fee on the water the water NRW
             # lever recovers, and spend it on SM sanitation connections.
             'nrw_link_return_ratio':0.80,'nrw_link_sewer_charge':16.0,'nrw_link_collection_rate':0.80,
@@ -324,12 +331,12 @@ def _real_cost(costs: dict, field: str, default: float) -> float:
     return float(nominal) * float(idx) / 100.0
 
 
-def _techmix_cost(iv: dict, costs: dict) -> float:
+def _techmix_cost(iv: dict, costs: dict, mix_key: str = 'techmix_sm_tech_mix') -> float:
     """test2 optimised-technology lever: the new REAL weighted SM connection cost from the intervention's
     edited technology mix (0 → no mix entered → keep the BAU cost). Weighted nominal Σ(share×cost) deflated
     by the SAME sector price_index as the BAU unit costs, so the engine's cost_factor (new ÷ BAU) is on a
     like-for-like real basis (the price index cancels)."""
-    w = _weighted(iv.get('techmix_sm_tech_mix') or [])
+    w = _weighted(iv.get(mix_key) or [])
     if w <= 0:
         return 0.0
     idx = costs.get('price_index', 100.0)
@@ -531,6 +538,8 @@ def to_engine(fe: dict) -> ModelInputs:
         # Optimised technology selection — new real weighted SM cost from the edited mix (0 → keep BAU).
         techmix_start_year=int(wi.get('techmix_start_year', 0) or 0),
         techmix_sm_cost=_techmix_cost(wi, fe.get('water_costs', {}) or {}),
+        techmix_basic_cost=_techmix_cost(wi, fe.get('water_costs', {}) or {}, 'techmix_basic_tech_mix'),
+        basic_share=float(wi.get('basic_share', 0.0) or 0.0),
         # Tariff reform (simplified): start/target year, volume (MLD), current & target tariff.
         tariff_start_year=int(wi.get('tariff_start_year', 0) or 0),
         tariff_target_year=int(wi.get('tariff_target_year', 0) or 0),
@@ -560,6 +569,8 @@ def to_engine(fe: dict) -> ModelInputs:
         costeff_target_pct=float(si.get('costeff_target_pct', 0.0) or 0.0),
         techmix_start_year=int(si.get('techmix_start_year', 0) or 0),
         techmix_sm_cost=_techmix_cost(si, fe.get('sanitation_costs', {}) or {}),
+        techmix_basic_cost=_techmix_cost(si, fe.get('sanitation_costs', {}) or {}, 'techmix_basic_tech_mix'),
+        basic_share=float(si.get('basic_share', 0.0) or 0.0),
         # NRW-linked sanitation revenue: charge a partly-collected sewer fee on the water the water NRW lever recovers.
         nrw_link_return_ratio=float(si.get('nrw_link_return_ratio', 0.0) or 0.0),
         nrw_link_sewer_charge=float(si.get('nrw_link_sewer_charge', 0.0) or 0.0),

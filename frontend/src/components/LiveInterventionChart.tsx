@@ -40,9 +40,13 @@ const SAN_INTV: Intv[] = [
 const zeroToggles = (t: any) => Object.fromEntries(Object.keys(t || {}).map(k => [k, false]));
 const sig = (v: number) => (!isFinite(v) || v === 0) ? '0' : Number(v.toPrecision(3)).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
-export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
-  inputs: any; sector: 'water' | 'sanitation'; scopeLabel?: string;
+export default function LiveInterventionChart({ inputs, sector, scopeLabel, rung = 0 }: {
+  inputs: any; sector: 'water' | 'sanitation'; scopeLabel?: string; rung?: 0 | 1;
 }) {
+  // Investment can now be directed at either rung, so the chart is drawn per rung: 0 = safely managed,
+  // 1 = basic. The engine returns every rung, so only the row index and the labels change.
+  const rungName = rung === 0 ? 'safely-managed' : 'basic';
+  const baseKey = `BAU (${rungName})`;
   const [data, setData] = useState<any[]>([]);
   const [bands, setBands] = useState<Intv[]>([]);   // interventions that actually contribute, in stack order
   const [summary, setSummary] = useState<any>(null);
@@ -92,10 +96,10 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
         // The engine returns a PURE BAU (`bau_hh`, invariant) plus the SCENARIO safely-managed path under
         // that pass's toggles+customs (`scenario_hh`). Grey base = pure BAU; each pass's scenario_hh gives
         // the extra SM its newly-added lever delivers (sm[p+1] − sm[p] for band p, in payload order).
-        const bauBase = secOf(results[0]).bau_hh[0];                 // pure BAU (same in every pass)
-        const sm = results.map((r: any) => secOf(r).scenario_hh[0]); // SM WITH the pass's levers
+        const bauBase = secOf(results[0]).bau_hh[rung];              // pure BAU (same in every pass)
+        const sm = results.map((r: any) => secOf(r).scenario_hh[rung]); // rung WITH the pass's levers
         const rows = years.map((y: number, i: number) => {
-          const row: any = { year: +y, 'BAU (safely managed)': +(+bauBase[i]).toFixed(4), 'Total households': +(+results[0].total_hh[i]).toFixed(4) };
+          const row: any = { year: +y, [baseKey]: +(+bauBase[i]).toFixed(4), 'Total households': +(+results[0].total_hh[i]).toFixed(4) };
           bandDefs.forEach(([, label], p) => { row[label] = Math.max(0, +(sm[p + 1][i] - sm[p][i]).toFixed(4)); });
           return row;
         });
@@ -109,7 +113,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
         const cum = (a: number[]) => (a || []).reduce((s: number, v: number) => s + (+v || 0), 0);
         setSummary({
           // Compare the full-scenario SM / gap against the PURE BAU (bau_hh / financing_gap).
-          endline: years[e], addHH: Math.max(0, (+full.scenario_hh[0][e]) - (+bau.bau_hh[0][e])),
+          endline: years[e], addHH: Math.max(0, (+full.scenario_hh[rung][e]) - (+bau.bau_hh[rung][e])),
           gapBau: cum(bau.financing_gap), gapIntv: cum(full.scenario_financing_gap),
           cur: inputs?.country_config?.currency || 'LCU',
         });
@@ -118,7 +122,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
     }, 350);
     return () => clearTimeout(h);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [depKey]);
+  }, [depKey, rung]);
 
   const sectorLabel = sector === 'water' ? 'Water Supply' : 'Sanitation';
   const chartRef = useRef<HTMLDivElement>(null);
@@ -131,7 +135,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
     return data.map((r: any) => {
       const tot = r['Total households'] || 0;
       const d = (v: number) => (tot > 0 ? (+v || 0) / tot : 0);
-      const o: any = { year: r.year, 'Total households': tot > 0 ? 1 : 0, 'BAU (safely managed)': d(r['BAU (safely managed)']) };
+      const o: any = { year: r.year, 'Total households': tot > 0 ? 1 : 0, [baseKey]: d(r[baseKey]) };
       bands.forEach(([, label]) => { o[label] = d(r[label]); });
       return o;
     });
@@ -139,21 +143,21 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
   const fmtAxis = (v: number) => (isShare ? Math.round(v * 100) + '%' : sig(v));
   const fmtVal = (v: number) => (isShare ? (v * 100).toFixed(1) + '%' : sig(v) + ' M');
   // Data series behind the chart, for the "⤓ Excel" export: Year, BAU base, each band, and the ceiling.
-  const exportHeaders = ['Year', 'BAU (safely managed)', ...bands.map(([, label]) => label), 'Total households'];
-  const exportRows = displayData.map((r: any) => [r.year, r['BAU (safely managed)'], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
+  const exportHeaders = ['Year', baseKey, ...bands.map(([, label]) => label), 'Total households'];
+  const exportRows = displayData.map((r: any) => [r.year, r[baseKey], ...bands.map(([, label]) => r[label] ?? 0), r['Total households']]);
   // Native Excel chart: grey BAU base + each contributing intervention band as stacked areas, ceiling as a line.
   const chartSpec = {
     category: 'Year', stacked: true,
-    areas: [{ name: 'BAU (safely managed)', color: C.bauFill }, ...bands.map(([, label, color]) => ({ name: label, color }))],
+    areas: [{ name: baseKey, color: C.bauFill }, ...bands.map(([, label, color]) => ({ name: label, color }))],
     lines: [{ name: 'Total households', color: C.total, dash: true }],
     yTitle: isShare ? '% of population' : '# households (millions)', xTitle: 'Year',
   };
-  const fileBase = `${scopeLabel ? scopeLabel + '_' : ''}${sector}_intervention_impact`;
+  const fileBase = `${scopeLabel ? scopeLabel + '_' : ''}${sector}_${rung === 0 ? 'sm' : 'basic'}_intervention_impact`;
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 6 }}>
         <h3 style={{ fontSize: 14, margin: 0, fontWeight: 600, color: '#1e3a5f' }}>
-          {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — intervention impact (live)
+          {scopeLabel ? scopeLabel + ' ' : ''}{sectorLabel} — {rungName} impact (live)
         </h3>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'inline-flex', border: '1px solid #cbd5e1', borderRadius: 6, overflow: 'hidden' }}>
@@ -170,12 +174,12 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
         </div>
       </div>
       <div style={{ fontSize: 10, color: '#334155', background: '#f1f5f9', padding: '4px 8px', borderRadius: 4, marginBottom: 8 }}>
-        Live engine output. The blue base is business-as-usual safely-managed coverage; each coloured band stacked on top is the extra coverage an enabled intervention delivers. Switch between absolute households and share of population above.
+        Live engine output. The blue base is business-as-usual {rungName} coverage; each coloured band stacked on top is the extra coverage an enabled intervention delivers. Switch between absolute households and share of population above.
       </div>
       {error && <div style={{ fontSize: 11, color: '#b91c1c', marginBottom: 8 }}>{error}</div>}
       {summary && (
         <div style={{ fontSize: 11.5, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderLeft: `3px solid ${C.scenario}`, borderRadius: 6, padding: '8px 12px', lineHeight: 1.55, marginBottom: 10 }}>
-          <b>Impact.</b> By {summary.endline}, the enabled interventions serve <b>{sig(summary.addHH)} M</b> more safely-managed households and cut the cumulative financing gap from <b>{sig(summary.gapBau)}</b> to <b>{sig(summary.gapIntv)} M {summary.cur}</b>
+          <b>Impact.</b> By {summary.endline}, the enabled interventions serve <b>{sig(summary.addHH)} M</b> more {rungName} households and cut the cumulative financing gap from <b>{sig(summary.gapBau)}</b> to <b>{sig(summary.gapIntv)} M {summary.cur}</b>
           {summary.gapBau > 0 && <> (a <b>{Math.round((1 - summary.gapIntv / summary.gapBau) * 100)}%</b> reduction)</>}.
         </div>
       )}
@@ -197,7 +201,7 @@ export default function LiveInterventionChart({ inputs, sector, scopeLabel }: {
               the hue. Stroke stays the band colour (not white) because recharts derives the legend
               swatch from stroke; the CVD-validated palette (see chartColors) carries identity, and
               the always-present legend is the secondary encoding. */}
-          <Area type="monotone" dataKey="BAU (safely managed)" stackId="s" fill={C.bauFill} stroke={C.bau} fillOpacity={0.7} strokeWidth={1.5} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
+          <Area type="monotone" dataKey={baseKey} stackId="s" fill={C.bauFill} stroke={C.bau} fillOpacity={0.7} strokeWidth={1.5} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           {bands.map(([k, label, color]) => (
             <Area key={k} type="monotone" dataKey={label} stackId="s" fill={color} stroke={color} fillOpacity={0.6} strokeWidth={1.75} strokeOpacity={1} legendType="rect" isAnimationActive animationDuration={600} animationEasing="ease-out" />
           ))}

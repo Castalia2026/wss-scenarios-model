@@ -235,6 +235,7 @@ def affordability_close(bracket_gap, cost_sm, *, pct_income, interest, tenor, pa
 def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_basic,
                full_budget, capex_pct, growth_capex_pct, planned_list, nonhh_pct, asset_life, capex_adder,
                hist_all_proportional, target_adjusted, execution_rate=1.0,
+               basic_share=0.0, cost_factor_basic=None,
                targets=None, budget_source='pct_gdp', budget_override=None, gdp_real=None,
                hist_series=None, first_year_idx=0, cost_factor=None,
                capeff_enabled=False, capeff_start=0, capeff_target_year=0,
@@ -281,7 +282,13 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     if cf.shape[0] < n:
         cf = np.concatenate([cf, np.ones(n - cf.shape[0])])
     cost_sm_t = cost_sm * cf[:n]
-    cost_basic_t = cost_basic * cf[:n]
+    # Basic carries its OWN factor. `cf` includes an SM-specific technology-mix ratio, so applying it to
+    # basic would price basic off the safely-managed mix. Falls back to `cf` only when no basic factor is
+    # supplied, which keeps the pre-split behaviour identical.
+    cfb = cf if cost_factor_basic is None else np.asarray(cost_factor_basic, dtype=float)
+    if cfb.shape[0] < n:
+        cfb = np.concatenate([cfb, np.ones(n - cfb.shape[0])])
+    cost_basic_t = cost_basic * cfb[:n]
     # Extra per-year capex cash (LC millions) injected into `avail` — a caller-supplied revenue stream on
     # top of the sector's own levers (used by sanitation for the water-NRW-linked sewer revenue). Defaults
     # to all-0.0, so the BAU pass and every other sector are untouched. Only added in the forecast loop.
@@ -595,7 +602,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
     depr = 1.0 / asset_life
     hh_share = 1.0 - nonhh_pct
     tgt_unadj = np.zeros((5, n)); tgt = np.zeros((5, n))
-    hh_gap = np.zeros(n); new_capex_total = np.zeros(n); stock = np.zeros(n)
+    hh_gap = np.zeros(n); hh_gap_basic = np.zeros(n); new_capex_total = np.zeros(n); stock = np.zeros(n)
     replacement = np.zeros(n); total_need = np.zeros(n); financing_gap = np.zeros(n)
     # BAU's OWN asset stock + its depreciation, kept SEPARATE from `stock` (which accumulates the
     # target-gap capex nc_total). The BAU 4a replacement depreciates THIS, so the BAU counterfactual
@@ -649,7 +656,27 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         # fixing costs exceed the water's value that year (drawn from the BAU budget first) and positive
         # later (surplus funds new connections). All the lever terms are 0 when their lever is off.
         avail = bau_available[t] + collection_cash[t] + tariff_cash[t] + nrw_net[t] + extra_cash_arr[t]
-        new_sm = max(0.0, avail - bau_replacement[t]) * hh_share / cost_sm_t[t] if cost_sm_t[t] > 0 else 0.0
+        # ── Investment split (test2) ───────────────────────────────────────────────────────────────────
+        # Replacement is funded first, then the remainder is split: `basic_share` buys BASIC service for
+        # households at limited-and-below, the rest buys SAFELY MANAGED for households at basic-and-below.
+        # Both flows are drawn from the PRIOR year's counts, so a household cannot climb two rungs and be
+        # paid for twice in one year. Money whose source pool is exhausted rolls over to the other rung.
+        # basic_share = 0 is the default and reproduces the pre-split single-purchase behaviour exactly.
+        invest = max(0.0, avail - bau_replacement[t]) * hh_share
+        bs = float(np.clip(basic_share, 0.0, 1.0))
+        pool_basic = max(0.0, bau[1, t - 1])                            # eligible for a safely-managed upgrade
+        pool_lower = sum(max(0.0, bau[r, t - 1]) for r in LOWER)        # eligible for a basic upgrade
+        money_basic, money_sm = invest * bs, invest * (1.0 - bs)
+        new_basic = money_basic / cost_basic_t[t] if cost_basic_t[t] > 0 else 0.0
+        if new_basic > pool_lower:                                      # basic pool dry → roll the rest to SM
+            money_sm += (new_basic - pool_lower) * cost_basic_t[t]
+            new_basic = pool_lower
+        new_sm = money_sm / cost_sm_t[t] if cost_sm_t[t] > 0 else 0.0
+        if new_sm > pool_basic:                                         # SM pool dry → roll back to basic
+            spare = (new_sm - pool_basic) * cost_sm_t[t]
+            new_sm = pool_basic
+            room = max(0.0, pool_lower - new_basic)
+            new_basic += min(room, (spare / cost_basic_t[t]) if cost_basic_t[t] > 0 else 0.0)
         nrw_upg = nrw_upgrade_cum[t] - nrw_upgrade_cum[t - 1]          # water-enabled basic→SM upgrades this year
         budget_sm = budget_sm + new_sm + nrw_upg                      # SM from the budget + NRW only (no levers)
         if nrw_enabled:
@@ -694,15 +721,29 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         # Total SM = budget + microfinance/grant connections (self-financers are ISOLATED, not added). Capped at
         # the SM target; the cap only engages when NRW or the lever is active so the pure-BAU pass is unchanged.
         sm_total = budget_sm + mf_cum + grant_cum
-        unadj[0] = min(sm_total, sm_cap[t]) if (nrw_enabled or afford_enabled) else sm_total
-        for r in range(1, 5):
-            unadj[r] = unadj[r] * (1.0 + cagr[r])                      # r37-40: prior unadj × (1+CAGR)
-        total_unadj = sum(unadj)                                       # r41
-        scale = total_hh[t] / total_unadj if total_unadj > 0 else 0.0  # r43/r41
-        for r in LOWER:                                                # r47-49 = unadj × (r43/r41)
-            bau[r, t] = unadj[r] * scale
-        bau[0, t] = unadj[0]                                           # r45 SM = unadj
-        bau[1, t] = total_hh[t] - unadj[0] - sum(bau[r, t] for r in LOWER)  # r46 Basic = plug
+        sm_level = min(sm_total, sm_cap[t]) if (nrw_enabled or afford_enabled) else sm_total
+        if True:
+            # ── Explicit named flows ───────────────────────────────────────────────────────────────────
+            # Households move between NAMED rungs instead of being redistributed by a proportional squeeze.
+            # The safely-managed flow is read off the level change, so every lever that raises SM (budget,
+            # NRW upgrades, microfinance, grants) is carried through automatically. Basic gains what was
+            # bought for it and loses what moved up to safely managed. The three lower rungs give up the
+            # basic purchases pro rata, then absorb the residual (population growth) in the same
+            # proportions, which is what keeps the five rungs summing to total households.
+            sm_flow = max(0.0, sm_level - bau[0, t - 1])
+            prev_lower = [max(0.0, bau[r, t - 1]) for r in LOWER]
+            psum = sum(prev_lower)
+            for j, r in enumerate(LOWER):
+                bau[r, t] = prev_lower[j] - new_basic * ((prev_lower[j] / psum) if psum > 0 else 0.0)
+            bau[0, t] = sm_level
+            bau[1, t] = max(0.0, bau[1, t - 1] + new_basic - sm_flow)
+            resid = total_hh[t] - (bau[0, t] + bau[1, t] + sum(bau[r, t] for r in LOWER))
+            lsum = sum(bau[r, t] for r in LOWER)
+            for j, r in enumerate(LOWER):
+                share = (bau[r, t] / lsum) if lsum > 0 else (1.0 / len(LOWER))
+                bau[r, t] = max(0.0, bau[r, t] + resid * share)
+            for r in range(5):
+                unadj[r] = bau[r, t]                                   # keep the unadjusted vector in step
         # BAU stock roll-forward (final workbook C|Urban Water r29 = X29 + budget − replacement): the
         # existing stock DEPRECIATES and the FULL capex budget is added each year — so an underfunded
         # sector (budget < replacement) sees the stock, and next year's replacement, DECLINE. Independent
@@ -725,7 +766,20 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
                 for k in range(1, len(bpoints)):
                     (y0, c0), (y1, c1) = bpoints[k - 1], bpoints[k]
                     dy = y1 - y0
-                    seg_cagr.append([((c1[r] / c0[r]) ** (1.0 / dy) - 1.0) if (c0[r] > 0 and c1[r] > 0 and dy > 0) else 0.0 for r in range(5)])
+                    # A target SHARE of 0 means the rung empties by that year. The old guard required
+                    # c1 > 0 and silently HELD the rung at its previous level instead, which left a
+                    # phantom target (e.g. a basic target of 0% still reporting households) and let the
+                    # five target rungs sum to more than the population. Decay toward a negligible floor
+                    # so the rung lands at effectively zero and the remainder flows to the rungs the
+                    # target actually asks for.
+                    row = []
+                    for r in range(5):
+                        if dy <= 0 or c0[r] <= 0:
+                            row.append(0.0)
+                        else:
+                            c1r = c1[r] if c1[r] > 0 else c0[r] * 1e-9
+                            row.append((c1r / c0[r]) ** (1.0 / dy) - 1.0)
+                    seg_cagr.append(row)
             seg = next((k for k, ty in enumerate(tgt_years) if years[t] <= ty), len(tgt_years) - 1)
             chosen = seg_cagr[seg]
             for r in range(5):
@@ -736,10 +790,10 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
             else:
                 # Adjusted block: SM = unadjusted, Basic = plug (or total−SM when the lower rungs hit 0),
                 # lower rungs = (total − SM − Basic) × prior-year adjusted lower shares.
-                sm = tgt_unadj[0, t]
+                sm = min(tgt_unadj[0, t], total_hh[t])
                 rest = sum(tgt_unadj[r, t] for r in range(1, 5))
-                basic = (total_hh[t] - sm) if rest == 0.0 else tgt_unadj[1, t]
-                remaining = total_hh[t] - sm - basic
+                basic = (total_hh[t] - sm) if rest == 0.0 else min(tgt_unadj[1, t], total_hh[t] - sm)
+                remaining = max(0.0, total_hh[t] - sm - basic)
                 prior_lower = [tgt[r, t - 1] for r in LOWER]
                 psum = sum(prior_lower)
                 for j, r in enumerate(LOWER):
@@ -748,7 +802,12 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
 
         # 4d — investment need & financing gap (formulas UNCHANGED; only the BAU inputs differ)
         gap = max(0.0, tgt[0, t] - bau[0, t]); hh_gap[t] = gap
-        nc_hh = (gap * cost_sm_t[t] + capex_adder) if gap > 0 else 0.0
+        # Basic is a costed objective once investment can be directed to it, so the investment need prices
+        # the basic shortfall at the basic unit cost alongside the safely-managed one. Under a 100%
+        # safely-managed target the basic gap is zero, so this term vanishes and the pre-split numbers hold.
+        gap_b = max(0.0, tgt[1, t] - bau[1, t]); hh_gap_basic[t] = gap_b
+        nc_hh = ((gap * cost_sm_t[t] + gap_b * cost_basic_t[t] + capex_adder)
+                 if (gap > 0 or gap_b > 0) else 0.0)
         nc_total = nc_hh * (1.0 + nonhh_mult); new_capex_total[t] = nc_total
         booked = opening_stock if years[t] == by else 0.0
         stock[t] = booked + prior_stock + nc_total
@@ -799,6 +858,7 @@ def sector_bau(ctx, *, period, pct_start, pct_base, tgt1, tgt2, cost_sm, cost_ba
         'target_hh': tgt.tolist(),
         'opening_stock': opening_stock,
         'household_gap': hh_gap.tolist(),
+        'household_gap_basic': hh_gap_basic.tolist(),
         'new_capex_total': new_capex_total.tolist(),
         'replacement_capex': replacement.tolist(),
         'bau_replacement_capex': bau_replacement.tolist(),
@@ -844,6 +904,19 @@ def calculate_water_supply(inputs, ctx):
         techmix_on=techmix_on,
         techmix_start=int(getattr(nrw, 'techmix_start_year', 0) or 0),
         techmix_sm_cost=float(getattr(nrw, 'techmix_sm_cost', 0.0) or 0.0))
+    # Basic gets its own factor: the same capex-efficiency discount (a procurement gain applies to both
+    # rungs) but the basic rung's OWN technology-mix step, priced off the basic base cost.
+    cost_basic_base = cost_no_treatment(wc)
+    cost_factor_basic = build_cost_factor(
+        ctx, inputs.period, cost_basic_base,
+        costeff_on=costeff_on,
+        costeff_start=int(getattr(nrw, 'costeff_start_year', 0) or 0),
+        costeff_target_year=int(getattr(nrw, 'costeff_target_year', 0) or 0),
+        costeff_current=float(getattr(nrw, 'costeff_current_pct', 0.0) or 0.0),
+        costeff_target=float(getattr(nrw, 'costeff_target_pct', 0.0) or 0.0),
+        techmix_on=techmix_on,
+        techmix_start=int(getattr(nrw, 'techmix_start_year', 0) or 0),
+        techmix_sm_cost=float(getattr(nrw, 'techmix_basic_cost', 0.0) or 0.0))
     # Custom interventions (water + 'both'): new-revenue net cash → extra_cash; cost-reduction → cost factor.
     cust_cash, cust_cf = custom_streams(ctx, inputs.period, cost_sm,
                                         getattr(inputs, 'custom_interventions', None) or [], 'water')
@@ -878,6 +951,8 @@ def calculate_water_supply(inputs, ctx):
         targets=_target_points(wt, inputs.period),
         cost_sm=cost_sm, cost_basic=cost_no_treatment(wc),
         cost_factor=cost_factor,                               # test2: capex-efficiency + optimised-technology + custom cost cuts
+        cost_factor_basic=cost_factor_basic * cust_cf,
+        basic_share=float(getattr(nrw, 'basic_share', 0.0) or 0.0),
         extra_cash=cust_cash,                                  # custom new-revenue net cash → water capex
         full_budget=full_budget, capex_pct=ws_capex,
         growth_capex_pct=ws_capex,                             # water 4a uses the water CAPEX budget (I!326)

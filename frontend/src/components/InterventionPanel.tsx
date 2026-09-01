@@ -109,29 +109,58 @@ function InterventionToggle({ label, checked, onChange, children, onFocus }: {
 // from the BAU mix). Its weighted cost becomes the new SM service cost from the start year onward. Only
 // the SM cost drives new service in the engine, so this is the SM mix only. The mix lives in the payload
 // (techmix_sm_tech_mix); the adapter collapses it to techmix_sm_cost. Equal to the BAU mix ⇒ zero effect.
-function TechMixEditor({ inputs, onChange, section, CUR }: {
-  inputs: any; onChange: (i: any) => void; section: 'water_interventions' | 'sanitation_interventions'; CUR: string;
+// Share of NEW investment (after replacement) directed at BASIC service. The remainder buys safely
+// managed service. Both fields edit the same underlying number, so they always total 100%.
+function SplitControl({ inputs, onChange, section, sector }: {
+  inputs: any; onChange: (i: any) => void; section: 'water_interventions' | 'sanitation_interventions'; sector: string;
 }) {
   const iv = inputs[section] || {};
-  const costsSection = section === 'water_interventions' ? 'water_costs' : 'sanitation_costs';
-  const bauMix: any[] = (inputs[costsSection]?.sm_tech_mix || []).filter((t: any) => t && typeof t === 'object');
-  const mix: any[] = (iv.techmix_sm_tech_mix || []).filter((t: any) => t && typeof t === 'object');
+  const basic = Math.round(((+iv.basic_share || 0) * 1000)) / 10;      // percent, 1dp
+  const sm = Math.round((100 - basic) * 10) / 10;
+  const setBasic = (pct: number) => {
+    const v = Math.min(100, Math.max(0, isFinite(pct) ? pct : 0));
+    onChange({ ...inputs, [section]: { ...iv, basic_share: v / 100 } });
+  };
+  const cell: React.CSSProperties = { padding: '4px 6px', border: '1px solid #93C5FD', background: '#EFF6FF', borderRadius: 3, fontSize: 12, color: '#1E3A5F', outline: 'none', width: 66 };
+  return (
+    <div style={{ border: '1px solid #bfdbfe', background: '#f8fbff', borderRadius: 6, padding: '8px 11px', marginBottom: 12 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, color: '#1e3a5f', marginBottom: 3 }}>Investment split by service level</div>
+      <div style={{ fontSize: 10.5, color: '#475569', marginBottom: 7, lineHeight: 1.5 }}>
+        How new {sector} investment is divided once replacement is funded. The safely-managed share upgrades
+        households from basic and below; the basic share upgrades households from limited and below. Each is
+        bought at its own unit cost. The default sends everything to safely managed.
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+          Safely managed
+          <NumInput style={cell} value={sm} onValue={v => setBasic(100 - (v ?? 0))} /> %
+        </label>
+        <label style={{ fontSize: 11, color: '#334155', display: 'flex', alignItems: 'center', gap: 6 }}>
+          Basic
+          <NumInput style={cell} value={basic} onValue={v => setBasic(v ?? 0)} /> %
+        </label>
+        <input type="range" min={0} max={100} step={1} value={basic} onChange={e => setBasic(+e.target.value)}
+          style={{ flex: 1, minWidth: 140, accentColor: '#2563eb' }} title="Drag to shift investment toward basic service" />
+      </div>
+    </div>
+  );
+}
+
+function MixTable({ mix, bauMix, setMix, CUR, rungLabel }: {
+  mix: any[]; bauMix: any[]; setMix: (m: any[]) => void; CUR: string; rungLabel: string;
+}) {
   const weighted = (m: any[]) => m.reduce((a: number, t: any) => a + (+t.share || 0) * (+t.cost || 0), 0);
   const bauCost = weighted(bauMix), newCost = weighted(mix);
   const shareSum = mix.reduce((a: number, t: any) => a + (+t.share || 0), 0);
   const okShare = Math.abs(shareSum - 1) < 0.001;
   const pct = bauCost > 0 ? (newCost / bauCost - 1) * 100 : 0;
-  const setMix = (m: any[]) => onChange({ ...inputs, [section]: { ...iv, techmix_sm_tech_mix: m } });
   const upd = (i: number, patch: any) => setMix(mix.map((x: any, j: number) => j === i ? { ...x, ...patch } : x));
   const cellStyle: React.CSSProperties = { padding: '4px 6px', border: '1px solid #F0D070', background: '#FFF9E6', borderRadius: 3, fontSize: 11, color: '#3A4452', outline: 'none' };
   return (
-    <div style={{ gridColumn: '1 / -1' }}>
-      <div style={{ maxWidth: 160 }}>
-        <F label="Improvement start year" value={iv.techmix_start_year} onChange={v => onChange({ ...inputs, [section]: { ...iv, techmix_start_year: v } })}
-          tip="Year the re-modelled technology mix takes effect. From this year on, new safely-managed service uses the mix below; earlier years keep the BAU mix." />
-      </div>
-      <div style={{ fontSize: 11, color: '#475569', margin: '8px 0 4px' }}>
-        Re-weight or re-cost the <b>safely-managed</b> technology mix (pre-filled from your BAU mix). Its weighted cost becomes the new safely-managed service cost from the start year — cheaper service lets the same budget reach more households.
+    <div style={{ marginTop: 10 }}>
+      <div style={{ fontSize: 11, color: '#475569', marginBottom: 4 }}>
+        Re-weight or re-cost the <b>{rungLabel}</b> technology mix (pre-filled from your BAU mix). Its weighted
+        cost becomes the new {rungLabel} service cost from the start year.
       </div>
       <table style={{ borderCollapse: 'collapse', fontSize: 11 }}>
         <thead><tr style={{ color: '#64748b' }}><th style={{ textAlign: 'left', padding: '2px 6px' }}>technology</th><th>share %</th><th>cost/HH</th><th></th></tr></thead>
@@ -160,9 +189,31 @@ function TechMixEditor({ inputs, onChange, section, CUR }: {
         Shares total {(shareSum * 100).toFixed(2)}%{okShare ? '' : ' (they must total 100%)'}.
       </div>
       <div style={{ fontSize: 11, color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 4, padding: '5px 9px', marginTop: 4 }}>
-        New safely-managed service cost: <b>{Math.round(newCost).toLocaleString()} {CUR}</b> vs BAU <b>{Math.round(bauCost).toLocaleString()} {CUR}</b>{' '}
-        (<b style={{ color: pct < 0 ? '#16a34a' : pct > 0 ? '#b45309' : '#64748b' }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</b>). Applied from {iv.techmix_start_year || 'the start year'}.
+        New {rungLabel} service cost: <b>{Math.round(newCost).toLocaleString()} {CUR}</b> vs BAU <b>{Math.round(bauCost).toLocaleString()} {CUR}</b>{' '}
+        (<b style={{ color: pct < 0 ? '#16a34a' : pct > 0 ? '#b45309' : '#64748b' }}>{pct >= 0 ? '+' : ''}{pct.toFixed(1)}%</b>).
       </div>
+    </div>
+  );
+}
+
+// Both rungs are purchased once investment can be split between them, so the lever re-costs BOTH mixes.
+function TechMixEditor({ inputs, onChange, section, CUR }: {
+  inputs: any; onChange: (i: any) => void; section: 'water_interventions' | 'sanitation_interventions'; CUR: string;
+}) {
+  const iv = inputs[section] || {};
+  const costsSection = section === 'water_interventions' ? 'water_costs' : 'sanitation_costs';
+  const clean = (a: any) => (a || []).filter((t: any) => t && typeof t === 'object');
+  const set = (key: string) => (m: any[]) => onChange({ ...inputs, [section]: { ...iv, [key]: m } });
+  return (
+    <div style={{ gridColumn: '1 / -1' }}>
+      <div style={{ maxWidth: 160 }}>
+        <F label="Improvement start year" value={iv.techmix_start_year} onChange={v => onChange({ ...inputs, [section]: { ...iv, techmix_start_year: v } })}
+          tip="Year the re-modelled technology mixes take effect. From this year on, new service uses the mixes below; earlier years keep the BAU mixes." />
+      </div>
+      <MixTable rungLabel="safely-managed" CUR={CUR}
+        mix={clean(iv.techmix_sm_tech_mix)} bauMix={clean(inputs[costsSection]?.sm_tech_mix)} setMix={set('techmix_sm_tech_mix')} />
+      <MixTable rungLabel="basic" CUR={CUR}
+        mix={clean(iv.techmix_basic_tech_mix)} bauMix={clean(inputs[costsSection]?.basic_tech_mix)} setMix={set('techmix_basic_tech_mix')} />
     </div>
   );
 }
@@ -322,6 +373,10 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {/* ===== WATER SUPPLY INTERVENTIONS ===== */}
         {sectorTab === 'water' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Water Supply Interventions</h3>
+          {/* Investment split: a scenario-wide assumption, not a toggled lever, so it has no checkbox
+              and it moves the BAU curve too. Default 100% safely managed reproduces the old model. */}
+          <SplitControl inputs={inputs} onChange={onChange} section="water_interventions" sector="water supply" />
+
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.ws_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('ws_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('ws_ce')}>
             <F label="Improvement start year" value={inputs.water_interventions.ce_start_year} onChange={v => u('water_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />
@@ -408,6 +463,10 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
         {/* ===== SANITATION INTERVENTIONS ===== */}
         {sectorTab === 'sanitation' && <>
           <h3 style={{ fontSize: 14, fontWeight: 700, color: '#1e3a5f', marginBottom: 10 }}>{scopeLabel} Sanitation Interventions</h3>
+          {/* Investment split: a scenario-wide assumption, not a toggled lever, so it has no checkbox
+              and it moves the BAU curve too. Default 100% safely managed reproduces the old model. */}
+          <SplitControl inputs={inputs} onChange={onChange} section="sanitation_interventions" sector="sanitation" />
+
 
           <InterventionToggle label="Collection efficiency" checked={inputs.toggles?.san_collection_efficiency_enabled ?? false} onChange={v => toggleIntv('san_collection_efficiency_enabled', v)} onFocus={() => onSectionFocus?.('san_ce')}>
             <F label="Improvement start year" value={inputs.sanitation_interventions.ce_start_year} onChange={v => u('sanitation_interventions','ce_start_year',v)} tip="Year the collection efficiency improvement begins" />
@@ -592,7 +651,9 @@ export default function InterventionPanel({ inputs, onChange, results, sectorTab
           {/* Excel / CSV only — the slide deck belongs to the finished scenario, so it lives on Results. */}
           <ExportButtons inputs={inputs} pptx={false} />
         </div>
-        <LiveInterventionChart inputs={inputs} sector={sectorTab} scopeLabel={scopeLabel} />
+        <LiveInterventionChart inputs={inputs} sector={sectorTab} scopeLabel={scopeLabel} rung={0} />
+        <div style={{ height: 18 }} />
+        <LiveInterventionChart inputs={inputs} sector={sectorTab} scopeLabel={scopeLabel} rung={1} />
       </div>
     </div>
   );

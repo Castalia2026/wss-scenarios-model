@@ -43,6 +43,18 @@ def calculate_sanitation(inputs, ctx, nrw_recovered_vol=None):
         techmix_on=san_techmix_on,
         techmix_start=int(getattr(si, 'techmix_start_year', 0) or 0),
         techmix_sm_cost=float(getattr(si, 'techmix_sm_cost', 0.0) or 0.0))
+    # Basic rung's own cost factor: shared capex-efficiency discount, basic's own technology-mix step.
+    cost_basic_base = cost_no_treatment(sc)
+    cost_factor_basic = build_cost_factor(
+        ctx, inputs.period, cost_basic_base,
+        costeff_on=san_costeff_on,
+        costeff_start=int(getattr(si, 'costeff_start_year', 0) or 0),
+        costeff_target_year=int(getattr(si, 'costeff_target_year', 0) or 0),
+        costeff_current=float(getattr(si, 'costeff_current_pct', 0.0) or 0.0),
+        costeff_target=float(getattr(si, 'costeff_target_pct', 0.0) or 0.0),
+        techmix_on=san_techmix_on,
+        techmix_start=int(getattr(si, 'techmix_start_year', 0) or 0),
+        techmix_sm_cost=float(getattr(si, 'techmix_basic_cost', 0.0) or 0.0))
     # NRW-linked sanitation revenue: recovered physical water → wastewater the sewer charges for. revenue
     # (LC millions/yr) = recovered_vol(M m³/yr) × return_ratio × sewer_charge(LC/m³) × collection_rate,
     # injected into sanitation capex (extra_cash) → more SM connections. Gated by san_nrw_link_enabled and,
@@ -90,6 +102,8 @@ def calculate_sanitation(inputs, ctx, nrw_recovered_vol=None):
         targets=_target_points(st, inputs.period),
         cost_sm=cost_sm, cost_basic=cost_no_treatment(sc),
         cost_factor=cost_factor,                               # test2: capex-efficiency + optimised-technology SM cost discount
+        cost_factor_basic=cost_factor_basic * cust_cf,
+        basic_share=float(getattr(si, 'basic_share', 0.0) or 0.0),
         full_budget=full_budget, capex_pct=san_capex,
         growth_capex_pct=1.0,   # sanitation 4a SM growth uses the sanitation capex budget (I!333)
         hist_all_proportional=False,  # sanitation history I!193-197 = SM kept / Basic plug / lower proportional
