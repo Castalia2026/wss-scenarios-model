@@ -8,5 +8,6 @@ refernce/
 # Word lock files
 ~$*
 
-# doc tooling deps
-tools/node_modules/
+# node deps (frontend build deps, doc tooling) - never committed;
+# the deployed app is served from the prebuilt bundle in static/
+node_modules/
